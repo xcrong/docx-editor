@@ -20,7 +20,13 @@ import type {
   ImageRun,
 } from '../layout-engine/types';
 import type { RenderContext } from './renderPage';
-import { isFloatingImageRun, isTextWrappingFloatingImageRun, emuToPixels } from './renderPage';
+import {
+  isFloatingImageRun,
+  emuToPixels,
+  floatingImageWrapsText,
+  floatingImageIsBehindDoc,
+  renderFloatingImagesLayer,
+} from './renderPage';
 import { renderParagraphFragment } from './renderParagraph';
 import { measureParagraph, type FloatingImageZone } from '../layout-bridge/measuring';
 
@@ -61,8 +67,8 @@ interface CellFloatingImage {
   distRight: number;
   /** OOXML wrapText: which side(s) TEXT flows on */
   wrapText?: 'bothSides' | 'left' | 'right' | 'largest';
-  affectsTextWrap: boolean;
-  behindDoc: boolean;
+  /** Wrap type (square, tight, through, behind, inFront) */
+  wrapType?: string;
   pmStart?: number;
   pmEnd?: number;
 }
@@ -166,8 +172,7 @@ function extractCellFloatingImages(
         distLeft,
         distRight,
         wrapText,
-        affectsTextWrap: isTextWrappingFloatingImageRun(imgRun),
-        behindDoc: imgRun.wrapType === 'behind',
+        wrapType: imgRun.wrapType,
         pmStart: imgRun.pmStart,
         pmEnd: imgRun.pmEnd,
       });
@@ -207,37 +212,42 @@ function renderCellContent(
   // Build floating zones for measurement and render floating layer
   let floatingZones: FloatingImageZone[] | undefined;
   if (cellFloatingImages.length > 0) {
-    floatingZones = cellFloatingImages
-      .filter((img) => img.affectsTextWrap)
-      .map((img) => {
-        const rectRight = img.x + img.width + img.distRight;
-        const rectTop = img.y - img.distTop;
-        const rectBottom = img.y + img.height + img.distBottom;
+    floatingZones = cellFloatingImages.filter(floatingImageWrapsText).map((img) => {
+      const rectRight = img.x + img.width + img.distRight;
+      const rectTop = img.y - img.distTop;
+      const rectBottom = img.y + img.height + img.distBottom;
 
-        let leftMargin = 0;
-        let rightMargin = 0;
-        // Use wrapText to determine which side text flows on (same as rectsToFloatingZones in renderPage.ts)
-        const wt = img.wrapText ?? 'bothSides';
-        if (wt === 'right') {
-          // Text flows on RIGHT only -> image blocks the left side
+      let leftMargin = 0;
+      let rightMargin = 0;
+      // Use wrapText to determine which side text flows on (same as rectsToFloatingZones in renderPage.ts)
+      const wt = img.wrapText ?? 'bothSides';
+      if (wt === 'right') {
+        // Text flows on RIGHT only -> image blocks the left side
+        leftMargin = rectRight;
+      } else if (wt === 'left') {
+        // Text flows on LEFT only -> image blocks the right side
+        rightMargin = contentWidth - (img.x - img.distLeft);
+      } else {
+        // bothSides / largest: use image position to determine which side it blocks
+        if (img.side === 'left') {
           leftMargin = rectRight;
-        } else if (wt === 'left') {
-          // Text flows on LEFT only -> image blocks the right side
-          rightMargin = contentWidth - (img.x - img.distLeft);
         } else {
-          // bothSides / largest: use image position to determine which side it blocks
-          if (img.side === 'left') {
-            leftMargin = rectRight;
-          } else {
-            rightMargin = contentWidth - (img.x - img.distLeft);
-          }
+          rightMargin = contentWidth - (img.x - img.distLeft);
         }
-        return { leftMargin, rightMargin, topY: rectTop, bottomY: rectBottom };
-      });
+      }
+      return { leftMargin, rightMargin, topY: rectTop, bottomY: rectBottom };
+    });
 
-    const behindFloatingImages = cellFloatingImages.filter((img) => img.behindDoc);
+    const behindFloatingImages = cellFloatingImages.filter(floatingImageIsBehindDoc);
     if (behindFloatingImages.length > 0) {
-      contentEl.appendChild(renderCellFloatingImagesLayer(behindFloatingImages, doc, 'behind'));
+      contentEl.appendChild(
+        renderFloatingImagesLayer(behindFloatingImages, doc, {
+          layerClass: 'layout-cell-floating-images-layer',
+          itemClass: 'layout-cell-floating-image',
+          sizing: 'fullSize',
+          layerMode: 'behind',
+        })
+      );
     }
   }
 
@@ -316,54 +326,19 @@ function renderCellContent(
     contentEl.style.paddingBottom = `${previousParagraphAfter}px`;
   }
 
-  const frontFloatingImages = cellFloatingImages.filter((img) => !img.behindDoc);
+  const frontFloatingImages = cellFloatingImages.filter((img) => !floatingImageIsBehindDoc(img));
   if (frontFloatingImages.length > 0) {
-    contentEl.appendChild(renderCellFloatingImagesLayer(frontFloatingImages, doc, 'front'));
+    contentEl.appendChild(
+      renderFloatingImagesLayer(frontFloatingImages, doc, {
+        layerClass: 'layout-cell-floating-images-layer',
+        itemClass: 'layout-cell-floating-image',
+        sizing: 'fullSize',
+        layerMode: 'front',
+      })
+    );
   }
 
   return contentEl;
-}
-
-function renderCellFloatingImagesLayer(
-  cellFloatingImages: CellFloatingImage[],
-  doc: Document,
-  layerMode: 'front' | 'behind'
-): HTMLElement {
-  const floatingLayer = doc.createElement('div');
-  floatingLayer.className = 'layout-cell-floating-images-layer';
-  floatingLayer.style.position = 'absolute';
-  floatingLayer.style.top = '0';
-  floatingLayer.style.left = '0';
-  floatingLayer.style.width = '100%';
-  floatingLayer.style.height = '100%';
-  floatingLayer.style.pointerEvents = 'none';
-  if (layerMode === 'front') {
-    floatingLayer.style.zIndex = '10';
-  }
-  floatingLayer.style.overflow = 'hidden';
-
-  for (const img of cellFloatingImages) {
-    const imgContainer = doc.createElement('div');
-    imgContainer.className = 'layout-cell-floating-image';
-    imgContainer.style.position = 'absolute';
-    imgContainer.style.left = `${img.x}px`;
-    imgContainer.style.top = `${img.y}px`;
-    imgContainer.style.pointerEvents = 'auto';
-    if (img.pmStart !== undefined) imgContainer.dataset.pmStart = String(img.pmStart);
-    if (img.pmEnd !== undefined) imgContainer.dataset.pmEnd = String(img.pmEnd);
-
-    const imgEl = doc.createElement('img');
-    imgEl.src = img.src;
-    imgEl.style.width = `${img.width}px`;
-    imgEl.style.height = `${img.height}px`;
-    imgEl.style.display = 'block';
-    if (img.alt) imgEl.alt = img.alt;
-    if (img.transform) imgEl.style.transform = img.transform;
-    imgContainer.appendChild(imgEl);
-    floatingLayer.appendChild(imgContainer);
-  }
-
-  return floatingLayer;
 }
 
 /**

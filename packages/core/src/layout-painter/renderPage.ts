@@ -36,6 +36,7 @@ import { borderToStyle } from '../utils/formatToStyle';
 import type { Theme } from '../types/document';
 import { measureParagraph, type FloatingImageZone } from '../layout-bridge/measuring';
 import { resolveFontFamily } from '../utils/fontResolver';
+import { isFloatingWrapType, isWrapNone, wrapsAroundText } from '../docx/wrapTypes';
 
 /**
  * Page-level floating image that has been extracted from paragraphs.
@@ -66,10 +67,24 @@ interface PageFloatingImage {
   wrapText?: 'bothSides' | 'left' | 'right' | 'largest';
   /** Wrap type (square, tight, through, topAndBottom) */
   wrapType?: string;
-  /** Whether this image should reserve text wrap space */
-  affectsTextWrap: boolean;
-  /** Whether this image should paint behind text */
-  behindDoc: boolean;
+}
+
+/**
+ * Whether a floating image record reserves space in the text-wrap calculation.
+ * Operates on any record that carries `wrapType`; centralises the predicate so
+ * page-level and cell-level layers agree. Records reaching this predicate have
+ * already passed `isFloatingImageRun`, so `wrapType=undefined` implies a `cssFloat`-driven float
+ * — those wrap text by default.
+ *
+ * @internal
+ */
+export function floatingImageWrapsText(img: { wrapType?: string }): boolean {
+  return !isWrapNone(img.wrapType) && img.wrapType !== 'topAndBottom';
+}
+
+/** @internal */
+export function floatingImageIsBehindDoc(img: { wrapType?: string }): boolean {
+  return img.wrapType === 'behind';
 }
 
 /**
@@ -472,20 +487,9 @@ export function emuToPixels(emu: number | undefined): number {
  * Check if an image run is a floating image (should be positioned at page level)
  */
 export function isFloatingImageRun(run: ImageRun): boolean {
-  const wrapType = run.wrapType;
-  const displayMode = run.displayMode;
-
-  // Floating images have specific wrap types that allow text to flow around them
-  if (wrapType && ['square', 'tight', 'through', 'behind', 'inFront'].includes(wrapType)) {
-    return true;
-  }
-
+  if (isFloatingWrapType(run.wrapType)) return true;
   // Or explicit float display mode (but not topAndBottom — those are block images)
-  if (displayMode === 'float') {
-    return true;
-  }
-
-  return false;
+  return run.displayMode === 'float';
 }
 
 /**
@@ -494,16 +498,8 @@ export function isFloatingImageRun(run: ImageRun): boolean {
  * shrink line widths; text paints over or under them.
  */
 export function isTextWrappingFloatingImageRun(run: ImageRun): boolean {
-  const wrapType = run.wrapType;
-
-  if (wrapType === 'behind' || wrapType === 'inFront' || wrapType === 'topAndBottom') {
-    return false;
-  }
-
-  if (wrapType && ['square', 'tight', 'through'].includes(wrapType)) {
-    return true;
-  }
-
+  if (isWrapNone(run.wrapType) || run.wrapType === 'topAndBottom') return false;
+  if (wrapsAroundText(run.wrapType)) return true;
   return run.displayMode === 'float' && run.cssFloat !== 'none';
 }
 
@@ -615,8 +611,6 @@ function extractFloatingImagesFromParagraph(
       pmEnd: imgRun.pmEnd,
       wrapText,
       wrapType: imgRun.wrapType,
-      affectsTextWrap: isTextWrappingFloatingImageRun(imgRun),
-      behindDoc: imgRun.wrapType === 'behind',
     });
   }
 
@@ -670,30 +664,70 @@ function rectsToFloatingZones(
 }
 
 /**
- * Render floating images into a page-level layer
+ * Minimum fields the floating-image painter needs. Page-level and cell-level
+ * float records both satisfy this shape.
+ *
+ * @internal
  */
-function renderFloatingImagesLayer(
-  floatingImages: PageFloatingImage[],
+export interface FloatingImagePaintRecord {
+  src: string;
+  width: number;
+  height: number;
+  alt?: string;
+  transform?: string;
+  x: number;
+  y: number;
+  pmStart?: number;
+  pmEnd?: number;
+}
+
+/** @internal */
+export interface FloatingImagesLayerOptions {
+  layerClass: string;
+  itemClass: string;
+  /**
+   * `inset0` sizes the layer with `top/right/bottom/left = 0` (used at page level).
+   * `fullSize` uses `width/height = 100%` and adds `overflow: hidden` (used inside table cells).
+   */
+  sizing: 'inset0' | 'fullSize';
+  /** `behind` skips z-index so DOM order keeps the layer below body fragments. */
+  layerMode: 'front' | 'behind';
+}
+
+/**
+ * Render a layer of positioned floating images. Used at both page level and
+ * inside table cells; the variant differs only in class names and sizing.
+ *
+ * @internal
+ */
+export function renderFloatingImagesLayer(
+  floatingImages: FloatingImagePaintRecord[],
   doc: Document,
-  layerMode: 'front' | 'behind' = 'front'
+  options: FloatingImagesLayerOptions
 ): HTMLElement {
   const layer = doc.createElement('div');
-  layer.className = 'layout-floating-images-layer';
+  layer.className = options.layerClass;
   layer.style.position = 'absolute';
   layer.style.top = '0';
   layer.style.left = '0';
-  layer.style.right = '0';
-  layer.style.bottom = '0';
-  layer.style.pointerEvents = 'none'; // Allow clicks to pass through
-  if (layerMode === 'front') {
+  if (options.sizing === 'inset0') {
+    layer.style.right = '0';
+    layer.style.bottom = '0';
+  } else {
+    layer.style.width = '100%';
+    layer.style.height = '100%';
+    layer.style.overflow = 'hidden';
+  }
+  layer.style.pointerEvents = 'none';
+  if (options.layerMode === 'front') {
     layer.style.zIndex = '10';
   }
 
   for (const floatImg of floatingImages) {
     const container = doc.createElement('div');
-    container.className = 'layout-page-floating-image';
+    container.className = options.itemClass;
     container.style.position = 'absolute';
-    container.style.pointerEvents = 'auto'; // Make images clickable
+    container.style.pointerEvents = 'auto';
     container.style.top = `${floatImg.y}px`;
     container.style.left = `${floatImg.x}px`;
     if (floatImg.pmStart !== undefined) container.dataset.pmStart = String(floatImg.pmStart);
@@ -1016,7 +1050,7 @@ export function renderPage(
 
   // Collect floating image exclusion rectangles
   for (const img of allFloatingImages) {
-    if (!img.affectsTextWrap) continue;
+    if (!floatingImageWrapsText(img)) continue;
 
     floatingRects.push({
       side: img.side,
@@ -1072,10 +1106,15 @@ export function renderPage(
     floatingRects.length > 0 ? rectsToFloatingZones(floatingRects, contentWidth) : [];
 
   // PHASE 3: Render behind-text floating images before text fragments.
-  const behindFloatingImages = allFloatingImages.filter((img) => img.behindDoc);
-  const frontFloatingImages = allFloatingImages.filter((img) => !img.behindDoc);
+  const behindFloatingImages = allFloatingImages.filter(floatingImageIsBehindDoc);
+  const frontFloatingImages = allFloatingImages.filter((img) => !floatingImageIsBehindDoc(img));
   if (behindFloatingImages.length > 0) {
-    const floatingLayer = renderFloatingImagesLayer(behindFloatingImages, doc, 'behind');
+    const floatingLayer = renderFloatingImagesLayer(behindFloatingImages, doc, {
+      layerClass: 'layout-floating-images-layer',
+      itemClass: 'layout-page-floating-image',
+      sizing: 'inset0',
+      layerMode: 'behind',
+    });
     contentEl.appendChild(floatingLayer);
   }
 
@@ -1199,7 +1238,12 @@ export function renderPage(
   // Render in-front floating images after text fragments so wrapNone and
   // wrapping images paint above body text without participating in flow.
   if (frontFloatingImages.length > 0) {
-    const floatingLayer = renderFloatingImagesLayer(frontFloatingImages, doc, 'front');
+    const floatingLayer = renderFloatingImagesLayer(frontFloatingImages, doc, {
+      layerClass: 'layout-floating-images-layer',
+      itemClass: 'layout-page-floating-image',
+      sizing: 'inset0',
+      layerMode: 'front',
+    });
     contentEl.appendChild(floatingLayer);
   }
 

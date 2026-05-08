@@ -105,7 +105,6 @@ import {
   type RenderPagesUpdateKind,
   type HeaderFooterContent,
   type FootnoteRenderItem,
-  isFloatingImageRun,
   isTextWrappingFloatingImageRun,
 } from '@eigenpal/docx-core/layout-painter';
 
@@ -608,7 +607,7 @@ function computePerBlockWidths(
   return widths;
 }
 
-// `isFloatingImageRun` and `emuToPixels` are imported from core. Local
+// `isTextWrappingFloatingImageRun` and `emuToPixels` are imported from core. Local
 // duplicates were drifting from the canonical implementations; sharing
 // keeps them in lockstep across React + Vue adapters.
 
@@ -788,7 +787,6 @@ function extractFloatingZones(blocks: FlowBlock[], contentWidth: number): Floati
       if (run.kind !== 'image') continue;
       const imgRun = run as ImageRun;
 
-      if (!isFloatingImageRun(imgRun)) continue;
       if (!isTextWrappingFloatingImageRun(imgRun)) continue;
 
       // Calculate Y position based on vertical alignment
