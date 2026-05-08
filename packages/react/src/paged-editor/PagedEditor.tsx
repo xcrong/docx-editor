@@ -95,7 +95,7 @@ import {
   type CaretPosition,
 } from '@eigenpal/docx-core/layout-bridge';
 import { findWordBoundaries } from '@eigenpal/docx-core/utils';
-import { emuToPixels } from '@eigenpal/docx-core/utils';
+import { emuToPixels, pixelsToEmu } from '@eigenpal/docx-core/utils';
 
 // Layout painter
 import { LayoutPainter, type BlockLookup } from '@eigenpal/docx-core/layout-painter';
@@ -3567,10 +3567,8 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
             // Convert drop coordinates to content-area-relative pixels
             const dropX = (clientX - contentRect.left) / zoom;
             const dropY = (clientY - contentRect.top) / zoom;
-            // Pixels to EMU: px * 914400 / 96
-            const PIXELS_TO_EMU = 914400 / 96;
-            const hOffsetEmu = Math.round(dropX * PIXELS_TO_EMU);
-            const vOffsetEmu = Math.round(dropY * PIXELS_TO_EMU);
+            const hOffsetEmu = pixelsToEmu(dropX);
+            const vOffsetEmu = pixelsToEmu(dropY);
 
             const newPosition = {
               horizontal: { posOffset: hOffsetEmu, relativeTo: 'margin' },
