@@ -66,6 +66,10 @@ interface PageFloatingImage {
   wrapText?: 'bothSides' | 'left' | 'right' | 'largest';
   /** Wrap type (square, tight, through, topAndBottom) */
   wrapType?: string;
+  /** Whether this image should reserve text wrap space */
+  affectsTextWrap: boolean;
+  /** Whether this image should paint behind text */
+  behindDoc: boolean;
 }
 
 /**
@@ -472,7 +476,7 @@ export function isFloatingImageRun(run: ImageRun): boolean {
   const displayMode = run.displayMode;
 
   // Floating images have specific wrap types that allow text to flow around them
-  if (wrapType && ['square', 'tight', 'through'].includes(wrapType)) {
+  if (wrapType && ['square', 'tight', 'through', 'behind', 'inFront'].includes(wrapType)) {
     return true;
   }
 
@@ -482,6 +486,25 @@ export function isFloatingImageRun(run: ImageRun): boolean {
   }
 
   return false;
+}
+
+/**
+ * Check if a floating image should create text wrapping exclusion zones.
+ * wrapNone images (`behind` / `inFront`) are positioned floats but do not
+ * shrink line widths; text paints over or under them.
+ */
+export function isTextWrappingFloatingImageRun(run: ImageRun): boolean {
+  const wrapType = run.wrapType;
+
+  if (wrapType === 'behind' || wrapType === 'inFront' || wrapType === 'topAndBottom') {
+    return false;
+  }
+
+  if (wrapType && ['square', 'tight', 'through'].includes(wrapType)) {
+    return true;
+  }
+
+  return run.displayMode === 'float' && run.cssFloat !== 'none';
 }
 
 /**
@@ -592,6 +615,8 @@ function extractFloatingImagesFromParagraph(
       pmEnd: imgRun.pmEnd,
       wrapText,
       wrapType: imgRun.wrapType,
+      affectsTextWrap: isTextWrappingFloatingImageRun(imgRun),
+      behindDoc: imgRun.wrapType === 'behind',
     });
   }
 
@@ -649,7 +674,8 @@ function rectsToFloatingZones(
  */
 function renderFloatingImagesLayer(
   floatingImages: PageFloatingImage[],
-  doc: Document
+  doc: Document,
+  layerMode: 'front' | 'behind' = 'front'
 ): HTMLElement {
   const layer = doc.createElement('div');
   layer.className = 'layout-floating-images-layer';
@@ -659,7 +685,9 @@ function renderFloatingImagesLayer(
   layer.style.right = '0';
   layer.style.bottom = '0';
   layer.style.pointerEvents = 'none'; // Allow clicks to pass through
-  layer.style.zIndex = '10';
+  if (layerMode === 'front') {
+    layer.style.zIndex = '10';
+  }
 
   for (const floatImg of floatingImages) {
     const container = doc.createElement('div');
@@ -988,6 +1016,8 @@ export function renderPage(
 
   // Collect floating image exclusion rectangles
   for (const img of allFloatingImages) {
+    if (!img.affectsTextWrap) continue;
+
     floatingRects.push({
       side: img.side,
       x: img.x,
@@ -1041,9 +1071,11 @@ export function renderPage(
   const floatingZones: FloatingImageZone[] =
     floatingRects.length > 0 ? rectsToFloatingZones(floatingRects, contentWidth) : [];
 
-  // PHASE 3: Render floating images in a page-level layer
-  if (allFloatingImages.length > 0) {
-    const floatingLayer = renderFloatingImagesLayer(allFloatingImages, doc);
+  // PHASE 3: Render behind-text floating images before text fragments.
+  const behindFloatingImages = allFloatingImages.filter((img) => img.behindDoc);
+  const frontFloatingImages = allFloatingImages.filter((img) => !img.behindDoc);
+  if (behindFloatingImages.length > 0) {
+    const floatingLayer = renderFloatingImagesLayer(behindFloatingImages, doc, 'behind');
     contentEl.appendChild(floatingLayer);
   }
 
@@ -1162,6 +1194,13 @@ export function renderPage(
 
     applyFragmentStyles(fragmentEl, fragment, { left: page.margins.left, top: page.margins.top });
     contentEl.appendChild(fragmentEl);
+  }
+
+  // Render in-front floating images after text fragments so wrapNone and
+  // wrapping images paint above body text without participating in flow.
+  if (frontFloatingImages.length > 0) {
+    const floatingLayer = renderFloatingImagesLayer(frontFloatingImages, doc, 'front');
+    contentEl.appendChild(floatingLayer);
   }
 
   // Render column separator lines between columns (when w:sep is set)

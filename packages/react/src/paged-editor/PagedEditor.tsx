@@ -106,6 +106,7 @@ import {
   type HeaderFooterContent,
   type FootnoteRenderItem,
   isFloatingImageRun,
+  isTextWrappingFloatingImageRun,
 } from '@eigenpal/docx-core/layout-painter';
 
 // Selection sync
@@ -788,6 +789,7 @@ function extractFloatingZones(blocks: FlowBlock[], contentWidth: number): Floati
       const imgRun = run as ImageRun;
 
       if (!isFloatingImageRun(imgRun)) continue;
+      if (!isTextWrappingFloatingImageRun(imgRun)) continue;
 
       // Calculate Y position based on vertical alignment
       let topY = 0;

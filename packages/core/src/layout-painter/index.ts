@@ -32,6 +32,7 @@ import {
   renderPage,
   renderPages,
   isFloatingImageRun,
+  isTextWrappingFloatingImageRun,
   type RenderContext,
   type RenderPagesUpdateKind,
 } from './renderPage';
@@ -57,6 +58,7 @@ export {
   renderTextBoxFragment,
   TEXTBOX_CLASS_NAMES,
   isFloatingImageRun,
+  isTextWrappingFloatingImageRun,
   type RenderContext,
 };
 export type { RenderPagesUpdateKind };
