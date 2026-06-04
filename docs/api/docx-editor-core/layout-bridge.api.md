@@ -509,6 +509,23 @@ export function resetBlockIdCounter(): void;
 // @public
 export function resetCanvasContext(): void;
 
+// @internal
+export function resolveCellGrid(tableBlock: TableBlock): ResolvedGridCell[];
+
+// @public
+export interface ResolvedGridCell {
+    // (undocumented)
+    cellIndex: number;
+    // (undocumented)
+    colSpan: number;
+    // (undocumented)
+    columnIndex: number;
+    // (undocumented)
+    rowIndex: number;
+    // (undocumented)
+    rowSpan: number;
+}
+
 // @public
 export function resolveHeaderFooter(doc: Document_2 | null, sp: SectionProperties | null | undefined): {
     header: HeaderFooter | null;

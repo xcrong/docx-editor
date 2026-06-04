@@ -585,6 +585,8 @@ export type TableFragment = FragmentBase & {
     continuesFromPrev?: boolean;
     continuesOnNext?: boolean;
     headerRowCount?: number;
+    topClip?: number;
+    bottomClip?: number;
 };
 
 // @public
@@ -603,6 +605,7 @@ export type TableRow = {
     height?: number;
     heightRule?: 'auto' | 'atLeast' | 'exact';
     isHeader?: boolean;
+    cantSplit?: boolean;
     trackedIns?: RevisionInfo;
     trackedDel?: RevisionInfo;
 };

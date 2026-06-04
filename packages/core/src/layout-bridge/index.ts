@@ -18,12 +18,14 @@ export {
 } from './toFlowBlocks';
 export type { ToFlowBlocksOptions } from './toFlowBlocks';
 
-// Table-width helpers used by both the React paged editor and the layout bridge.
+// Table grid + width helpers used by the measurer, painter, and paginator.
 export {
   resolveTableWidthPx,
   countTableColumns,
   normalizeTableColumnWidths,
+  resolveCellGrid,
 } from './tableWidthUtils';
+export type { ResolvedGridCell } from './tableWidthUtils';
 
 // Measurement (text + paragraph + caches)
 export * from './measuring';

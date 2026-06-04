@@ -425,6 +425,12 @@ export type TableRow = {
   height?: number;
   heightRule?: 'auto' | 'atLeast' | 'exact';
   isHeader?: boolean;
+  /**
+   * `w:cantSplit` (§17.4.6): the row may not break across a page boundary.
+   * The layout engine keeps such a row whole, moving it wholesale to the next
+   * page rather than splitting its content.
+   */
+  cantSplit?: boolean;
   /** Tracked row ins / del (`<w:trPr><w:ins/>` / `<w:del/>`). */
   trackedIns?: import('../types/content/trackedChange').RevisionInfo;
   /** see trackedIns */ trackedDel?: import('../types/content/trackedChange').RevisionInfo;
@@ -837,6 +843,20 @@ export type TableFragment = FragmentBase & {
   continuesOnNext?: boolean;
   /** Number of header rows prepended to this continuation fragment (0 or undefined for first fragment). */
   headerRowCount?: number;
+  /**
+   * Pixels to skip from the top of `fromRow`. Non-zero when this fragment's
+   * first row is the continuation of a row that broke across a page boundary
+   * (Word's "allow row to break across pages"). The painter renders the row
+   * shifted up by this amount so the already-shown top slice is clipped.
+   */
+  topClip?: number;
+  /**
+   * Visible height (px) measured from the top of the LAST row (`toRow - 1`).
+   * Set when that row breaks mid-content onto the next page; `undefined`
+   * means the last row is fully visible. When `fromRow === toRow - 1`, the
+   * visible band of that single row is `[topClip, bottomClip)`.
+   */
+  bottomClip?: number;
 };
 
 /**
