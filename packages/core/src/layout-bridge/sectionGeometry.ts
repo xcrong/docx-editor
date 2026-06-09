@@ -26,7 +26,34 @@ export function twipsToPixels(twips: number): number {
   return Math.round((twips / 1440) * 96);
 }
 
-/** Convert SectionProperties page size (twips) → pixel `{ w, h }`. */
+/**
+ * Convert an OFFSET-like twip dimension (page margin, header/footer distance)
+ * to px, falling back to `fallbackPx` ONLY when the value is absent.
+ *
+ * Use this — not `value ? twipsToPixels(value) : fallback` — for any dimension
+ * where `0` is a meaningful, explicit value distinct from "not set". A truthy
+ * test treats `0` as absent and substitutes the default, which silently breaks
+ * documents that pin a margin/header/footer to 0 (e.g. full-bleed layouts, or
+ * `w:header="0"` — issue #740). `parseNumericAttribute` already returns
+ * `undefined` for a missing attribute and `0` for `="0"`, so a nullish guard is
+ * the correct discriminator.
+ *
+ * NOTE: this is for OFFSETS, not SIZES. A size (page width/height, image/shape
+ * extent) treats `0` as malformed/missing and SHOULD fall back — honoring a
+ * literal `0` there would render a zero-area element. Keep the truthy guard for
+ * sizes; use this helper for offsets.
+ */
+export function twipsToPxOr(twips: number | null | undefined, fallbackPx: number): number {
+  return twips != null ? twipsToPixels(twips) : fallbackPx;
+}
+
+/**
+ * Convert SectionProperties page size (twips) → pixel `{ w, h }`.
+ *
+ * Page size is a SIZE: a literal `0` (malformed `w:pgSz`) defaults to Letter
+ * rather than rendering a zero-area page — so the truthy guard is intentional
+ * here (contrast `getMargins`, where `0` is honored). See `twipsToPxOr`.
+ */
 export function getPageSize(sp: SectionProperties | null | undefined): {
   w: number;
   h: number;
@@ -40,21 +67,20 @@ export function getPageSize(sp: SectionProperties | null | undefined): {
 /**
  * Convert SectionProperties margins (twips) → pixel `PageMargins`.
  *
- * `header` / `footer` default to 48px (Word's 0.5-inch default) so the
- * HF margin-extension math doesn't have to special-case undefined.
+ * Every distance is an OFFSET, so an explicit `0` is honored (full-bleed body
+ * margins; a header/footer pinned to the page edge — issue #740). Only an
+ * ABSENT distance falls back to Word's default. `header`/`footer` default to
+ * 48px (Word's 0.5in) so the HF margin-extension math needn't special-case
+ * undefined.
  */
 export function getMargins(sp: SectionProperties | null | undefined): PageMargins {
   return {
-    top: sp?.marginTop ? twipsToPixels(sp.marginTop) : DEFAULT_BODY_MARGIN_PX,
-    right: sp?.marginRight ? twipsToPixels(sp.marginRight) : DEFAULT_BODY_MARGIN_PX,
-    bottom: sp?.marginBottom ? twipsToPixels(sp.marginBottom) : DEFAULT_BODY_MARGIN_PX,
-    left: sp?.marginLeft ? twipsToPixels(sp.marginLeft) : DEFAULT_BODY_MARGIN_PX,
-    // Nullish, not truthy: `w:header="0"` (a header pinned to the page top) is
-    // a valid explicit distance and must stay 0 — only an ABSENT distance falls
-    // back to Word's 0.5in default. A truthy test mapped 0 → 48px, over-
-    // reserving the header band and pushing content onto an extra page (#740).
-    header: sp?.headerDistance != null ? twipsToPixels(sp.headerDistance) : DEFAULT_HF_DISTANCE_PX,
-    footer: sp?.footerDistance != null ? twipsToPixels(sp.footerDistance) : DEFAULT_HF_DISTANCE_PX,
+    top: twipsToPxOr(sp?.marginTop, DEFAULT_BODY_MARGIN_PX),
+    right: twipsToPxOr(sp?.marginRight, DEFAULT_BODY_MARGIN_PX),
+    bottom: twipsToPxOr(sp?.marginBottom, DEFAULT_BODY_MARGIN_PX),
+    left: twipsToPxOr(sp?.marginLeft, DEFAULT_BODY_MARGIN_PX),
+    header: twipsToPxOr(sp?.headerDistance, DEFAULT_HF_DISTANCE_PX),
+    footer: twipsToPxOr(sp?.footerDistance, DEFAULT_HF_DISTANCE_PX),
   };
 }
 
