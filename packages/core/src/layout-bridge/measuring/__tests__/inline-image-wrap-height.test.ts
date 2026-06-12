@@ -70,4 +70,19 @@ describe('inline image line-height attribution across wraps (#766)', () => {
     expect(result.lines.length).toBe(1);
     expect(result.lines[0].lineHeight).toBeGreaterThanOrEqual(151);
   });
+
+  test('image wider than the column reserves the scaled-down height, not the declared one', () => {
+    // The painter fits an inline image to the column with `max-width: 100%`, so
+    // an 800×492 image in a 600px column renders at 600×369. The line must
+    // reserve ~369px, not the declared 492px — otherwise a tall gap opens below
+    // the image (the Vue insert path inserts at up to 800px wide).
+    const result = measure([{ kind: 'image', width: 800, height: 492 }], 600);
+    if (result.kind !== 'paragraph') throw new Error('expected paragraph measure');
+
+    // The image lands on its own line; assert against the tallest line.
+    const h = Math.max(...result.lines.map((l) => l.lineHeight));
+    // Scaled height ≈ 492 × (600 / 800) = 369, plus a few px of leading.
+    expect(h).toBeGreaterThanOrEqual(368);
+    expect(h).toBeLessThan(420); // pre-fix this was ~492 + leading
+  });
 });

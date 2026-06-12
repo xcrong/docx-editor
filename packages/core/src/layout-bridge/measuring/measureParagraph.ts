@@ -794,6 +794,16 @@ export function measureParagraph(
         startNewLine(runIndex, 0);
       }
 
+      // The painter fits an inline image to its column with `max-width: 100%`
+      // (renderInlineImageRun), so one wider than the column renders scaled down.
+      // Reserve the *rendered* height, not the declared one, or the line keeps
+      // space the shrunk image never fills — a tall gap below it. No-op if it fits.
+      const fitScale =
+        imageWidth > 0 && imageWidth > currentLine.availableWidth
+          ? currentLine.availableWidth / imageWidth
+          : 1;
+      const renderedImageHeight = imageHeight * fitScale;
+
       // The image's vertical footprint in the line includes its wrap
       // distances (wp:inline distT/distB). These default to 0 for inline
       // images (unlike the block path's synthetic 6px). The painter applies
@@ -803,7 +813,7 @@ export function measureParagraph(
       // the line the image actually lands on, not the line it wrapped away
       // from (else the previous line inflates and this one stays text-height,
       // and everything after paints over the overflowing image — #766).
-      const imageFootprintPx = imageHeight + (run.distTop ?? 0) + (run.distBottom ?? 0);
+      const imageFootprintPx = renderedImageHeight + (run.distTop ?? 0) + (run.distBottom ?? 0);
       if (imageFootprintPx > currentLine.maxImageHeightPx) {
         currentLine.maxImageHeightPx = imageFootprintPx;
       }
