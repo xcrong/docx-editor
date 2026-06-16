@@ -567,6 +567,7 @@ function renderBlockImage(run: ImageRun, doc: Document): HTMLElement {
   }
 
   applyPmPositions(container, run.pmStart, run.pmEnd);
+
   container.appendChild(img);
 
   return container;
