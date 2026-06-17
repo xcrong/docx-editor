@@ -35,6 +35,14 @@ import { getFootnoteText } from '../docx/footnoteParser';
 export const FOOTNOTE_SEPARATOR_HEIGHT = 12;
 
 /**
+ * Gutter between footnote columns when `w15:footnoteColumns` > 1, in pixels
+ * (≈ 0.25in). Shared by the reserved-height/measurement path (core) and the
+ * footnote painter so a footnote measured at column width paints into a column
+ * of exactly that width. Single-column footnotes never consult it.
+ */
+export const FOOTNOTE_COLUMN_GAP_PX = 24;
+
+/**
  * Hard cap on the multi-pass footnote layout loop. Reserving footnote
  * space can move a reference to another page, so adapters keep remapping
  * until the page→height contract is stable. Dense layouts converge in
@@ -418,29 +426,84 @@ export function buildFootnoteContentMap(
 // ============================================================================
 
 /**
+ * Distribute footnote items across `columns` balanced columns, preserving
+ * document order (footnotes must still read in numeric sequence). Items fill
+ * the first column until it reaches the balanced target height (≈ total / N),
+ * then spill into the next column — the same order-preserving balance Word
+ * applies to its footnote columns, not a greedy shortest-column packing
+ * (which would scramble the reading order).
+ *
+ * `columns <= 1` (the default for ordinary single-column footnotes) returns a
+ * single column unchanged, so callers that never opt into multi-column
+ * footnotes are byte-for-byte unaffected.
+ *
+ * Pure and shared by the reserved-height calculation (core) and the footnote
+ * painter (layout-painter) so the reserved area and the rendered columns are
+ * computed from the same partition.
+ */
+export function distributeFootnotesIntoColumns<T extends { height: number }>(
+  items: T[],
+  columns: number
+): T[][] {
+  const n = Math.max(1, Math.floor(columns));
+  if (n <= 1 || items.length <= 1) return [items];
+
+  const total = items.reduce((sum, item) => sum + item.height, 0);
+  const target = total / n;
+
+  const result: T[][] = [[]];
+  let columnHeight = 0;
+  for (const item of items) {
+    // Move to the next column once the current one has passed the balanced
+    // target (measured at the item's midpoint to avoid lopsided splits) and
+    // columns remain. Never leave a column empty.
+    if (result.length < n && columnHeight > 0 && columnHeight + item.height / 2 > target) {
+      result.push([]);
+      columnHeight = 0;
+    }
+    result[result.length - 1].push(item);
+    columnHeight += item.height;
+  }
+
+  return result;
+}
+
+/**
  * Calculate per-page footnote reserved heights.
  * Returns Map<pageNumber, reservedHeight>.
+ *
+ * With `columns > 1` the footnotes are balanced across that many columns and
+ * the reserved height is the tallest column (plus the separator), since the
+ * columns sit side by side — not the sum of every footnote height.
  */
 export function calculateFootnoteReservedHeights(
   pageFootnoteMap: Map<number, number[]>,
-  footnoteContentMap: Map<number, { height: number }>
+  footnoteContentMap: Map<number, { height: number }>,
+  columns: number = 1
 ): Map<number, number> {
   const reserved = new Map<number, number>();
 
   for (const [pageNumber, footnoteIds] of pageFootnoteMap) {
-    let totalHeight = 0;
+    const heights = footnoteIds
+      .map((fnId) => footnoteContentMap.get(fnId)?.height ?? 0)
+      .filter((h) => h > 0)
+      .map((height) => ({ height }));
 
-    for (const fnId of footnoteIds) {
-      const content = footnoteContentMap.get(fnId);
-      if (content) {
-        totalHeight += content.height;
-      }
-    }
+    if (heights.length === 0) continue;
 
-    if (totalHeight > 0) {
+    const cols = distributeFootnotesIntoColumns(heights, columns);
+    const tallestColumn = cols.reduce(
+      (max, col) =>
+        Math.max(
+          max,
+          col.reduce((sum, item) => sum + item.height, 0)
+        ),
+      0
+    );
+
+    if (tallestColumn > 0) {
       // Add separator height
-      totalHeight += FOOTNOTE_SEPARATOR_HEIGHT;
-      reserved.set(pageNumber, totalHeight);
+      reserved.set(pageNumber, tallestColumn + FOOTNOTE_SEPARATOR_HEIGHT);
     }
   }
 
@@ -459,6 +522,13 @@ export interface StabilizeFootnoteLayoutArgs {
   footnoteContentMap: Map<number, FootnoteContent>;
   /** First-pass layout already computed by the caller without reserved heights. */
   initialLayout: Layout;
+  /**
+   * Number of columns the footnote area is laid out in (`w15:footnoteColumns`).
+   * Defaults to 1. When > 1, reserved heights are balanced across the columns
+   * (tallest column wins) instead of summing every footnote, and the value is
+   * written onto each footnote-bearing page as `page.footnoteColumns`.
+   */
+  footnoteColumns?: number;
 }
 
 export interface StabilizeFootnoteLayoutResult {
@@ -483,11 +553,13 @@ export function stabilizeFootnoteLayout(
   args: StabilizeFootnoteLayoutArgs
 ): StabilizeFootnoteLayoutResult {
   const { blocks, measures, layoutOpts, footnoteRefs, footnoteContentMap, initialLayout } = args;
+  const footnoteColumns = Math.max(1, args.footnoteColumns ?? 1);
 
   let pageFootnoteMap = mapFootnotesToPages(initialLayout.pages, footnoteRefs);
   let footnoteReservedHeights = calculateFootnoteReservedHeights(
     pageFootnoteMap,
-    footnoteContentMap
+    footnoteContentMap,
+    footnoteColumns
   );
 
   if (footnoteReservedHeights.size === 0) {
@@ -505,7 +577,8 @@ export function stabilizeFootnoteLayout(
     const nextPageFootnoteMap = mapFootnotesToPages(newLayout.pages, footnoteRefs);
     const nextFootnoteReservedHeights = calculateFootnoteReservedHeights(
       nextPageFootnoteMap,
-      footnoteContentMap
+      footnoteContentMap,
+      footnoteColumns
     );
 
     pageFootnoteMap = nextPageFootnoteMap;
@@ -526,7 +599,11 @@ export function stabilizeFootnoteLayout(
         footnoteReservedHeights: fallbackReservedHeights,
       });
       pageFootnoteMap = mapFootnotesToPages(newLayout.pages, footnoteRefs);
-      const requiredHeights = calculateFootnoteReservedHeights(pageFootnoteMap, footnoteContentMap);
+      const requiredHeights = calculateFootnoteReservedHeights(
+        pageFootnoteMap,
+        footnoteContentMap,
+        footnoteColumns
+      );
       if (footnoteReservedHeightsCover(fallbackReservedHeights, requiredHeights)) {
         fallbackCovered = true;
         break;
@@ -551,7 +628,10 @@ export function stabilizeFootnoteLayout(
 
   for (const [pageNum, fnIds] of pageFootnoteMap) {
     const page = newLayout.pages.find((p) => p.number === pageNum);
-    if (page) page.footnoteIds = fnIds;
+    if (page) {
+      page.footnoteIds = fnIds;
+      if (footnoteColumns > 1) page.footnoteColumns = footnoteColumns;
+    }
   }
 
   return { layout: newLayout, pageFootnoteMap, converged };

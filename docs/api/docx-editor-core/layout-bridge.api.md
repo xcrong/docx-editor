@@ -30,7 +30,7 @@ export function buildFootnoteRenderItems(pageFootnoteMap: Map<number, number[]>,
 // @public
 export function calculateFootnoteReservedHeights(pageFootnoteMap: Map<number, number[]>, footnoteContentMap: Map<number, {
     height: number;
-}>): Map<number, number>;
+}>, columns?: number): Map<number, number>;
 
 // @public (undocumented)
 export function calculateHeaderFooterVisualBounds(blocks: FlowBlock[], measures: Measure[], flowHeight: number, metrics: HeaderFooterMetrics): {
@@ -179,6 +179,11 @@ export function demoteBlockLikeFloatingTables(blocks: FlowBlock[], blockWidths: 
 export function detectTableInsertHover(input: TableInsertHoverInput): TableInsertHoverHit | null;
 
 // @public
+export function distributeFootnotesIntoColumns<T extends {
+    height: number;
+}>(items: T[], columns: number): T[][];
+
+// @public
 export interface DomCaretPosition {
     // (undocumented)
     height: number;
@@ -322,6 +327,9 @@ export interface FontStyle {
     // (undocumented)
     letterSpacing?: number;
 }
+
+// @public
+export const FOOTNOTE_COLUMN_GAP_PX = 24;
 
 // @public
 export const FOOTNOTE_SEPARATOR_HEIGHT = 12;
@@ -661,6 +669,7 @@ export function stabilizeFootnoteLayout(args: StabilizeFootnoteLayoutArgs): Stab
 export interface StabilizeFootnoteLayoutArgs {
     // (undocumented)
     blocks: FlowBlock[];
+    footnoteColumns?: number;
     // (undocumented)
     footnoteContentMap: Map<number, FootnoteContent>;
     // (undocumented)

@@ -824,13 +824,22 @@ export function renderPage(
 
   // Render footnote area at the bottom of the content area (above footer)
   if (options.footnoteArea && options.footnoteArea.length > 0) {
-    const fnAreaEl = renderFootnoteArea(options.footnoteArea, contentWidth, context, doc);
+    const footnoteColumns = page.footnoteColumns ?? 1;
+    const fnAreaEl = renderFootnoteArea(
+      options.footnoteArea,
+      contentWidth,
+      context,
+      doc,
+      footnoteColumns
+    );
     fnAreaEl.style.position = 'absolute';
-    // Position at page bottom minus bottom margin (bottom of content area)
-    // The reserved height includes separator + all footnotes
+    // Position at page bottom minus bottom margin (bottom of content area).
+    // The reserved height includes the separator + the tallest footnote column
+    // (multi-column footnotes sit side by side, so the area is as tall as the
+    // tallest column, not the sum of every footnote).
     const reservedHeight = Math.max(
       page.footnoteReservedHeight ?? 0,
-      calculateFootnoteAreaRenderHeight(options.footnoteArea)
+      calculateFootnoteAreaRenderHeight(options.footnoteArea, footnoteColumns)
     );
     const contentAreaBottom = page.size.h - page.margins.bottom - page.margins.top;
     fnAreaEl.style.top = `${Math.max(-page.margins.top, contentAreaBottom - reservedHeight)}px`;

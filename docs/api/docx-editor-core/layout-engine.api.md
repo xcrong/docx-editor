@@ -449,6 +449,7 @@ export type Page = {
     };
     footnoteIds?: number[];
     footnoteReservedHeight?: number;
+    footnoteColumns?: number;
     columns?: ColumnLayout;
 };
 
