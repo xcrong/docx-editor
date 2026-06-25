@@ -199,7 +199,12 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
   }
 
   function scrollVisiblePositionIntoView(pmPos: number) {
-    scrollVisiblePositionIntoViewImpl(opts.pagesRef.value, opts.pagesViewportRef.value, pmPos);
+    scrollVisiblePositionIntoViewImpl(
+      opts.pagesRef.value,
+      opts.pagesViewportRef.value,
+      pmPos,
+      opts.layout.value
+    );
   }
 
   function selectWord(pos: number) {

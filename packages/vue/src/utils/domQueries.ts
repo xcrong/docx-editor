@@ -15,6 +15,8 @@ import {
   findBodyPmAnchor,
   clickToPositionDom,
 } from '@eigenpal/docx-editor-core/layout-bridge';
+import { findPageIndexContainingPmPos } from '@eigenpal/docx-editor-core/layout-engine';
+import type { Layout } from '@eigenpal/docx-editor-core/layout-engine';
 import { findWordBoundaries } from '@eigenpal/docx-editor-core/utils';
 
 /**
@@ -73,42 +75,100 @@ export function findElementAtPosition(
   return null;
 }
 
+/** px of padding kept above the target when it's scrolled into view. */
+const SCROLL_TOP_PADDING = 48;
+
 /**
- * Smooth-scroll the viewport so the painted element at `pmPos` is
- * visible (48px top padding). Falls back to a CSS attribute selector
- * when no body span carries pmPos in its [start,end] range.
+ * Resolve the painted body element for `pmPos`: an exact, body-scoped
+ * `data-pm-start` anchor first (paragraph elements, including headings, carry
+ * one), then the run-span `[start,end]` range. A heading's pmPos is the
+ * paragraph node position, which only the anchor match catches — the span
+ * loop alone would miss it (#930). Returns `null` when the position lives on a
+ * page virtualization has left as an empty shell.
+ */
+function resolvePaintedScrollTarget(
+  pagesContainer: HTMLElement,
+  pmPos: number
+): HTMLElement | null {
+  const exact = findBodyPmAnchor(pagesContainer, pmPos);
+  if (exact) return exact;
+  for (const el of findBodyPmSpans(pagesContainer)) {
+    const start = Number(el.dataset.pmStart);
+    const end = Number(el.dataset.pmEnd);
+    if (Number.isFinite(start) && Number.isFinite(end) && pmPos >= start && pmPos <= end) {
+      return el;
+    }
+  }
+  return null;
+}
+
+/**
+ * Smooth-scroll `viewport` so `el` sits `SCROLL_TOP_PADDING` px below the
+ * viewport's top edge. Uses `viewport.scrollTo` (not `el.scrollIntoView`)
+ * because the pages sit under a CSS `transform` (zoom) where the native call
+ * misbehaves — mirrors React's `scrollElementCenterIntoContainer`.
+ */
+function scrollElementTopIntoViewport(viewport: HTMLElement, el: HTMLElement): void {
+  const viewportRect = viewport.getBoundingClientRect();
+  const targetRect = el.getBoundingClientRect();
+  viewport.scrollTo({
+    top: targetRect.top - viewportRect.top + viewport.scrollTop - SCROLL_TOP_PADDING,
+    behavior: 'smooth',
+  });
+}
+
+/**
+ * Smooth-scroll the viewport so the painted element at `pmPos` is visible.
+ *
+ * When the target heading is on a page that virtualization has left as an
+ * empty shell (no painted `[data-pm-start]` content), resolution returns
+ * `null` and the call uses `layout` geometry to find the page index, scrolls
+ * its always-present shell into view — the IntersectionObserver then populates
+ * it — and re-resolves the exact element once paint settles. Without this
+ * fallback the scroll was a silent no-op on large (≥ virtualization threshold)
+ * documents. Mirrors React's `usePagedScrollApi` geometric fallback (#930).
  */
 export function scrollVisiblePositionIntoView(
   pagesContainer: HTMLElement | null,
   viewport: HTMLElement | null,
-  pmPos: number
+  pmPos: number,
+  layout?: Layout | null
 ): void {
   if (!pagesContainer || !viewport) return;
-  // Resolve the painted element the same way the React paged-scroll API does:
-  // an exact, body-scoped `data-pm-start` anchor first (paragraph elements,
-  // including headings, carry one), then the run-span [start,end] range. A
-  // heading's pmPos is the paragraph node position, which only the anchor
-  // match catches — the span loop alone would miss it (#930). The old
-  // unscoped `[data-pm-start]` fallback is dropped: it could latch onto a
-  // header/footer element sharing the same PM position.
-  let targetEl: HTMLElement | null = findBodyPmAnchor(pagesContainer, pmPos);
-  if (!targetEl) {
-    for (const el of findBodyPmSpans(pagesContainer)) {
-      const start = Number(el.dataset.pmStart);
-      const end = Number(el.dataset.pmEnd);
-      if (Number.isFinite(start) && Number.isFinite(end) && pmPos >= start && pmPos <= end) {
-        targetEl = el;
-        break;
-      }
-    }
+
+  const painted = resolvePaintedScrollTarget(pagesContainer, pmPos);
+  if (painted) {
+    scrollElementTopIntoViewport(viewport, painted);
+    return;
   }
-  if (!targetEl) return;
-  const viewportRect = viewport.getBoundingClientRect();
-  const targetRect = targetEl.getBoundingClientRect();
-  viewport.scrollTo({
-    top: targetRect.top - viewportRect.top + viewport.scrollTop - 48,
-    behavior: 'smooth',
-  });
+
+  // Virtualization fallback: scroll the page shell in, then re-resolve the
+  // heading once virtualization fills it. `layout` is optional so callers that
+  // haven't been wired through still get the original (no-op) behavior rather
+  // than a crash — but the outline path always passes it.
+  if (!layout) return;
+  const pageIndex = findPageIndexContainingPmPos(layout, pmPos);
+  if (pageIndex == null) return;
+  const shell = pagesContainer.querySelectorAll<HTMLElement>('.layout-page')[pageIndex];
+  if (!shell) return;
+  scrollElementTopIntoViewport(viewport, shell);
+
+  // The IntersectionObserver fills the shell asynchronously over a few frames
+  // once it scrolls near the viewport. Retry the painted resolution a bounded
+  // number of times so we land on the heading itself, not just its page. Bails
+  // if the container leaves the DOM (navigation/unmount).
+  let attempts = 0;
+  const tryResolveAfterPaint = (): void => {
+    if (!pagesContainer.isConnected || attempts >= 3) return;
+    attempts++;
+    const target = resolvePaintedScrollTarget(pagesContainer, pmPos);
+    if (target) {
+      scrollElementTopIntoViewport(viewport, target);
+      return;
+    }
+    requestAnimationFrame(tryResolveAfterPaint);
+  };
+  requestAnimationFrame(tryResolveAfterPaint);
 }
 
 /**
