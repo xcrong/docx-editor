@@ -42,7 +42,7 @@ jobs:
     permissions:
       contents: write # push tags, create GitHub Releases
       pull-requests: write # changesets/action opens / updates the release PR
-      id-token: write # OIDC for npm provenance signing
+      id-token: write # OIDC; reserved for future Trusted Publishing (currently NPM_TOKEN auth, provenance disabled)
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.3
@@ -173,7 +173,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: 'true'
 
       # changesets/action creates per-package tags (e.g. `@xcrong/docx-editor-react@1.0.1`);
       # also create a single `vX.Y.Z` umbrella tag for Renovate/Dependabot/Releases.
