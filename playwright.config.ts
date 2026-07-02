@@ -83,10 +83,17 @@ export default defineConfig({
     },
   ],
 
-  /* Run dev servers before tests */
+  /* Run dev servers before tests.
+   * PERF_REACT_ONLY: boot just the React server (perf / large-doc specs).
+   * NO_NUXT: boot React + Vue but skip Nuxt. Nuxt's cold boot (>120s on a CI
+   *   runner) would otherwise gate the `parity` project — but parity compares
+   *   React vs Vue and never hits the Nuxt server (port 3002), so parity runs
+   *   opt out. The `nuxt` project still boots it (NO_NUXT unset). */
   webServer: process.env.PERF_REACT_ONLY
     ? [reactDevServer]
-    : [reactDevServer, vueDevServer, nuxtDevServer],
+    : process.env.NO_NUXT
+      ? [reactDevServer, vueDevServer]
+      : [reactDevServer, vueDevServer, nuxtDevServer],
 
   /* Output directory for screenshots */
   outputDir: './screenshots/test-results',
