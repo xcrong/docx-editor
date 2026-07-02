@@ -1,5 +1,13 @@
 # @xcrong/docx-editor-i18n
 
+## 1.10.2
+
+### Patch Changes
+
+- 7670214: Maintenance release. No public API changes.
+  - Switch npm publishing from an `NPM_TOKEN` secret to **npm Trusted Publishing (OIDC)** — no long-lived token, packages are signed with provenance from GitHub Actions.
+  - Add a `NOTICE` file crediting the upstream project (EigenPal Inc.) and documenting the fork; README links to it from a new License & Attribution section.
+
 ## 1.10.1
 
 ### Patch Changes
