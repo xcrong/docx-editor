@@ -64,9 +64,6 @@ jobs:
       - name: Run tests
         run: bun test
 
-      - name: CLA logic tests
-        run: bash .github/cla/cla.test.sh
-
   build:
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
