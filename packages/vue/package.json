@@ -1,6 +1,6 @@
 {
   "name": "@xcrong/docx-editor-vue",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "description": "Vue 3 DOCX editor adapter for @xcrong/docx-editor-core.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -83,9 +83,9 @@
     "vue": "^3.3.0"
   },
   "dependencies": {
-    "@xcrong/docx-editor-agents": "^1.10.0",
-    "@xcrong/docx-editor-core": "^1.10.0",
-    "@xcrong/docx-editor-i18n": "^1.10.0"
+    "@xcrong/docx-editor-agents": "^1.10.1",
+    "@xcrong/docx-editor-core": "^1.10.1",
+    "@xcrong/docx-editor-i18n": "^1.10.1"
   },
   "keywords": [
     "docx",

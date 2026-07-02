@@ -1,5 +1,19 @@
 # @xcrong/docx-editor-vue
 
+## 1.10.1
+
+### Patch Changes
+
+- bf6f161: Republish all packages under the `@xcrong` npm scope (fork maintenance).
+
+  The upstream `@eigenpal/*` packages are deprecated and the source repo was migrated away from the original maintainer, so this fork republishes under the `@xcrong` scope to keep a controlled, maintained release line. Package names change from `@eigenpal/*` to `@xcrong/*`; the public API is unchanged. Repository and homepage metadata now point at `github.com/xcrong/docx-editor`.
+
+- f6ac7f4: Fix outline (and bookmark / find-replace) navigation silently no-op'ing on large documents (≥ the 8-page virtualization threshold). When the target heading sits on a page that virtualization has left as an empty shell, `scrollVisiblePositionIntoView` now uses layout geometry to find the page, scrolls its always-present shell into view so the IntersectionObserver populates it, then re-resolves the exact heading once paint settles — mirroring the React adapter's `usePagedScrollApi` geometric fallback. Previously the helper returned early when no painted element matched, so the scroll never happened. Closes #1032.
+- Updated dependencies [bf6f161]
+  - @xcrong/docx-editor-core@1.10.1
+  - @xcrong/docx-editor-agents@1.10.1
+  - @xcrong/docx-editor-i18n@1.10.1
+
 ## 1.10.0
 
 ### Patch Changes
