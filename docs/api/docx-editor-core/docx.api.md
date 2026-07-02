@@ -26,6 +26,7 @@ export interface ComplexFieldContext {
     codeRuns: Run[];
     dirty: boolean;
     fldLock: boolean;
+    formCheckbox?: ComplexField['formCheckbox'];
     instruction: string;
     nestingLevel: number;
     resultRuns: Run[];

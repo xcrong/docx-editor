@@ -85,6 +85,10 @@ export interface ComplexField {
     fieldType: FieldType;
     fldLock?: boolean;
     formatting?: TextFormatting;
+    formCheckbox?: {
+        checked: boolean;
+        ffDataXml?: string;
+    };
     instruction: string;
     // (undocumented)
     type: 'complexField';
@@ -148,7 +152,9 @@ export type Field = SimpleField | ComplexField;
 export interface FieldCharContent {
     charType: 'begin' | 'separate' | 'end';
     dirty?: boolean;
+    ffDataXml?: string;
     fldLock?: boolean;
+    formCheckboxChecked?: boolean;
     // (undocumented)
     type: 'fieldChar';
 }
