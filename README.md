@@ -12,9 +12,12 @@
   <a href="https://www.docx-editor.dev/docs"><img src="https://img.shields.io/badge/Docs-3B5BDB?style=flat-square&logo=readthedocs&logoColor=white" alt="Documentation" /></a>
 </p>
 
-> **⚠️ 注意：本项目为 Fork 维护版本**
+> **ℹ️ Maintained fork of EigenPal's docx-editor**
 >
-> 原始项目 `xcrong/docx-editor` 的仓库已被转移至 `docxgsid/docx-editor`，项目状态回退至约五个月前且无活跃开发迹象，原 `@xcrong/*` npm 包也已废弃。此仓库基于 Fork 网络中的较新代码（源自 [DoctorSlimm/docx-js-editor](https://github.com/DoctorSlimm/docx-js-editor)）进行 Fork，仅对现有代码做必要维护，**不再设计新功能开发**。所有更改均遵循原始项目的 Apache 2.0 许可证。
+> The upstream `@eigenpal/*` packages are deprecated; this fork continues
+> maintenance and publishes under the **`@xcrong/*`** scope with the public API
+> unchanged. All changes follow the original Apache-2.0 license. See
+> [NOTICE](./NOTICE) for attribution and the full fork notice.
 
 Open-source WYSIWYG `.docx` editor for React and Vue with canonical OOXML, tracked changes, and real-time collaboration. Agent-ready. **[Live demo](https://docx-editor.dev/editor)** | **[Documentation](https://www.docx-editor.dev/docs)**
 
@@ -178,3 +181,7 @@ bun run i18n:status      # check translation coverage
 
 > [!TIP]
 > Questions or custom features? Email **[docx-editor@eigenpal.com](mailto:docx-editor@eigenpal.com)**.
+
+## License & Attribution
+
+Apache-2.0 — see [LICENSE](./LICENSE). This is a community-maintained fork of [EigenPal's docx-editor](https://github.com/eigenpal/docx-editor); upstream attribution and the full fork notice live in [NOTICE](./NOTICE).

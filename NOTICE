@@ -1,0 +1,51 @@
+NOTICE
+======
+
+This product includes software originally developed by EigenPal Inc. and its
+contributors as part of the docx-editor project
+(https://github.com/eigenpal/docx-editor).
+
+  Copyright 2026 EigenPal Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+these files except in compliance with the License. You may obtain a copy of the
+License in the [LICENSE](./LICENSE) file or at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+
+Fork notice
+-----------
+
+This repository (https://github.com/xcrong/docx-editor) is a community-maintained
+fork of the upstream docx-editor project. It continues maintenance of the codebase
+and republishes the packages under the `@xcrong` npm scope:
+
+  - @xcrong/docx-editor-core
+  - @xcrong/docx-editor-react
+  - @xcrong/docx-editor-vue
+  - @xcrong/docx-editor-agents
+  - @xcrong/docx-editor-i18n
+  - @xcrong/nuxt-docx-editor
+
+The public API is unchanged from the upstream release this fork is based on. The
+original `@eigenpal/*` npm packages have been deprecated upstream; `@xcrong/*`
+exists so downstream users keep a controlled, maintained release line.
+
+Original copyright, author, and attribution notices from the upstream source are
+retained in full (see the [LICENSE](./LICENSE) file). Modified files are
+identifiable via the project's version-control history.
+
+
+Acknowledgements
+----------------
+
+Sincere thanks to EigenPal Inc. and every docx-editor contributor — in particular
+Jedr Blaszyk (@jedrazb) — for building this editor and releasing it under a
+permissive license. This fork exists only because that original work was freely
+shared.
