@@ -1,5 +1,17 @@
 # @xcrong/nuxt-docx-editor
 
+## 1.10.1
+
+### Patch Changes
+
+- bf6f161: Republish all packages under the `@xcrong` npm scope (fork maintenance).
+
+  The upstream `@eigenpal/*` packages are deprecated and the source repo was migrated away from the original maintainer, so this fork republishes under the `@xcrong` scope to keep a controlled, maintained release line. Package names change from `@eigenpal/*` to `@xcrong/*`; the public API is unchanged. Repository and homepage metadata now point at `github.com/xcrong/docx-editor`.
+
+- Updated dependencies [bf6f161]
+- Updated dependencies [f6ac7f4]
+  - @xcrong/docx-editor-vue@1.10.1
+
 ## 1.10.0
 
 ### Patch Changes
