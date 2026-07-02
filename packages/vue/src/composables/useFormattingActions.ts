@@ -7,23 +7,23 @@
 
 import type { Ref } from 'vue';
 import type { EditorView } from 'prosemirror-view';
-import type { Document } from '@eigenpal/docx-editor-core/types/document';
-import { applyStyle } from '@eigenpal/docx-editor-core/prosemirror/commands/paragraph';
-import { createStyleResolver } from '@eigenpal/docx-editor-core/prosemirror/styles';
-import { getCachedNumberingMap } from '@eigenpal/docx-editor-core/docx';
-import { clearFormatting } from '@eigenpal/docx-editor-core/prosemirror/commands/formatting';
-import { insertPageBreak } from '@eigenpal/docx-editor-core/prosemirror/commands/pageBreak';
+import type { Document } from '@xcrong/docx-editor-core/types/document';
+import { applyStyle } from '@xcrong/docx-editor-core/prosemirror/commands/paragraph';
+import { createStyleResolver } from '@xcrong/docx-editor-core/prosemirror/styles';
+import { getCachedNumberingMap } from '@xcrong/docx-editor-core/docx';
+import { clearFormatting } from '@xcrong/docx-editor-core/prosemirror/commands/formatting';
+import { insertPageBreak } from '@xcrong/docx-editor-core/prosemirror/commands/pageBreak';
 import {
   insertSectionBreakNextPage,
   insertSectionBreakContinuous,
-} from '@eigenpal/docx-editor-core/prosemirror/commands/sectionBreak';
+} from '@xcrong/docx-editor-core/prosemirror/commands/sectionBreak';
 import {
   applyFormatting as applyFormattingCore,
   setParagraphStyle as setParagraphStyleCore,
   insertBreak as insertBreakCore,
   type ApplyFormattingOptions,
   type InsertBreakOptions,
-} from '@eigenpal/docx-editor-core/prosemirror/applyFormatting';
+} from '@xcrong/docx-editor-core/prosemirror/applyFormatting';
 
 export interface UseFormattingActionsOptions {
   editorView: Ref<EditorView | null>;

@@ -1,23 +1,23 @@
 ---
 title: 'Contributing a translation'
-description: 'Add a new editor language to @eigenpal/docx-editor-i18n: scaffold the locale JSON, fill the strings, validate, and open a PR. Partial translations welcome.'
+description: 'Add a new editor language to @xcrong/docx-editor-i18n: scaffold the locale JSON, fill the strings, validate, and open a PR. Partial translations welcome.'
 category: 'i18n'
 ---
 
 The editor UI ships in nine languages. Adding a tenth is a single JSON file
-in the [monorepo](https://github.com/eigenpal/docx-editor).
+in the [monorepo](https://github.com/xcrong/docx-editor).
 
 ## How locales work
 
 `packages/i18n/en.json` is the source of truth. Every other locale mirrors
 its shape; a `null` value falls back to the English string at runtime, and a
 missing key fails CI. Locales publish as named exports and per-locale
-subpaths of `@eigenpal/docx-editor-i18n`.
+subpaths of `@xcrong/docx-editor-i18n`.
 
 ## Add a language
 
 ```bash
-git clone https://github.com/eigenpal/docx-editor && cd docx-editor
+git clone https://github.com/xcrong/docx-editor && cd docx-editor
 bun install
 
 bun run i18n:new <code>   # scaffolds packages/i18n/<code>.json with nulls
@@ -39,4 +39,4 @@ and open a PR. No code changes needed.
 
 - [i18n package](/docs/1.x/i18n): wiring locales into the editor
 - [i18n API reference](/docs/1.x/api/i18n): every locale export
-- [Open a PR](https://github.com/eigenpal/docx-editor/pulls)
+- [Open a PR](https://github.com/xcrong/docx-editor/pulls)

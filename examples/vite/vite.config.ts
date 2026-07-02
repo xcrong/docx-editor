@@ -8,7 +8,7 @@ const monorepoRoot = path.resolve(__dirname, '../..');
 
 async function fetchGitHubStars(): Promise<number | null> {
   try {
-    const res = await fetch('https://api.github.com/repos/eigenpal/docx-editor');
+    const res = await fetch('https://api.github.com/repos/xcrong/docx-editor');
     const data = await res.json();
     if (typeof data.stargazers_count === 'number') return data.stargazers_count;
   } catch {}
@@ -34,45 +34,45 @@ export default defineConfig(async () => {
             // Resolve package imports to source for live development
             // Order matters: more-specific prefixes before less-specific ones
             {
-              find: '@eigenpal/docx-editor-react',
+              find: '@xcrong/docx-editor-react',
               replacement: path.join(monorepoRoot, 'packages/react/src/index.ts'),
             },
             {
-              find: '@eigenpal/docx-editor-i18n',
+              find: '@xcrong/docx-editor-i18n',
               replacement: path.join(monorepoRoot, 'packages/i18n/src/index.ts'),
             },
             {
-              find: '@eigenpal/docx-editor-agents/react',
+              find: '@xcrong/docx-editor-agents/react',
               replacement: path.join(monorepoRoot, 'packages/agents/src/react.ts'),
             },
             {
-              find: '@eigenpal/docx-editor-agents/server',
+              find: '@xcrong/docx-editor-agents/server',
               replacement: path.join(monorepoRoot, 'packages/agents/src/server.ts'),
             },
             {
-              find: /^@eigenpal\/docx-editor-agents$/,
+              find: /^@xcrong\/docx-editor-agents$/,
               replacement: path.join(monorepoRoot, 'packages/agents/src/index.ts'),
             },
             {
-              find: '@eigenpal/docx-editor-core/headless',
+              find: '@xcrong/docx-editor-core/headless',
               replacement: path.join(monorepoRoot, 'packages/core/src/headless.ts'),
             },
             {
-              find: '@eigenpal/docx-editor-core/core-plugins',
+              find: '@xcrong/docx-editor-core/core-plugins',
               replacement: path.join(monorepoRoot, 'packages/core/src/core-plugins/index.ts'),
             },
             {
-              find: '@eigenpal/docx-editor-core/mcp',
+              find: '@xcrong/docx-editor-core/mcp',
               replacement: path.join(monorepoRoot, 'packages/core/src/mcp/index.ts'),
             },
-            // Wildcard alias for deep core imports (e.g. @eigenpal/docx-editor-core/utils/docxInput)
+            // Wildcard alias for deep core imports (e.g. @xcrong/docx-editor-core/utils/docxInput)
             {
-              find: /^@eigenpal\/docx-editor-core\/(.+)/,
+              find: /^@xcrong\/docx-editor-core\/(.+)/,
               replacement: path.join(monorepoRoot, 'packages/core/src/$1'),
             },
-            // Exact match for bare @eigenpal/docx-editor-core (must come AFTER the prefix match above)
+            // Exact match for bare @xcrong/docx-editor-core (must come AFTER the prefix match above)
             {
-              find: /^@eigenpal\/docx-editor-core$/,
+              find: /^@xcrong\/docx-editor-core$/,
               replacement: path.join(monorepoRoot, 'packages/core/src/core.ts'),
             },
             { find: '@', replacement: path.join(monorepoRoot, 'packages/react/src') },

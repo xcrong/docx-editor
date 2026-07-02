@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { DocxEditor, type DocxEditorRef } from '@eigenpal/docx-editor-react';
+import { DocxEditor, type DocxEditorRef } from '@xcrong/docx-editor-react';
 
 type Phase = 'upload' | 'roasting' | 'result';
 
@@ -242,8 +242,8 @@ export default function Home() {
 
         <div style={styles.footer}>
           Powered by{' '}
-          <a href="https://www.npmjs.com/package/@eigenpal/docx-editor-agents" style={styles.link}>
-            @eigenpal/docx-editor-agents
+          <a href="https://www.npmjs.com/package/@xcrong/docx-editor-agents" style={styles.link}>
+            @xcrong/docx-editor-agents
           </a>
           {' + '}
           <a href="https://platform.openai.com" style={styles.link}>

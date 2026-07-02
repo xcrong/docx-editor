@@ -28,7 +28,7 @@ test.describe('Help menu', () => {
     expect(openedUrl).toBeDefined();
 
     const url = new URL(openedUrl!);
-    expect(url.origin + url.pathname).toBe('https://github.com/eigenpal/docx-editor/issues/new');
+    expect(url.origin + url.pathname).toBe('https://github.com/xcrong/docx-editor/issues/new');
 
     expect(url.searchParams.get('title')).toBe('[Bug] ');
     const body = url.searchParams.get('body') ?? '';

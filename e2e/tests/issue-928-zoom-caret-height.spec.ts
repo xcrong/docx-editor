@@ -9,7 +9,7 @@
  * height scales LINEARLY with zoom (core `getCaretPositionFromDom` normalizes
  * the one scaled measurement by zoom) — covers React and Vue via core.
  *
- * Background: https://github.com/eigenpal/docx-editor/issues/928
+ * Background: https://github.com/xcrong/docx-editor/issues/928
  */
 
 import { test, expect } from '@playwright/test';

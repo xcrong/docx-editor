@@ -1,5 +1,5 @@
 /**
- * @eigenpal/docx-editor-agents/mcp
+ * @xcrong/docx-editor-agents/mcp
  *
  * Model Context Protocol (MCP) server for the docx editor agent bridge.
  *

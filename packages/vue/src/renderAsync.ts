@@ -4,13 +4,13 @@
 
 import { createApp, h, type App } from 'vue';
 import DocxEditor from './components/DocxEditor.vue';
-import type { EditorHandle } from '@eigenpal/docx-editor-core';
-import type { Document } from '@eigenpal/docx-editor-core/types/document';
+import type { EditorHandle } from '@xcrong/docx-editor-core';
+import type { Document } from '@xcrong/docx-editor-core/types/document';
 import {
   toArrayBuffer,
   type DocxInput,
   type ScrollToParaIdOptions,
-} from '@eigenpal/docx-editor-core/utils';
+} from '@xcrong/docx-editor-core/utils';
 import type { DocxEditorProps, DocxEditorRef, EditorMode } from './components/DocxEditor/types';
 
 /** Options for `renderAsync`. */

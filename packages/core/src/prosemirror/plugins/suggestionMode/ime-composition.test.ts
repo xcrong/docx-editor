@@ -5,7 +5,7 @@
  * composition is in flight the plugin must NOT mark the composed text (the
  * `appendTransaction` catch-all is suppressed), and the committed text must be
  * marked as a tracked insertion once, on compositionend. See the
- * `createSuggestionModePlugin` IME comments and eigenpal/docx-editor#676.
+ * `createSuggestionModePlugin` IME comments and xcrong/docx-editor#676.
  *
  * The composition handling lives in view-level DOM handlers, so these tests
  * drive `props.handleDOMEvents` against a minimal mock view whose `dispatch`

@@ -4,4 +4,4 @@ export {
   buildReportIssueUrl,
   openReportIssue,
   type ReportIssueEnv,
-} from '@eigenpal/docx-editor-core/utils/reportIssue';
+} from '@xcrong/docx-editor-core/utils/reportIssue';

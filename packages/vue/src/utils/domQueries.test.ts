@@ -1,6 +1,6 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
-import type { Layout } from '@eigenpal/docx-editor-core/layout-engine';
+import type { Layout } from '@xcrong/docx-editor-core/layout-engine';
 
 import { scrollVisiblePositionIntoView } from './domQueries';
 

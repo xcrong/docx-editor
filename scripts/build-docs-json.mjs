@@ -40,7 +40,7 @@ const docsJsonDir = path.join(repoRoot, 'docs', 'json');
 // Default is `main` for now since docs JSON is regenerated on every PR
 // touch via api:extract anyway.
 const GITHUB = {
-  repo: 'eigenpal/docx-editor',
+  repo: 'xcrong/docx-editor',
   ref: process.env.DOCS_GITHUB_REF || 'main',
 };
 
@@ -60,7 +60,7 @@ function entriesFromExports(packageRoot, packageName, exportsMap) {
   // Instead of parsing tsup configs we use a robust fallback: scan all
   // `**/index.ts` and same-named `.ts` files under `src/`, pick the one
   // whose head doc-block names this exact subpath (e.g. matches the
-  // string `@eigenpal/docx-editor-react/dialogs` in the comment).
+  // string `@xcrong/docx-editor-react/dialogs` in the comment).
   const subpathSrcIndex = buildSubpathSrcIndex(packageRoot, packageName);
 
   const entries = [];

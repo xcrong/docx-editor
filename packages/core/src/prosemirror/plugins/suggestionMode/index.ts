@@ -84,8 +84,8 @@ function markComposedAsInsertion(
 /**
  * Create the suggestion-mode ProseMirror plugin. **Must be mounted on
  * the editor view for `setSuggestionMode` and `toggleSuggestionMode`
- * to do anything** — both adapters (`@eigenpal/docx-editor-react`,
- * `@eigenpal/docx-editor-vue`) auto-mount this inside the `DocxEditor`
+ * to do anything** — both adapters (`@xcrong/docx-editor-react`,
+ * `@xcrong/docx-editor-vue`) auto-mount this inside the `DocxEditor`
  * component, so consumers using the bundled components don't need to
  * register it themselves.
  *
@@ -100,7 +100,7 @@ function markComposedAsInsertion(
  *
  * @example
  * ```ts
- * import { createSuggestionModePlugin } from '@eigenpal/docx-editor-core/prosemirror/plugins';
+ * import { createSuggestionModePlugin } from '@xcrong/docx-editor-core/prosemirror/plugins';
  *
  * const plugin = createSuggestionModePlugin(false, 'Jane');
  * EditorState.create({ doc, plugins: [plugin, ...other] });
@@ -261,7 +261,7 @@ export function createSuggestionModePlugin(initialActive = false, author = 'User
       // History transactions are skipped because a tracked edit and its marks
       // are recorded in one history event, so undo/redo already restores them;
       // re-running the catch-all over the replayed steps mis-stamps an insertion
-      // on the boundary character. See eigenpal/docx-editor#633.
+      // on the boundary character. See xcrong/docx-editor#633.
       const userTr = transactions.find(
         (tr) =>
           tr.docChanged &&

@@ -46,9 +46,9 @@
       "dependencies": {
         "@ai-sdk/openai": "^3.0.54",
         "@ai-sdk/react": "^3.0.171",
-        "@eigenpal/docx-editor-agents": "workspace:*",
-        "@eigenpal/docx-editor-core": "workspace:*",
-        "@eigenpal/docx-editor-react": "workspace:*",
+        "@xcrong/docx-editor-agents": "workspace:*",
+        "@xcrong/docx-editor-core": "workspace:*",
+        "@xcrong/docx-editor-react": "workspace:*",
         "ai": "^6.0.169",
         "next": "^16.2.4",
         "react": "^19.0.0",
@@ -67,9 +67,9 @@
     "examples/agents-demo": {
       "name": "agents-demo",
       "dependencies": {
-        "@eigenpal/docx-editor-agents": "workspace:*",
-        "@eigenpal/docx-editor-core": "workspace:*",
-        "@eigenpal/docx-editor-react": "workspace:*",
+        "@xcrong/docx-editor-agents": "workspace:*",
+        "@xcrong/docx-editor-core": "workspace:*",
+        "@xcrong/docx-editor-react": "workspace:*",
         "next": "^16.2.6",
         "openai": "^6.36.0",
         "react": "^19.0.0",
@@ -86,8 +86,8 @@
       "name": "docx-editor-example-astro",
       "dependencies": {
         "@astrojs/react": "^5.0.4",
-        "@eigenpal/docx-editor-core": "workspace:*",
-        "@eigenpal/docx-editor-react": "workspace:*",
+        "@xcrong/docx-editor-core": "workspace:*",
+        "@xcrong/docx-editor-react": "workspace:*",
         "astro": "^6.3.1",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
@@ -103,8 +103,8 @@
     "examples/collaboration": {
       "name": "docx-editor-example-collaboration",
       "dependencies": {
-        "@eigenpal/docx-editor-core": "workspace:*",
-        "@eigenpal/docx-editor-react": "workspace:*",
+        "@xcrong/docx-editor-core": "workspace:*",
+        "@xcrong/docx-editor-react": "workspace:*",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "y-prosemirror": "^1.2.12",
@@ -122,8 +122,8 @@
     "examples/nextjs": {
       "name": "docx-editor-example-nextjs",
       "dependencies": {
-        "@eigenpal/docx-editor-core": "workspace:*",
-        "@eigenpal/docx-editor-react": "workspace:*",
+        "@xcrong/docx-editor-core": "workspace:*",
+        "@xcrong/docx-editor-react": "workspace:*",
         "next": "^16.2.7",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
@@ -139,9 +139,9 @@
     "examples/nuxt": {
       "name": "docx-editor-example-nuxt",
       "dependencies": {
-        "@eigenpal/docx-editor-core": "workspace:*",
-        "@eigenpal/docx-editor-vue": "workspace:*",
-        "@eigenpal/nuxt-docx-editor": "workspace:*",
+        "@xcrong/docx-editor-core": "workspace:*",
+        "@xcrong/docx-editor-vue": "workspace:*",
+        "@xcrong/nuxt-docx-editor": "workspace:*",
         "vue": "^3.5.0",
       },
       "devDependencies": {
@@ -152,8 +152,8 @@
     "examples/plugins/docxtemplater": {
       "name": "docx-editor-example-docxtemplater",
       "dependencies": {
-        "@eigenpal/docx-editor-core": "workspace:*",
-        "@eigenpal/docx-editor-react": "workspace:*",
+        "@xcrong/docx-editor-core": "workspace:*",
+        "@xcrong/docx-editor-react": "workspace:*",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
       },
@@ -168,8 +168,8 @@
     "examples/plugins/hello-world": {
       "name": "docx-editor-example-hello-world",
       "dependencies": {
-        "@eigenpal/docx-editor-core": "workspace:*",
-        "@eigenpal/docx-editor-react": "workspace:*",
+        "@xcrong/docx-editor-core": "workspace:*",
+        "@xcrong/docx-editor-react": "workspace:*",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
       },
@@ -184,8 +184,8 @@
     "examples/remix": {
       "name": "docx-editor-example-remix",
       "dependencies": {
-        "@eigenpal/docx-editor-core": "workspace:*",
-        "@eigenpal/docx-editor-react": "workspace:*",
+        "@xcrong/docx-editor-core": "workspace:*",
+        "@xcrong/docx-editor-react": "workspace:*",
         "@remix-run/node": "^2.16.0",
         "@remix-run/react": "^2.16.0",
         "@remix-run/serve": "^2.16.0",
@@ -207,9 +207,9 @@
     "examples/vite": {
       "name": "docx-editor-example-vite",
       "dependencies": {
-        "@eigenpal/docx-editor-agents": "workspace:*",
-        "@eigenpal/docx-editor-core": "workspace:*",
-        "@eigenpal/docx-editor-react": "workspace:*",
+        "@xcrong/docx-editor-agents": "workspace:*",
+        "@xcrong/docx-editor-core": "workspace:*",
+        "@xcrong/docx-editor-react": "workspace:*",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
       },
@@ -224,10 +224,10 @@
     "examples/vue": {
       "name": "docx-editor-example-vue",
       "dependencies": {
-        "@eigenpal/docx-editor-agents": "workspace:*",
-        "@eigenpal/docx-editor-core": "workspace:*",
-        "@eigenpal/docx-editor-i18n": "workspace:*",
-        "@eigenpal/docx-editor-vue": "workspace:*",
+        "@xcrong/docx-editor-agents": "workspace:*",
+        "@xcrong/docx-editor-core": "workspace:*",
+        "@xcrong/docx-editor-i18n": "workspace:*",
+        "@xcrong/docx-editor-vue": "workspace:*",
         "vue": "^3.5.0",
       },
       "devDependencies": {
@@ -237,7 +237,7 @@
       },
     },
     "packages/agents": {
-      "name": "@eigenpal/docx-editor-agents",
+      "name": "@xcrong/docx-editor-agents",
       "version": "1.8.3",
       "dependencies": {
         "docxtemplater": "^3.50.0",
@@ -268,7 +268,7 @@
       ],
     },
     "packages/core": {
-      "name": "@eigenpal/docx-editor-core",
+      "name": "@xcrong/docx-editor-core",
       "version": "1.8.3",
       "bin": {
         "docx-editor-mcp": "./dist/mcp-cli.mjs",
@@ -305,7 +305,7 @@
       },
     },
     "packages/i18n": {
-      "name": "@eigenpal/docx-editor-i18n",
+      "name": "@xcrong/docx-editor-i18n",
       "version": "1.8.3",
       "devDependencies": {
         "tsup": "^8.0.1",
@@ -313,10 +313,10 @@
       },
     },
     "packages/nuxt": {
-      "name": "@eigenpal/nuxt-docx-editor",
+      "name": "@xcrong/nuxt-docx-editor",
       "version": "1.8.3",
       "dependencies": {
-        "@eigenpal/docx-editor-vue": "^1.0.3",
+        "@xcrong/docx-editor-vue": "^1.0.3",
         "@nuxt/kit": "^3.14.0 || ^4.0.0",
         "prosemirror-commands": "^1.5.2",
         "prosemirror-dropcursor": "^1.8.2",
@@ -339,12 +339,12 @@
       },
     },
     "packages/react": {
-      "name": "@eigenpal/docx-editor-react",
+      "name": "@xcrong/docx-editor-react",
       "version": "1.8.3",
       "dependencies": {
-        "@eigenpal/docx-editor-agents": "^1.5.0",
-        "@eigenpal/docx-editor-core": "^1.5.0",
-        "@eigenpal/docx-editor-i18n": "^1.5.0",
+        "@xcrong/docx-editor-agents": "^1.5.0",
+        "@xcrong/docx-editor-core": "^1.5.0",
+        "@xcrong/docx-editor-i18n": "^1.5.0",
         "@radix-ui/react-select": "^2.2.6",
         "clsx": "^2.1.0",
         "sonner": "^2.0.7",
@@ -379,12 +379,12 @@
       ],
     },
     "packages/vue": {
-      "name": "@eigenpal/docx-editor-vue",
+      "name": "@xcrong/docx-editor-vue",
       "version": "1.8.3",
       "dependencies": {
-        "@eigenpal/docx-editor-agents": "^1.3.1",
-        "@eigenpal/docx-editor-core": "^1.3.1",
-        "@eigenpal/docx-editor-i18n": "^1.3.1",
+        "@xcrong/docx-editor-agents": "^1.3.1",
+        "@xcrong/docx-editor-core": "^1.3.1",
+        "@xcrong/docx-editor-i18n": "^1.3.1",
       },
       "devDependencies": {
         "prosemirror-history": "^1.4.0",
@@ -556,17 +556,17 @@
 
     "@dxup/unimport": ["@dxup/unimport@0.1.2", "", {}, "sha512-/B8YJGPzaYq1NbsQmwgP8EZqg40NpTw4ZB3suuI0TplbxKHeK94jeaawLmVhCv+YwUnOpiWEz9U6SeThku/8JQ=="],
 
-    "@eigenpal/docx-editor-agents": ["@eigenpal/docx-editor-agents@workspace:packages/agents"],
+    "@xcrong/docx-editor-agents": ["@xcrong/docx-editor-agents@workspace:packages/agents"],
 
-    "@eigenpal/docx-editor-core": ["@eigenpal/docx-editor-core@workspace:packages/core"],
+    "@xcrong/docx-editor-core": ["@xcrong/docx-editor-core@workspace:packages/core"],
 
-    "@eigenpal/docx-editor-i18n": ["@eigenpal/docx-editor-i18n@workspace:packages/i18n"],
+    "@xcrong/docx-editor-i18n": ["@xcrong/docx-editor-i18n@workspace:packages/i18n"],
 
-    "@eigenpal/docx-editor-react": ["@eigenpal/docx-editor-react@workspace:packages/react"],
+    "@xcrong/docx-editor-react": ["@xcrong/docx-editor-react@workspace:packages/react"],
 
-    "@eigenpal/docx-editor-vue": ["@eigenpal/docx-editor-vue@workspace:packages/vue"],
+    "@xcrong/docx-editor-vue": ["@xcrong/docx-editor-vue@workspace:packages/vue"],
 
-    "@eigenpal/nuxt-docx-editor": ["@eigenpal/nuxt-docx-editor@workspace:packages/nuxt"],
+    "@xcrong/nuxt-docx-editor": ["@xcrong/nuxt-docx-editor@workspace:packages/nuxt"],
 
     "@emnapi/core": ["@emnapi/core@1.10.0", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.1", "tslib": "^2.4.0" } }, "sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw=="],
 
@@ -3460,9 +3460,9 @@
 
     "@dxup/nuxt/chokidar": ["chokidar@5.0.0", "", { "dependencies": { "readdirp": "^5.0.0" } }, "sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw=="],
 
-    "@eigenpal/docx-editor-agents/@vitejs/plugin-vue": ["@vitejs/plugin-vue@6.0.7", "", { "dependencies": { "@rolldown/pluginutils": "^1.0.1" }, "peerDependencies": { "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0", "vue": "^3.2.25" } }, "sha512-km+p+XdSz9Sxm5rqUbqcSfZYaAniKxWBj1KURl+Jr7UaPvvX7BmaWMdP69I5rrFDeQGyxAG7NXdc57vz+snhWg=="],
+    "@xcrong/docx-editor-agents/@vitejs/plugin-vue": ["@vitejs/plugin-vue@6.0.7", "", { "dependencies": { "@rolldown/pluginutils": "^1.0.1" }, "peerDependencies": { "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0", "vue": "^3.2.25" } }, "sha512-km+p+XdSz9Sxm5rqUbqcSfZYaAniKxWBj1KURl+Jr7UaPvvX7BmaWMdP69I5rrFDeQGyxAG7NXdc57vz+snhWg=="],
 
-    "@eigenpal/docx-editor-agents/vue": ["vue@3.5.34", "", { "dependencies": { "@vue/compiler-dom": "3.5.34", "@vue/compiler-sfc": "3.5.34", "@vue/runtime-dom": "3.5.34", "@vue/server-renderer": "3.5.34", "@vue/shared": "3.5.34" }, "peerDependencies": { "typescript": "*" }, "optionalPeers": ["typescript"] }, "sha512-WdLBG9gm02OgJIG9axd5Hpx0TFLdzVgfG2evFFu8Rur5O/IoGc5cMjnjh3tPL6GnRGsYvUhBSKVPYVcxRKpMCA=="],
+    "@xcrong/docx-editor-agents/vue": ["vue@3.5.34", "", { "dependencies": { "@vue/compiler-dom": "3.5.34", "@vue/compiler-sfc": "3.5.34", "@vue/runtime-dom": "3.5.34", "@vue/server-renderer": "3.5.34", "@vue/shared": "3.5.34" }, "peerDependencies": { "typescript": "*" }, "optionalPeers": ["typescript"] }, "sha512-WdLBG9gm02OgJIG9axd5Hpx0TFLdzVgfG2evFFu8Rur5O/IoGc5cMjnjh3tPL6GnRGsYvUhBSKVPYVcxRKpMCA=="],
 
     "@eslint-community/eslint-utils/eslint-visitor-keys": ["eslint-visitor-keys@3.4.3", "", {}, "sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag=="],
 
@@ -4224,15 +4224,15 @@
 
     "@dxup/nuxt/chokidar/readdirp": ["readdirp@5.0.0", "", {}, "sha512-9u/XQ1pvrQtYyMpZe7DXKv2p5CNvyVwzUB6uhLAnQwHMSgKMBR62lc7AHljaeteeHXn11XTAaLLUVZYVZyuRBQ=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/compiler-dom": ["@vue/compiler-dom@3.5.34", "", { "dependencies": { "@vue/compiler-core": "3.5.34", "@vue/shared": "3.5.34" } }, "sha512-EbF/T++k0e2MMZlJsBhzK8Sgwt0HcIPOhzn1CTB/lv6sQcyk+OWf8YeiLxZp3ro7MbbLcAfAJ6sEvjFWuNgUCw=="],
+    "@xcrong/docx-editor-agents/vue/@vue/compiler-dom": ["@vue/compiler-dom@3.5.34", "", { "dependencies": { "@vue/compiler-core": "3.5.34", "@vue/shared": "3.5.34" } }, "sha512-EbF/T++k0e2MMZlJsBhzK8Sgwt0HcIPOhzn1CTB/lv6sQcyk+OWf8YeiLxZp3ro7MbbLcAfAJ6sEvjFWuNgUCw=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/compiler-sfc": ["@vue/compiler-sfc@3.5.34", "", { "dependencies": { "@babel/parser": "^7.29.3", "@vue/compiler-core": "3.5.34", "@vue/compiler-dom": "3.5.34", "@vue/compiler-ssr": "3.5.34", "@vue/shared": "3.5.34", "estree-walker": "^2.0.2", "magic-string": "^0.30.21", "postcss": "^8.5.14", "source-map-js": "^1.2.1" } }, "sha512-D/ihr6uZeIt6r+pVZf46RWT1fAsLFMbUP7k8G1VkiiWexriED9GrX3echHd4Abbt17zjlfiFJ8z7a3BxZOPNjg=="],
+    "@xcrong/docx-editor-agents/vue/@vue/compiler-sfc": ["@vue/compiler-sfc@3.5.34", "", { "dependencies": { "@babel/parser": "^7.29.3", "@vue/compiler-core": "3.5.34", "@vue/compiler-dom": "3.5.34", "@vue/compiler-ssr": "3.5.34", "@vue/shared": "3.5.34", "estree-walker": "^2.0.2", "magic-string": "^0.30.21", "postcss": "^8.5.14", "source-map-js": "^1.2.1" } }, "sha512-D/ihr6uZeIt6r+pVZf46RWT1fAsLFMbUP7k8G1VkiiWexriED9GrX3echHd4Abbt17zjlfiFJ8z7a3BxZOPNjg=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/runtime-dom": ["@vue/runtime-dom@3.5.34", "", { "dependencies": { "@vue/reactivity": "3.5.34", "@vue/runtime-core": "3.5.34", "@vue/shared": "3.5.34", "csstype": "^3.2.3" } }, "sha512-e8kZzERmCwUnBRVsgSQlAfrfU2rGoy0FFKPBXSlfEjc/O3KfA7QP0t1/2ZylrbchjmIKB4dPTd07A6WPr0eOrg=="],
+    "@xcrong/docx-editor-agents/vue/@vue/runtime-dom": ["@vue/runtime-dom@3.5.34", "", { "dependencies": { "@vue/reactivity": "3.5.34", "@vue/runtime-core": "3.5.34", "@vue/shared": "3.5.34", "csstype": "^3.2.3" } }, "sha512-e8kZzERmCwUnBRVsgSQlAfrfU2rGoy0FFKPBXSlfEjc/O3KfA7QP0t1/2ZylrbchjmIKB4dPTd07A6WPr0eOrg=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/server-renderer": ["@vue/server-renderer@3.5.34", "", { "dependencies": { "@vue/compiler-ssr": "3.5.34", "@vue/shared": "3.5.34" }, "peerDependencies": { "vue": "3.5.34" } }, "sha512-nHxmJoTrKsmrkbILRhkC9gY1G3moZbJTqCzDd7DOOzG5KH9oeJ0Unqrff5f9v0pW//jES05ZkJcNtfE8JjOIew=="],
+    "@xcrong/docx-editor-agents/vue/@vue/server-renderer": ["@vue/server-renderer@3.5.34", "", { "dependencies": { "@vue/compiler-ssr": "3.5.34", "@vue/shared": "3.5.34" }, "peerDependencies": { "vue": "3.5.34" } }, "sha512-nHxmJoTrKsmrkbILRhkC9gY1G3moZbJTqCzDd7DOOzG5KH9oeJ0Unqrff5f9v0pW//jES05ZkJcNtfE8JjOIew=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/shared": ["@vue/shared@3.5.34", "", {}, "sha512-24uqU4OIiX29ryC3MeWid/Xf2fa2EFRUVLb77nRhk+UrTVrh/XiGtFAFmJBAtBRbjwNdsPRP+jj/OL27Eg1NDA=="],
+    "@xcrong/docx-editor-agents/vue/@vue/shared": ["@vue/shared@3.5.34", "", {}, "sha512-24uqU4OIiX29ryC3MeWid/Xf2fa2EFRUVLb77nRhk+UrTVrh/XiGtFAFmJBAtBRbjwNdsPRP+jj/OL27Eg1NDA=="],
 
     "@happy-dom/global-registrator/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 
@@ -4832,19 +4832,19 @@
 
     "zip-stream/readable-stream/string_decoder": ["string_decoder@1.3.0", "", { "dependencies": { "safe-buffer": "~5.2.0" } }, "sha512-hkRX8U1WjJFd8LsDJ2yQ/wWWxaopEsABU1XfkM8A+j0+85JAGppt16cr1Whg6KIbb4okU6Mql6BOj+uup/wKeA=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/compiler-dom/@vue/compiler-core": ["@vue/compiler-core@3.5.34", "", { "dependencies": { "@babel/parser": "^7.29.3", "@vue/shared": "3.5.34", "entities": "^7.0.1", "estree-walker": "^2.0.2", "source-map-js": "^1.2.1" } }, "sha512-s9cLyK5mLcvZ4Agva5QgRsQyLKvts9WbU9DB6NqiZkkGEdwmcEiylj5Jbwkp680drF/NNCV8OlAJSe+yMLxaJw=="],
+    "@xcrong/docx-editor-agents/vue/@vue/compiler-dom/@vue/compiler-core": ["@vue/compiler-core@3.5.34", "", { "dependencies": { "@babel/parser": "^7.29.3", "@vue/shared": "3.5.34", "entities": "^7.0.1", "estree-walker": "^2.0.2", "source-map-js": "^1.2.1" } }, "sha512-s9cLyK5mLcvZ4Agva5QgRsQyLKvts9WbU9DB6NqiZkkGEdwmcEiylj5Jbwkp680drF/NNCV8OlAJSe+yMLxaJw=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/compiler-sfc/@vue/compiler-core": ["@vue/compiler-core@3.5.34", "", { "dependencies": { "@babel/parser": "^7.29.3", "@vue/shared": "3.5.34", "entities": "^7.0.1", "estree-walker": "^2.0.2", "source-map-js": "^1.2.1" } }, "sha512-s9cLyK5mLcvZ4Agva5QgRsQyLKvts9WbU9DB6NqiZkkGEdwmcEiylj5Jbwkp680drF/NNCV8OlAJSe+yMLxaJw=="],
+    "@xcrong/docx-editor-agents/vue/@vue/compiler-sfc/@vue/compiler-core": ["@vue/compiler-core@3.5.34", "", { "dependencies": { "@babel/parser": "^7.29.3", "@vue/shared": "3.5.34", "entities": "^7.0.1", "estree-walker": "^2.0.2", "source-map-js": "^1.2.1" } }, "sha512-s9cLyK5mLcvZ4Agva5QgRsQyLKvts9WbU9DB6NqiZkkGEdwmcEiylj5Jbwkp680drF/NNCV8OlAJSe+yMLxaJw=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/compiler-sfc/@vue/compiler-ssr": ["@vue/compiler-ssr@3.5.34", "", { "dependencies": { "@vue/compiler-dom": "3.5.34", "@vue/shared": "3.5.34" } }, "sha512-cDtTHKibkThKGHH1SP+WdccquNRYQDFH6rRjQCqT9G2ltFAfoR5pUftpab/z+aM5mW9HLLVQW7hfKKQe/1GBeQ=="],
+    "@xcrong/docx-editor-agents/vue/@vue/compiler-sfc/@vue/compiler-ssr": ["@vue/compiler-ssr@3.5.34", "", { "dependencies": { "@vue/compiler-dom": "3.5.34", "@vue/shared": "3.5.34" } }, "sha512-cDtTHKibkThKGHH1SP+WdccquNRYQDFH6rRjQCqT9G2ltFAfoR5pUftpab/z+aM5mW9HLLVQW7hfKKQe/1GBeQ=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/compiler-sfc/postcss": ["postcss@8.5.14", "", { "dependencies": { "nanoid": "^3.3.11", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg=="],
+    "@xcrong/docx-editor-agents/vue/@vue/compiler-sfc/postcss": ["postcss@8.5.14", "", { "dependencies": { "nanoid": "^3.3.11", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/runtime-dom/@vue/reactivity": ["@vue/reactivity@3.5.34", "", { "dependencies": { "@vue/shared": "3.5.34" } }, "sha512-y9XDjCEuBp+98k+UL5dbYkh57AHU4o6cxZedOPXw3bmrZZYLQsVHguGurq7hVrPCSrQtrnz1f9dssyFr+dMXfQ=="],
+    "@xcrong/docx-editor-agents/vue/@vue/runtime-dom/@vue/reactivity": ["@vue/reactivity@3.5.34", "", { "dependencies": { "@vue/shared": "3.5.34" } }, "sha512-y9XDjCEuBp+98k+UL5dbYkh57AHU4o6cxZedOPXw3bmrZZYLQsVHguGurq7hVrPCSrQtrnz1f9dssyFr+dMXfQ=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/runtime-dom/@vue/runtime-core": ["@vue/runtime-core@3.5.34", "", { "dependencies": { "@vue/reactivity": "3.5.34", "@vue/shared": "3.5.34" } }, "sha512-mKeBYvu8tcMSLhypAHBmriUFfWXKTCF/23Z4jiCoYK3UtWepkliViNLuR90V9XOyD62mUxs9p1jsrpK3CCGIzw=="],
+    "@xcrong/docx-editor-agents/vue/@vue/runtime-dom/@vue/runtime-core": ["@vue/runtime-core@3.5.34", "", { "dependencies": { "@vue/reactivity": "3.5.34", "@vue/shared": "3.5.34" } }, "sha512-mKeBYvu8tcMSLhypAHBmriUFfWXKTCF/23Z4jiCoYK3UtWepkliViNLuR90V9XOyD62mUxs9p1jsrpK3CCGIzw=="],
 
-    "@eigenpal/docx-editor-agents/vue/@vue/server-renderer/@vue/compiler-ssr": ["@vue/compiler-ssr@3.5.34", "", { "dependencies": { "@vue/compiler-dom": "3.5.34", "@vue/shared": "3.5.34" } }, "sha512-cDtTHKibkThKGHH1SP+WdccquNRYQDFH6rRjQCqT9G2ltFAfoR5pUftpab/z+aM5mW9HLLVQW7hfKKQe/1GBeQ=="],
+    "@xcrong/docx-editor-agents/vue/@vue/server-renderer/@vue/compiler-ssr": ["@vue/compiler-ssr@3.5.34", "", { "dependencies": { "@vue/compiler-dom": "3.5.34", "@vue/shared": "3.5.34" } }, "sha512-cDtTHKibkThKGHH1SP+WdccquNRYQDFH6rRjQCqT9G2ltFAfoR5pUftpab/z+aM5mW9HLLVQW7hfKKQe/1GBeQ=="],
 
     "@manypkg/find-root/find-up/locate-path/p-locate": ["p-locate@4.1.0", "", { "dependencies": { "p-limit": "^2.2.0" } }, "sha512-R79ZZ/0wAxKGu3oYMlz8jy/kbhsNrS7SKZ7PxEHBgJ5+F2mtFW2fK2cOtBh1cHYkQsbzFV7I+EoRKe6Yt0oK7A=="],
 

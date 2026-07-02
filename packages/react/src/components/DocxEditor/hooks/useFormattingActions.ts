@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { TextSelection } from 'prosemirror-state';
-import type { Document } from '@eigenpal/docx-editor-core/types/document';
+import type { Document } from '@xcrong/docx-editor-core/types/document';
 import {
   toggleBold,
   toggleItalic,
@@ -32,9 +32,9 @@ import {
   insertSectionBreakContinuous,
   generateTOC,
   insertTable,
-} from '@eigenpal/docx-editor-core/prosemirror/commands';
-import { createStyleResolver } from '@eigenpal/docx-editor-core/prosemirror';
-import { getCachedNumberingMap } from '@eigenpal/docx-editor-core/docx';
+} from '@xcrong/docx-editor-core/prosemirror/commands';
+import { createStyleResolver } from '@xcrong/docx-editor-core/prosemirror';
+import { getCachedNumberingMap } from '@xcrong/docx-editor-core/docx';
 import type { EditorView } from 'prosemirror-view';
 import type { FormattingAction } from '../../Toolbar';
 import { pointsToHalfPoints } from '../../ui/FontSizePicker';

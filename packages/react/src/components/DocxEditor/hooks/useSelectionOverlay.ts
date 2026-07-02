@@ -24,9 +24,9 @@ import {
   syncImeCaretAnchor,
   type CaretPosition,
   type SelectionRect,
-} from '@eigenpal/docx-editor-core/layout-bridge';
-import type { FlowBlock, Layout, Measure } from '@eigenpal/docx-editor-core/layout-engine';
-import { enclosingSdtGroupIds, applySdtFocus } from '@eigenpal/docx-editor-core/layout-painter';
+} from '@xcrong/docx-editor-core/layout-bridge';
+import type { FlowBlock, Layout, Measure } from '@xcrong/docx-editor-core/layout-engine';
+import { enclosingSdtGroupIds, applySdtFocus } from '@xcrong/docx-editor-core/layout-painter';
 
 import type { HiddenProseMirrorRef } from '../HiddenProseMirror';
 import type { ImageSelectionInfo } from '../overlays/ImageSelectionOverlay';

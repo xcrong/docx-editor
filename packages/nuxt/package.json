@@ -1,7 +1,7 @@
 {
-  "name": "@eigenpal/nuxt-docx-editor",
+  "name": "@xcrong/nuxt-docx-editor",
   "version": "1.10.0",
-  "description": "Nuxt 3 & 4 module for the @eigenpal/docx-editor WYSIWYG DOCX editor — auto-imports an SSR-safe <DocxEditor> component.",
+  "description": "Nuxt 3 & 4 module for the @xcrong/docx-editor WYSIWYG DOCX editor — auto-imports an SSR-safe <DocxEditor> component.",
   "type": "module",
   "exports": {
     ".": {
@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "@nuxt/kit": "^3.14.0 || ^4.0.0",
-    "@eigenpal/docx-editor-vue": "^1.10.0",
+    "@xcrong/docx-editor-vue": "^1.10.0",
     "prosemirror-commands": "^1.5.2",
     "prosemirror-dropcursor": "^1.8.2",
     "prosemirror-history": "^1.4.0",
@@ -63,10 +63,10 @@
     "url": "https://github.com/jedrazb"
   },
   "license": "Apache-2.0",
-  "homepage": "https://docx-editor.dev/",
+  "homepage": "https://github.com/xcrong/docx-editor",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eigenpal/docx-editor.git",
+    "url": "https://github.com/xcrong/docx-editor.git",
     "directory": "packages/nuxt"
   },
   "publishConfig": {

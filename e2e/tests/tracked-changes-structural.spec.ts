@@ -7,7 +7,7 @@
  * tracked paragraph-mark deletion (`pPrDel`) on the previous paragraph —
  * not an untracked structural edit. Then exercises accept/reject by id.
  *
- * Background: https://github.com/eigenpal/docx-editor/issues/614
+ * Background: https://github.com/xcrong/docx-editor/issues/614
  */
 
 import { test, expect } from '@playwright/test';

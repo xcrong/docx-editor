@@ -14,10 +14,10 @@ import {
   findBodyPmSpans,
   findBodyPmAnchor,
   clickToPositionDom,
-} from '@eigenpal/docx-editor-core/layout-bridge';
-import { findPageIndexContainingPmPos } from '@eigenpal/docx-editor-core/layout-engine';
-import type { Layout } from '@eigenpal/docx-editor-core/layout-engine';
-import { findWordBoundaries } from '@eigenpal/docx-editor-core/utils';
+} from '@xcrong/docx-editor-core/layout-bridge';
+import { findPageIndexContainingPmPos } from '@xcrong/docx-editor-core/layout-engine';
+import type { Layout } from '@xcrong/docx-editor-core/layout-engine';
+import { findWordBoundaries } from '@xcrong/docx-editor-core/utils';
 
 /**
  * Resolve the painted header/footer instance nearest the viewport center — the

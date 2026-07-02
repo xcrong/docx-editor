@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { DocxEditor, type DocxEditorRef } from '@eigenpal/docx-editor-react';
-import { PluginHost, templatePlugin } from '@eigenpal/docx-editor-react/plugin-api';
-import { createEmptyDocument, type Document } from '@eigenpal/docx-editor-core';
+import { DocxEditor, type DocxEditorRef } from '@xcrong/docx-editor-react';
+import { PluginHost, templatePlugin } from '@xcrong/docx-editor-react/plugin-api';
+import { createEmptyDocument, type Document } from '@xcrong/docx-editor-core';
 
 function createTemplateDocument(): Document {
   const doc = createEmptyDocument();
@@ -259,12 +259,12 @@ export function App() {
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <a
-            href="https://github.com/eigenpal/docx-editor"
+            href="https://github.com/xcrong/docx-editor"
             target="_blank"
             rel="noopener noreferrer"
             style={styles.titleLink}
           >
-            <h1 style={styles.title}>@eigenpal/docx-editor-react</h1>
+            <h1 style={styles.title}>@xcrong/docx-editor-react</h1>
           </a>
           <span style={styles.badge}>Docxtemplater Plugin</span>
           {fileName && <span style={styles.fileName}>{fileName}</span>}

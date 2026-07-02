@@ -1,7 +1,7 @@
 {
-  "name": "@eigenpal/docx-editor-i18n",
+  "name": "@xcrong/docx-editor-i18n",
   "version": "1.10.0",
-  "description": "Shared UI locale strings and types for the @eigenpal docx-editor adapters (React and Vue).",
+  "description": "Shared UI locale strings and types for the @xcrong docx-editor adapters (React and Vue).",
   "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -69,10 +69,10 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup && node ../../scripts/inject-package-doc.mjs --package @eigenpal/docx-editor-i18n",
+    "build": "tsup && node ../../scripts/inject-package-doc.mjs --package @xcrong/docx-editor-i18n",
     "typecheck": "tsc --noEmit",
-    "api:extract": "node ../../scripts/api-extractor.mjs --package @eigenpal/docx-editor-i18n --local",
-    "api:check": "node ../../scripts/api-extractor.mjs --package @eigenpal/docx-editor-i18n"
+    "api:extract": "node ../../scripts/api-extractor.mjs --package @xcrong/docx-editor-i18n --local",
+    "api:check": "node ../../scripts/api-extractor.mjs --package @xcrong/docx-editor-i18n"
   },
   "devDependencies": {
     "tsup": "^8.0.1",
@@ -91,10 +91,10 @@
     "url": "https://github.com/jedrazb"
   },
   "license": "Apache-2.0",
-  "homepage": "https://docx-editor.dev/",
+  "homepage": "https://github.com/xcrong/docx-editor",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eigenpal/docx-editor.git",
+    "url": "https://github.com/xcrong/docx-editor.git",
     "directory": "packages/i18n"
   },
   "publishConfig": {

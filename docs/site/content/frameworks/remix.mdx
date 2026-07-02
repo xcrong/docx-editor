@@ -10,12 +10,12 @@ This page builds a Remix route that loads a `.docx`, keeps SSR and hydration int
 ## Install
 
 ```bash
-npm install @eigenpal/docx-editor-react
+npm install @xcrong/docx-editor-react
 ```
 
 ## Mount the editor
 
-Remix renders routes on the server by default and the editor is browser-only, so the route gates it behind a mount check plus a `lazy()` import. This is the pattern from [`examples/remix/app/routes/_index.tsx`](https://github.com/eigenpal/docx-editor/tree/main/examples/remix):
+Remix renders routes on the server by default and the editor is browser-only, so the route gates it behind a mount check plus a `lazy()` import. This is the pattern from [`examples/remix/app/routes/_index.tsx`](https://github.com/xcrong/docx-editor/tree/main/examples/remix):
 
 ```tsx
 // app/routes/_index.tsx
@@ -42,8 +42,8 @@ The editor component is plain React, no framework-specific code:
 ```tsx
 // app/components/Editor.tsx
 import { useRef, useState } from 'react';
-import { DocxEditor, type DocxEditorRef } from '@eigenpal/docx-editor-react';
-import '@eigenpal/docx-editor-react/styles.css';
+import { DocxEditor, type DocxEditorRef } from '@xcrong/docx-editor-react';
+import '@xcrong/docx-editor-react/styles.css';
 
 export function Editor() {
   const editorRef = useRef<DocxEditorRef>(null);
@@ -89,10 +89,10 @@ The pattern solves two problems, one per half:
 
 ## Run the example
 
-The example resolves `@eigenpal/*` from built output, so build the workspace packages once first:
+The example resolves `@xcrong/*` from built output, so build the workspace packages once first:
 
 ```bash
-git clone https://github.com/eigenpal/docx-editor.git
+git clone https://github.com/xcrong/docx-editor.git
 cd docx-editor
 bun install
 bun run build:packages
@@ -104,4 +104,4 @@ bun run dev:remix   # http://localhost:3001
 - [Quickstart](/docs/1.x/quickstart): the load, edit, save flow in detail
 - [Loading and saving](/docs/1.x/guides/loading-and-saving): URLs, autosave, upload to your API
 - [Remix DOCX editor guide](/blog/remix-docx-editor): the long-form walkthrough
-- [Remix example on GitHub](https://github.com/eigenpal/docx-editor/tree/main/examples/remix)
+- [Remix example on GitHub](https://github.com/xcrong/docx-editor/tree/main/examples/remix)

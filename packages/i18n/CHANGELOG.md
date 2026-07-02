@@ -1,4 +1,4 @@
-# @eigenpal/docx-editor-i18n
+# @xcrong/docx-editor-i18n
 
 ## 1.10.0
 
@@ -64,16 +64,16 @@
 
 ### Patch Changes
 
-- fe4cb94: Add per-locale subpath imports to `@eigenpal/docx-editor-i18n` so dynamic
+- fe4cb94: Add per-locale subpath imports to `@xcrong/docx-editor-i18n` so dynamic
   locale loading can code-split a single locale instead of bundling the whole
   set:
 
   ```ts
   // Static — bundler ships only this locale's strings
-  import pl from '@eigenpal/docx-editor-i18n/pl';
+  import pl from '@xcrong/docx-editor-i18n/pl';
 
   // Dynamic — splits into its own chunk, loaded on demand
-  const pl = (await import('@eigenpal/docx-editor-i18n/pl')).default;
+  const pl = (await import('@xcrong/docx-editor-i18n/pl')).default;
   ```
 
   Subpaths ship for every locale: `/en`, `/de`, `/he`, `/pl`, `/pt-BR`, `/tr`,
@@ -81,15 +81,15 @@
   ergonomic path for static lists, the subpath for runtime locale switching.
 
   Also re-export `createEmptyDocument`, `createDocumentWithText`, and
-  `CreateEmptyDocumentOptions` from `@eigenpal/docx-editor-react` and
-  `@eigenpal/docx-editor-vue` so the common "spawn a blank editor"
+  `CreateEmptyDocumentOptions` from `@xcrong/docx-editor-react` and
+  `@xcrong/docx-editor-vue` so the common "spawn a blank editor"
   affordance no longer requires installing `-core` alongside the adapter.
 
   Surface `Comment`, `CommentRangeStart`, `CommentRangeEnd`,
   `TrackedChangeInfo`, `TrackedRunChange`, `Insertion`, `Deletion`,
   `MoveFrom`, `MoveTo`, and `ParagraphContent` from the main
-  `@eigenpal/docx-editor-core` entry. They were already public via
-  `@eigenpal/docx-editor-core/headless`; the main entry just hadn't been
+  `@xcrong/docx-editor-core` entry. They were already public via
+  `@xcrong/docx-editor-core/headless`; the main entry just hadn't been
   re-exporting them.
 
 ## 1.0.0
@@ -98,29 +98,29 @@
 
 - 6272b32: # 1.0.0
 
-  First multi-package, multi-framework release. The monolithic `@eigenpal/docx-js-editor` is split into a framework-agnostic core and per-framework adapters, Vue 3 ships as a first-class adapter alongside React, and the license moves to Apache 2.0 across all packages.
+  First multi-package, multi-framework release. The monolithic `@xcrong/docx-js-editor` is split into a framework-agnostic core and per-framework adapters, Vue 3 ships as a first-class adapter alongside React, and the license moves to Apache 2.0 across all packages.
 
   ## Package restructure (breaking)
 
-  | Old import                                 | New import                                |
-  | ------------------------------------------ | ----------------------------------------- |
-  | `@eigenpal/docx-js-editor`                 | `@eigenpal/docx-editor-react`             |
-  | `@eigenpal/docx-js-editor/react`           | `@eigenpal/docx-editor-react`             |
-  | `@eigenpal/docx-editor-react/core`         | `@eigenpal/docx-editor-core`              |
-  | `@eigenpal/docx-editor-react/headless`     | `@eigenpal/docx-editor-core/headless`     |
-  | `@eigenpal/docx-editor-react/core-plugins` | `@eigenpal/docx-editor-core/core-plugins` |
-  | `@eigenpal/docx-editor-react/mcp`          | `@eigenpal/docx-editor-agents/mcp`        |
-  | `@eigenpal/docx-editor-react/i18n/*.json`  | `@eigenpal/docx-editor-i18n/*.json`       |
+  | Old import                               | New import                              |
+  | ---------------------------------------- | --------------------------------------- |
+  | `@xcrong/docx-js-editor`                 | `@xcrong/docx-editor-react`             |
+  | `@xcrong/docx-js-editor/react`           | `@xcrong/docx-editor-react`             |
+  | `@xcrong/docx-editor-react/core`         | `@xcrong/docx-editor-core`              |
+  | `@xcrong/docx-editor-react/headless`     | `@xcrong/docx-editor-core/headless`     |
+  | `@xcrong/docx-editor-react/core-plugins` | `@xcrong/docx-editor-core/core-plugins` |
+  | `@xcrong/docx-editor-react/mcp`          | `@xcrong/docx-editor-agents/mcp`        |
+  | `@xcrong/docx-editor-react/i18n/*.json`  | `@xcrong/docx-editor-i18n/*.json`       |
 
-  The old `@eigenpal/docx-js-editor` package stays on 0.x for legacy maintenance — no 1.x compatibility shim ships. Framework-agnostic utilities (e.g. `createEmptyDocument`) move to core:
+  The old `@xcrong/docx-js-editor` package stays on 0.x for legacy maintenance — no 1.x compatibility shim ships. Framework-agnostic utilities (e.g. `createEmptyDocument`) move to core:
 
   ```diff
-  - import { DocxEditor, createEmptyDocument } from '@eigenpal/docx-js-editor';
-  + import { DocxEditor } from '@eigenpal/docx-editor-react';
-  + import { createEmptyDocument } from '@eigenpal/docx-editor-core';
+  - import { DocxEditor, createEmptyDocument } from '@xcrong/docx-js-editor';
+  + import { DocxEditor } from '@xcrong/docx-editor-react';
+  + import { createEmptyDocument } from '@xcrong/docx-editor-core';
   ```
 
-  ## Vue 3 adapter (`@eigenpal/docx-editor-vue`)
+  ## Vue 3 adapter (`@xcrong/docx-editor-vue`)
 
   The Vue package becomes a real adapter (previously a stub). Public API mirrors React:
   - `<DocxEditor>` with matching prop surface
@@ -129,28 +129,28 @@
 
   Parity gates cover insert-table, find/replace, page-setup, context menus, image overlay (resize/move/rotate/aspect-locked corners, dimension tooltip), advanced cell/row options (margins, height rule, text direction, no-wrap), menu-bar icons + shortcuts + carets, toolbar pickers, and the agent UI surface.
 
-  ## Shared i18n package (`@eigenpal/docx-editor-i18n`)
+  ## Shared i18n package (`@xcrong/docx-editor-i18n`)
 
-  Locale strings move out of `@eigenpal/docx-editor-react` into a dedicated package consumed by both adapters from a single source.
+  Locale strings move out of `@xcrong/docx-editor-react` into a dedicated package consumed by both adapters from a single source.
 
   ```diff
-  - import de from '@eigenpal/docx-editor-react/i18n/de.json';
-  + import de from '@eigenpal/docx-editor-i18n/de.json';
+  - import de from '@xcrong/docx-editor-react/i18n/de.json';
+  + import de from '@xcrong/docx-editor-i18n/de.json';
   ```
 
   The `defaultLocale` value (English) is still re-exported from the adapter packages, unchanged.
 
   ## Agent UI relocation (breaking)
 
-  `AgentPanel`, `AgentChatLog`, `AgentComposer`, `AgentSuggestionChip`, `AgentTimeline` no longer ship from `@eigenpal/docx-editor-react`. They live at:
-  - `@eigenpal/docx-editor-agents/react` — React components + `useAgentChat`
-  - `@eigenpal/docx-editor-agents/vue` — Vue 3 twins, plus `AIContextMenu` and `AIResponsePreview`
-  - `@eigenpal/docx-editor-agents/ai-sdk/react` / `/ai-sdk/vue` — `@ai-sdk/*` adapters
-  - `@eigenpal/docx-editor-agents/bridge` — React-free `createEditorBridge`, `agentTools`, `executeToolCall`, `getToolSchemas`, `createReviewerBridge`. Safe for headless / Vue / Node.
+  `AgentPanel`, `AgentChatLog`, `AgentComposer`, `AgentSuggestionChip`, `AgentTimeline` no longer ship from `@xcrong/docx-editor-react`. They live at:
+  - `@xcrong/docx-editor-agents/react` — React components + `useAgentChat`
+  - `@xcrong/docx-editor-agents/vue` — Vue 3 twins, plus `AIContextMenu` and `AIResponsePreview`
+  - `@xcrong/docx-editor-agents/ai-sdk/react` / `/ai-sdk/vue` — `@ai-sdk/*` adapters
+  - `@xcrong/docx-editor-agents/bridge` — React-free `createEditorBridge`, `agentTools`, `executeToolCall`, `getToolSchemas`, `createReviewerBridge`. Safe for headless / Vue / Node.
 
   ```diff
-  - import { AgentPanel, AgentChatLog } from '@eigenpal/docx-editor-react';
-  + import { AgentPanel, AgentChatLog } from '@eigenpal/docx-editor-agents/react';
+  - import { AgentPanel, AgentChatLog } from '@xcrong/docx-editor-react';
+  + import { AgentPanel, AgentChatLog } from '@xcrong/docx-editor-agents/react';
   ```
 
   The agent components no longer call `useTranslation` directly — pass localized `*Label` props instead. `<DocxEditor>`'s built-in agent panel slot still forwards localized strings automatically.
@@ -182,7 +182,7 @@
 
   ## License moves to Apache 2.0
 
-  All published packages relicense to Apache 2.0. Notably: `@eigenpal/docx-editor-agents` was AGPL-3.0-or-later — the relicense lifts copyleft obligations on agent embedders.
+  All published packages relicense to Apache 2.0. Notably: `@xcrong/docx-editor-agents` was AGPL-3.0-or-later — the relicense lifts copyleft obligations on agent embedders.
 
 ### Patch Changes
 

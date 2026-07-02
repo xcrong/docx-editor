@@ -6,7 +6,7 @@
  * the watermark extractor no longer greedily claims a non-watermark VML
  * picture as a picture watermark.
  *
- * Background: https://github.com/eigenpal/docx-editor/issues/777
+ * Background: https://github.com/xcrong/docx-editor/issues/777
  */
 
 import { describe, expect, test } from 'bun:test';

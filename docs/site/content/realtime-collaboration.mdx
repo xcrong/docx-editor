@@ -78,7 +78,7 @@ The hook returns `null` until the provider is ready; guard the editor render on 
 ## Step 3. Pass it to DocxEditor
 
 ```tsx
-import { DocxEditor, createEmptyDocument } from '@eigenpal/docx-editor-react';
+import { DocxEditor, createEmptyDocument } from '@xcrong/docx-editor-react';
 import { useCollaboration } from './useCollaboration';
 
 export function CollaborativeEditor({ room, user }) {
@@ -114,7 +114,7 @@ Two small changes to Step 2's hook first: keep the `Y.Doc` in the state object (
 // useSharedComments.ts
 import { useCallback, useEffect, useState } from 'react';
 import type * as Y from 'yjs';
-import type { Comment } from '@eigenpal/docx-editor-core';
+import type { Comment } from '@xcrong/docx-editor-core';
 
 export function useSharedComments(ydoc: Y.Doc | null) {
   const [comments, setCommentsState] = useState<Comment[]>([]);
@@ -182,7 +182,7 @@ const provider = new YPartyKitProvider('docx-collab.your-account.partykit.dev', 
 
 A complete runnable example (full hook, AvatarStack, identity helper, App.tsx wiring) lives in the repo:
 
-> [examples/collaboration on GitHub](https://github.com/eigenpal/docx-editor/tree/main/examples/collaboration)
+> [examples/collaboration on GitHub](https://github.com/xcrong/docx-editor/tree/main/examples/collaboration)
 
 The same code powers the **Collaborate** button in the [online editor](/editor) on this site. Direct deep-link: [/editor?collaborate=1](/editor?collaborate=1).
 
@@ -190,5 +190,5 @@ The same code powers the **Collaborate** button in the [online editor](/editor) 
 
 - [Comments](/docs/1.x/guides/comments) for the controlled comments API the sync builds on
 - [Tracked changes](/docs/1.x/guides/tracked-changes) for revision attribution and review
-- [examples/collaboration](https://github.com/eigenpal/docx-editor/tree/main/examples/collaboration): the full runnable starter
+- [examples/collaboration](https://github.com/xcrong/docx-editor/tree/main/examples/collaboration): the full runnable starter
 - [React props](/docs/1.x/react/props) for `externalContent`, `externalPlugins`, and `comments`

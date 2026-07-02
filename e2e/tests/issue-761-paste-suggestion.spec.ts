@@ -10,7 +10,7 @@
  * (copying = serializing the selected content) so it exercises the production
  * path without depending on the OS clipboard.
  *
- * Background: https://github.com/eigenpal/docx-editor/issues/761
+ * Background: https://github.com/xcrong/docx-editor/issues/761
  */
 
 import { test, expect } from '@playwright/test';

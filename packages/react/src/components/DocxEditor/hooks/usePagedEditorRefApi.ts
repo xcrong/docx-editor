@@ -17,14 +17,14 @@ import { TextSelection } from 'prosemirror-state';
 import type { EditorState, Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
-import type { Layout } from '@eigenpal/docx-editor-core/layout-engine';
-import type { Document, HeaderFooter } from '@eigenpal/docx-editor-core/types/document';
-import type { ScrollToParaIdOptions } from '@eigenpal/docx-editor-core/utils';
+import type { Layout } from '@xcrong/docx-editor-core/layout-engine';
+import type { Document, HeaderFooter } from '@xcrong/docx-editor-core/types/document';
+import type { ScrollToParaIdOptions } from '@xcrong/docx-editor-core/utils';
 import {
   findCommentRange,
   findChangeRange,
   clampRangeToDoc,
-} from '@eigenpal/docx-editor-core/prosemirror/queries';
+} from '@xcrong/docx-editor-core/prosemirror/queries';
 
 import type { HiddenProseMirrorRef } from '../HiddenProseMirror';
 import type { HiddenHeaderFooterPMsRef } from '../HiddenHeaderFooterPMs';

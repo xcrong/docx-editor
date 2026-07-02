@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback } from 'react';
-import { DocxEditor, type DocxEditorRef } from '@eigenpal/docx-editor-react';
-import { PluginHost } from '@eigenpal/docx-editor-react/plugin-api';
-import { createEmptyDocument } from '@eigenpal/docx-editor-core';
+import { DocxEditor, type DocxEditorRef } from '@xcrong/docx-editor-react';
+import { PluginHost } from '@xcrong/docx-editor-react/plugin-api';
+import { createEmptyDocument } from '@xcrong/docx-editor-core';
 import { wordCountPlugin } from './wordCountPlugin';
 
 export function App() {

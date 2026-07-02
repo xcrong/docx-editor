@@ -7,7 +7,7 @@
  * cursor on the previous page. It must land on the page where the cursor's text
  * is actually visible. Core fix (clickToPositionDom) → covers React and Vue.
  *
- * Background: https://github.com/eigenpal/docx-editor/issues/763
+ * Background: https://github.com/xcrong/docx-editor/issues/763
  */
 
 import { test, expect } from '@playwright/test';

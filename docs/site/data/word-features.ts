@@ -134,8 +134,7 @@ export const wordFeatures: WordFeature[] = [
     rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
-    notes:
-      'Bidi layout with mirrored alignment; Hebrew locale ships in @eigenpal/docx-editor-i18n.',
+    notes: 'Bidi layout with mirrored alignment; Hebrew locale ships in @xcrong/docx-editor-i18n.',
   },
   {
     id: 'text.effects',
@@ -379,7 +378,8 @@ export const wordFeatures: WordFeature[] = [
     rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
-    notes: 'tbRl/btLr cell text renders via writing-mode and round-trips; not settable from the UI.',
+    notes:
+      'tbRl/btLr cell text renders via writing-mode and round-trips; not settable from the UI.',
   },
 
   // --- Images & drawings ---------------------------------------------------
@@ -632,7 +632,8 @@ export const wordFeatures: WordFeature[] = [
     rendering: 'none',
     roundTrip: 'none',
     tier: 'community',
-    notes: 'Not modeled; numbering start/format (i, ii, A) is dropped and PAGE fields render as arabic.',
+    notes:
+      'Not modeled; numbering start/format (i, ii, A) is dropped and PAGE fields render as arabic.',
   },
 
   // --- Review ---------------------------------------------------------------
@@ -788,8 +789,7 @@ export const wordFeatures: WordFeature[] = [
     rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
-    notes:
-      'Add and remove items from the editor; the section configuration itself is read-only.',
+    notes: 'Add and remove items from the editor; the section configuration itself is read-only.',
     docsLink: '/docs/1.x/guides/content-controls',
   },
   {
@@ -820,7 +820,8 @@ export const wordFeatures: WordFeature[] = [
     rendering: 'none',
     roundTrip: 'preserved',
     tier: 'community',
-    notes: 'Never executed, by design (client-side security); the vbaProject part survives open -> save.',
+    notes:
+      'Never executed, by design (client-side security); the vbaProject part survives open -> save.',
   },
   {
     id: 'structure.ole',
@@ -840,7 +841,8 @@ export const wordFeatures: WordFeature[] = [
     rendering: 'none',
     roundTrip: 'preserved',
     tier: 'community',
-    notes: 'Protection settings round-trip but are not enforced; inline permission ranges may be dropped.',
+    notes:
+      'Protection settings round-trip but are not enforced; inline permission ranges may be dropped.',
   },
 
   // --- Collaboration, i18n & editing UX ---------------------------------------
@@ -890,7 +892,7 @@ export const wordFeatures: WordFeature[] = [
     rendering: 'full',
     roundTrip: 'full',
     tier: 'community',
-    notes: 'en, de, fr, he, hi, pl, pt-BR, tr, zh-CN via @eigenpal/docx-editor-i18n.',
+    notes: 'en, de, fr, he, hi, pl, pt-BR, tr, zh-CN via @xcrong/docx-editor-i18n.',
     docsLink: '/docs/1.x/i18n',
   },
   {

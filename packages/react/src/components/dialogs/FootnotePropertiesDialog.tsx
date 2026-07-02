@@ -13,9 +13,9 @@ import type {
   EndnotePosition,
   NoteNumberRestart,
   NumberFormat,
-} from '@eigenpal/docx-editor-core/types/document';
+} from '@xcrong/docx-editor-core/types/document';
 import { useTranslation } from '../../i18n';
-import type { TranslationKey } from '@eigenpal/docx-editor-i18n';
+import type { TranslationKey } from '@xcrong/docx-editor-i18n';
 
 // ============================================================================
 // TYPES

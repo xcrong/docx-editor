@@ -10,7 +10,7 @@
  * @public
  */
 
-const ISSUE_URL = 'https://github.com/eigenpal/docx-editor/issues/new';
+const ISSUE_URL = 'https://github.com/xcrong/docx-editor/issues/new';
 
 export interface ReportIssueEnv {
   userAgent?: string;

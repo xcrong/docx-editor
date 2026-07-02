@@ -4,7 +4,7 @@
  * one. Drives the `window.__DOCX_EDITOR_E2E__` hooks that wrap the public
  * `DocxEditorRef` content-control methods, against the comprehensive fixture.
  *
- * Background: https://github.com/eigenpal/docx-editor/issues/622
+ * Background: https://github.com/xcrong/docx-editor/issues/622
  */
 
 import { test, expect } from '@playwright/test';

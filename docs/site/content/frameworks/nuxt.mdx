@@ -10,7 +10,7 @@ By the end of this page you have a Nuxt app that opens a `.docx` from disk and e
 ## Install
 
 ```bash
-npm install @eigenpal/nuxt-docx-editor
+npm install @xcrong/nuxt-docx-editor
 ```
 
 ## Register the module
@@ -18,7 +18,7 @@ npm install @eigenpal/nuxt-docx-editor
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  modules: ['@eigenpal/nuxt-docx-editor'],
+  modules: ['@xcrong/nuxt-docx-editor'],
 });
 ```
 
@@ -26,7 +26,7 @@ The module auto-imports an SSR-safe `<DocxEditor>` and injects the editor styles
 
 ## Use the component
 
-Adapted from [`examples/nuxt/app.vue`](https://github.com/eigenpal/docx-editor/tree/main/examples/nuxt):
+Adapted from [`examples/nuxt/app.vue`](https://github.com/xcrong/docx-editor/tree/main/examples/nuxt):
 
 ```vue
 <!-- app.vue -->
@@ -51,7 +51,7 @@ async function onFileSelect(event: Event) {
 </template>
 ```
 
-`<DocxEditor>` never renders during SSR; Nuxt shows a placeholder and hydrates the editor on the client. The component is the Vue adapter registered unchanged, so every prop, event, and ref method from `@eigenpal/docx-editor-vue` applies.
+`<DocxEditor>` never renders during SSR; Nuxt shows a placeholder and hydrates the editor on the client. The component is the Vue adapter registered unchanged, so every prop, event, and ref method from `@xcrong/docx-editor-vue` applies.
 
 <Callout type="info">
   This page is the short version. Module options (`prefix`, `injectStyles`), auto-imported
@@ -62,7 +62,7 @@ async function onFileSelect(event: Event) {
 ## Run the example
 
 ```bash
-git clone https://github.com/eigenpal/docx-editor.git
+git clone https://github.com/xcrong/docx-editor.git
 cd docx-editor
 bun install
 bun run dev:nuxt   # http://localhost:3002
@@ -74,4 +74,4 @@ bun run dev:nuxt   # http://localhost:3002
 - [Quickstart](/docs/1.x/quickstart): the load, edit, save flow in detail
 - [Loading and saving](/docs/1.x/guides/loading-and-saving): URLs, autosave, upload to your API
 - [Nuxt DOCX editor guide](/blog/nuxt-docx-editor): the long-form walkthrough
-- [Nuxt example on GitHub](https://github.com/eigenpal/docx-editor/tree/main/examples/nuxt)
+- [Nuxt example on GitHub](https://github.com/xcrong/docx-editor/tree/main/examples/nuxt)

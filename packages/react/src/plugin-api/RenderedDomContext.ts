@@ -2,4 +2,4 @@
 export {
   RenderedDomContextImpl,
   createRenderedDomContext,
-} from '@eigenpal/docx-editor-core/plugin-api/RenderedDomContext';
+} from '@xcrong/docx-editor-core/plugin-api/RenderedDomContext';

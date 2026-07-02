@@ -10,12 +10,12 @@ This page builds the open-edit-download flow in a Vite + React app. Vite is clie
 ## Install
 
 ```bash
-npm install @eigenpal/docx-editor-react
+npm install @xcrong/docx-editor-react
 ```
 
 ## Mount the editor
 
-Two files, mirroring [`examples/vite`](https://github.com/eigenpal/docx-editor/tree/main/examples/vite).
+Two files, mirroring [`examples/vite`](https://github.com/xcrong/docx-editor/tree/main/examples/vite).
 
 ```tsx
 // src/main.tsx
@@ -31,8 +31,8 @@ if (container) {
 ```tsx
 // src/App.tsx
 import { useRef, useState } from 'react';
-import { DocxEditor, type DocxEditorRef } from '@eigenpal/docx-editor-react';
-import '@eigenpal/docx-editor-react/styles.css';
+import { DocxEditor, type DocxEditorRef } from '@xcrong/docx-editor-react';
+import '@xcrong/docx-editor-react/styles.css';
 
 export function App() {
   const editorRef = useRef<DocxEditorRef>(null);
@@ -74,14 +74,14 @@ export function App() {
 
 `documentBuffer` and `save()` work as described in the [Quickstart](/docs/1.x/quickstart); the only Vite-specific fact is that there is no SSR boundary to manage.
 
-The full example also wires `createEmptyDocument()` for a New button and an agent panel; see [`src/App.tsx`](https://github.com/eigenpal/docx-editor/tree/main/examples/vite) in the repo.
+The full example also wires `createEmptyDocument()` for a New button and an agent panel; see [`src/App.tsx`](https://github.com/xcrong/docx-editor/tree/main/examples/vite) in the repo.
 
 ## Run the example
 
-The Vite example aliases `@eigenpal/*` to workspace source, so no build step is needed:
+The Vite example aliases `@xcrong/*` to workspace source, so no build step is needed:
 
 ```bash
-git clone https://github.com/eigenpal/docx-editor.git
+git clone https://github.com/xcrong/docx-editor.git
 cd docx-editor
 bun install
 bun run dev:react   # http://localhost:5173
@@ -92,4 +92,4 @@ bun run dev:react   # http://localhost:5173
 - [Quickstart](/docs/1.x/quickstart): the load, edit, save flow in detail
 - [Loading and saving](/docs/1.x/guides/loading-and-saving): URLs, autosave, upload to your API
 - [Vite DOCX editor guide](/blog/vite-docx-editor): the long-form walkthrough
-- [Vite example on GitHub](https://github.com/eigenpal/docx-editor/tree/main/examples/vite)
+- [Vite example on GitHub](https://github.com/xcrong/docx-editor/tree/main/examples/vite)
