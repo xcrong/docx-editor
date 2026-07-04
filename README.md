@@ -8,7 +8,7 @@
   <a href="https://www.npmjs.com/package/@xcrong/docx-editor-core"><img src="https://img.shields.io/npm/v/@xcrong/docx-editor-core.svg?style=flat-square&color=3B5BDB" alt="npm version" /></a>
   <a href="https://www.npmjs.com/package/@xcrong/docx-js-editor"><img src="https://img.shields.io/npm/dm/@xcrong/docx-js-editor.svg?style=flat-square&color=3B5BDB" alt="npm downloads" /></a>
   <a href="https://github.com/xcrong/docx-editor/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-blue.svg?style=flat-square&color=3B5BDB" alt="license" /></a>
-  <a href="https://docx-editor.dev/editor"><img src="https://img.shields.io/badge/Live_Demo-3B5BDB?style=flat-square&logo=vercel&logoColor=white" alt="Demo" /></a>
+  <a href="https://docx-editor.xcrong.me"><img src="https://img.shields.io/badge/Live_Demo-3B5BDB?style=flat-square&logo=vercel&logoColor=white" alt="Demo" /></a>
   <a href="https://www.docx-editor.dev/docs"><img src="https://img.shields.io/badge/Docs-3B5BDB?style=flat-square&logo=readthedocs&logoColor=white" alt="Documentation" /></a>
 </p>
 
@@ -19,7 +19,7 @@
 > unchanged. All changes follow the original Apache-2.0 license. See
 > [NOTICE](./NOTICE) for attribution and the full fork notice.
 
-Open-source WYSIWYG `.docx` editor for React and Vue with canonical OOXML, tracked changes, and real-time collaboration. Agent-ready. **[Live demo](https://docx-editor.dev/editor)** | **[Documentation](https://www.docx-editor.dev/docs)**
+Open-source WYSIWYG `.docx` editor for React and Vue with canonical OOXML, tracked changes, and real-time collaboration. Agent-ready. **[Live demo](https://docx-editor.xcrong.me)** | **[Documentation](https://www.docx-editor.dev/docs)**
 
 ## Quick Start
 
@@ -42,7 +42,7 @@ npm install @xcrong/nuxt-docx-editor
 See the [Nuxt quick start](#nuxt) below.
 
 <p align="center">
-  <a href="https://docx-editor.dev/editor">
+  <a href="https://docx-editor.xcrong.me">
     <img src="./.github/assets/editor.png" alt="docx-editor screenshot" width="100%" />
   </a>
 </p>
@@ -146,7 +146,7 @@ bun run build
 bun run typecheck
 ```
 
-A live preview of `main` is auto-deployed at **[latest.docx-editor.dev](https://latest.docx-editor.dev/)** — useful for trying out changes before they ship to npm.
+A live preview of `main` is auto-deployed at **[docx-editor.xcrong.me](https://docx-editor.xcrong.me/)** — useful for trying out changes before they ship to npm.
 
 Examples: [Vite](examples/vite) | [Next.js](examples/nextjs) | [Remix](examples/remix) | [Astro](examples/astro) | [Vue](examples/vue) | [Nuxt](examples/nuxt)
 

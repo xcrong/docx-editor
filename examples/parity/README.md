@@ -45,4 +45,4 @@ To stand up a preview for the `1.0.0-release` branch on a custom URL:
 
 - In your Vercel project Settings → Domains, add a domain (e.g. `next.docx-editor.dev` or `1-0-0-release.docx-editor.dev`) and set its Git Branch to `1.0.0-release`. Every push to that branch redeploys.
 
-The existing `latest.docx-editor.dev` deployment off `main` will pick up the parity build on its next deploy after this change merges. `/` redirects to `/react/`, the React adapter takes the full viewport, and a switcher pill in the toolbar flips to `/vue/`. A yellow banner on each editor route notes that this is a preview deployment and links back to `docx-editor.dev`.
+The existing `docx-editor.xcrong.me` deployment off `main` will pick up the parity build on its next deploy after this change merges. `/` redirects to `/react/`, the React adapter takes the full viewport, and a switcher pill in the toolbar flips to `/vue/`. A yellow banner on each editor route notes that this is a preview deployment and links back to `docx-editor.dev`.

@@ -8,7 +8,7 @@
   <a href="https://www.npmjs.com/package/@xcrong/docx-editor-core"><img src="https://img.shields.io/npm/v/@xcrong/docx-editor-core.svg?style=flat-square&color=3B5BDB" alt="npm version" /></a>
   <a href="https://www.npmjs.com/package/@xcrong/docx-editor-core"><img src="https://img.shields.io/npm/dm/@xcrong/docx-editor-core.svg?style=flat-square&color=3B5BDB" alt="npm downloads" /></a>
   <a href="https://github.com/xcrong/docx-editor/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-blue.svg?style=flat-square&color=3B5BDB" alt="license" /></a>
-  <a href="https://docx-editor.dev/editor"><img src="https://img.shields.io/badge/Live_Demo-3B5BDB?style=flat-square&logo=vercel&logoColor=white" alt="Demo" /></a>
+  <a href="https://docx-editor.xcrong.me"><img src="https://img.shields.io/badge/Live_Demo-3B5BDB?style=flat-square&logo=vercel&logoColor=white" alt="Demo" /></a>
   <a href="https://www.docx-editor.dev/docs"><img src="https://img.shields.io/badge/Docs-3B5BDB?style=flat-square&logo=readthedocs&logoColor=white" alt="Documentation" /></a>
 </p>
 
