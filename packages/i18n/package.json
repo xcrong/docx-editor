@@ -1,6 +1,6 @@
 {
   "name": "@xcrong/docx-editor-i18n",
-  "version": "1.10.2",
+  "version": "1.10.3",
   "description": "Shared UI locale strings and types for the @xcrong docx-editor adapters (React and Vue).",
   "sideEffects": false,
   "main": "./dist/index.js",

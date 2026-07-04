@@ -1,5 +1,14 @@
 # @xcrong/docx-js-editor
 
+## 1.10.3
+
+### Patch Changes
+
+- ef57c8e: Update live demo links to point to the new deployment at docx-editor.xcrong.me.
+  - @xcrong/docx-editor-core@1.10.3
+  - @xcrong/docx-editor-agents@1.10.3
+  - @xcrong/docx-editor-i18n@1.10.3
+
 ## 1.10.2
 
 ### Patch Changes
