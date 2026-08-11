@@ -1,5 +1,11 @@
 # @xcrong/docx-editor-core
 
+## 1.10.3
+
+### Patch Changes
+
+- b5de1dc: Upgrade DOMPurify to include current clipboard HTML sanitization security fixes.
+
 ## 1.10.2
 
 ### Patch Changes

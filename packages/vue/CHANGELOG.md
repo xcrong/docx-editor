@@ -1,5 +1,14 @@
 # @xcrong/docx-editor-vue
 
+## 1.10.3
+
+### Patch Changes
+
+- Updated dependencies [b5de1dc]
+  - @xcrong/docx-editor-core@1.10.3
+  - @xcrong/docx-editor-agents@1.10.3
+  - @xcrong/docx-editor-i18n@1.10.3
+
 ## 1.10.2
 
 ### Patch Changes
