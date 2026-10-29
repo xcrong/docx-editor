@@ -1,5 +1,11 @@
 # @xcrong/nuxt-docx-editor
 
+## 1.10.4
+
+### Patch Changes
+
+- @xcrong/docx-editor-vue@1.10.4
+
 ## 1.10.3
 
 ### Patch Changes
