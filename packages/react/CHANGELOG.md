@@ -1,5 +1,14 @@
 # @xcrong/docx-js-editor
 
+## 1.10.4
+
+### Patch Changes
+
+- Updated dependencies [321c4bf]
+  - @xcrong/docx-editor-core@1.10.4
+  - @xcrong/docx-editor-agents@1.10.4
+  - @xcrong/docx-editor-i18n@1.10.4
+
 ## 1.10.3
 
 ### Patch Changes
