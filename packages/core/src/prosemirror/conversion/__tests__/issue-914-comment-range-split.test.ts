@@ -172,4 +172,78 @@ describe('issue #914 — comment range split by tracked change', () => {
     expect(xml.indexOf('<w:commentRangeStart')).toBeLessThan(xml.indexOf('<w:ins '));
     expect(xml.indexOf('<w:ins ')).toBeLessThan(xml.indexOf('<w:commentRangeEnd'));
   });
+
+  // Cross-paragraph ranges: commentRangeStart in p1, commentRangeEnd in p2.
+  // toProseDoc must carry the open range across the paragraph boundary so
+  // p2's leading runs keep the comment mark (previously p2's head silently
+  // lost the mark, dropping the anchor on round-trip). In the model each
+  // paragraph holds its own open/close markers, so fromProseDoc re-emits one
+  // pair per paragraph — the requirement is that p2's pair survives and the
+  // range does not leak into p3.
+  test('comment range spanning two paragraphs marks both paragraphs', async () => {
+    const { toProseDoc } = await import('../toProseDoc');
+    const doc = {
+      package: {
+        document: {
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'commentRangeStart', id: 3 },
+                { type: 'run', content: [{ type: 'text', text: 'tail of p1' }] },
+              ],
+            },
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'run', content: [{ type: 'text', text: 'head of p2' }] },
+                { type: 'commentRangeEnd', id: 3 },
+                { type: 'run', content: [{ type: 'text', text: ' tail of p2' }] },
+              ],
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'run', content: [{ type: 'text', text: 'p3 clean' }] }],
+            },
+          ],
+        },
+      },
+    };
+    const pmDoc = toProseDoc(doc as never);
+    const marksOf = (paraIdx: number): number[][] =>
+      (pmDoc.child(paraIdx).content.content as PMNode[]).map((t) =>
+        (t.marks as unknown as { attrs: { commentId?: number } }[])
+          .filter((m) => m.attrs?.commentId != null)
+          .map((m) => m.attrs.commentId as number)
+      );
+
+    // p1 tail and p2 head carry comment 3; p2 tail and p3 do not.
+    expect(marksOf(0)).toEqual([[3]]);
+    expect(marksOf(1).flat()).toContain(3);
+    expect(marksOf(1)[1]).toEqual([]);
+    expect(marksOf(2).flat()).not.toContain(3);
+
+    // Round-trip: each paragraph re-emits its own pair (PM marks cannot
+    // express cross-paragraph identity), but the range must not leak past
+    // its End marker — p1 has an unclosed Start, p2 a balanced pair, p3 none.
+    const { fromProseDoc } = await import('../fromProseDoc');
+    const model = fromProseDoc(pmDoc);
+    const paras = model.package.document.content.filter(
+      (b): b is Paragraph => b.type === 'paragraph'
+    );
+    const markersIn = (i: number) =>
+      paras[i].content.filter((c) => c.type === 'commentRangeStart' || c.type === 'commentRangeEnd')
+        .length;
+    // p1: start carried in (unclosed in-model, but the PM mark survives)
+    expect(paras[0].content.some((c) => c.type === 'commentRangeStart' && c.id === 3)).toBe(true);
+    // p2: balanced pair for the continued range
+    expect(
+      paras[1].content.filter((c) => c.type === 'commentRangeStart' && c.id === 3)
+    ).toHaveLength(1);
+    expect(paras[1].content.filter((c) => c.type === 'commentRangeEnd' && c.id === 3)).toHaveLength(
+      1
+    );
+    // p3: no leakage
+    expect(markersIn(2)).toBe(0);
+  });
 });

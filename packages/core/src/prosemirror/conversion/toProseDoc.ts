@@ -46,9 +46,13 @@ function convertBlocksToNodes(
   includePageBreaks: boolean
 ): PMNode[] {
   const nodes: PMNode[] = [];
+  // Comment ranges (w:commentRangeStart/End) can span paragraph boundaries.
+  // Thread the open-range set across paragraphs so a range ending in a later
+  // paragraph still marks that paragraph's leading runs.
+  const activeCommentIds = new Set<number>();
   for (const block of blocks) {
     if (block.type === 'paragraph') {
-      nodes.push(...convertParagraphWithTextBoxes(block, styleResolver));
+      nodes.push(...convertParagraphWithTextBoxes(block, styleResolver, activeCommentIds));
       if (includePageBreaks && paragraphHasNonLeadingPageBreak(block)) {
         nodes.push(schema.node('pageBreak'));
       }

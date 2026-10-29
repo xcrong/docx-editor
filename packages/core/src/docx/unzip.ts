@@ -102,6 +102,7 @@ export interface RawDocxContent {
   commentsXml: string | null;
   commentsExtensibleXml: string | null;
   commentsExtendedXml: string | null;
+  commentsIdsXml: string | null;
 
   // Relationships
   documentRels: string | null;
@@ -184,6 +185,7 @@ export async function unzipDocx(buffer: ArrayBuffer): Promise<RawDocxContent> {
     commentsXml: null,
     commentsExtensibleXml: null,
     commentsExtendedXml: null,
+    commentsIdsXml: null,
     documentRels: null,
     packageRels: null,
     contentTypesXml: null,
@@ -234,6 +236,8 @@ export async function unzipDocx(buffer: ArrayBuffer): Promise<RawDocxContent> {
         content.commentsExtensibleXml = xmlContent;
       } else if (lowerPath === 'word/commentsextended.xml') {
         content.commentsExtendedXml = xmlContent;
+      } else if (lowerPath === 'word/commentsids.xml') {
+        content.commentsIdsXml = xmlContent;
       } else if (lowerPath === 'word/_rels/document.xml.rels') {
         content.documentRels = xmlContent;
       } else if (lowerPath === '_rels/.rels') {

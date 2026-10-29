@@ -65,12 +65,12 @@
 
 ## 8. DOCX Round-Trip Serialization
 
-- [ ] 8.1 Verify comment parser (`commentParser.ts`) correctly loads comments with threading and range markers
-- [ ] 8.2 Implement comment serializer: write `comments.xml` with comment content, author, date; write `commentRangeStart`/`commentRangeEnd` in document body
-- [ ] 8.3 Verify tracked changes parser loads `w:ins`/`w:del` elements with author and date metadata
-- [ ] 8.4 Implement tracked changes serializer: write `w:ins`/`w:del` revision markup to document XML
-- [ ] 8.5 Add round-trip E2E test: load DOCX with comments → save → reload → verify comments preserved
-- [ ] 8.6 Add round-trip E2E test: load DOCX with tracked changes → save → reload → verify changes preserved
+- [x] 8.1 Verify comment parser (`commentParser.ts`) correctly loads comments with threading and range markers
+- [x] 8.2 Implement comment serializer: write `comments.xml` with comment content, author, date; write `commentRangeStart`/`commentRangeEnd` in document body
+- [x] 8.3 Verify tracked changes parser loads `w:ins`/`w:del` elements with author and date metadata
+- [x] 8.4 Implement tracked changes serializer: write `w:ins`/`w:del` revision markup to document XML
+- [x] 8.5 Add round-trip E2E test: load DOCX with comments → save → reload → verify comments preserved
+- [x] 8.6 Add round-trip E2E test: load DOCX with tracked changes → save → reload → verify changes preserved
 
 ## 9. Visual Polish & Edge Cases
 

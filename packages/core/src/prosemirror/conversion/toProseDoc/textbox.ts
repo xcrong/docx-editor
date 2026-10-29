@@ -23,10 +23,11 @@ import { convertParagraph } from './paragraph';
  */
 export function convertParagraphWithTextBoxes(
   block: Paragraph,
-  styleResolver: StyleResolver | null
+  styleResolver: StyleResolver | null,
+  activeCommentIds?: Set<number>
 ): PMNode[] {
   const textBoxes = extractTextBoxesFromParagraph(block);
-  const pmParagraph = convertParagraph(block, styleResolver);
+  const pmParagraph = convertParagraph(block, styleResolver, activeCommentIds);
   const nodes: PMNode[] = [];
   const isEmptyAfterExtraction = textBoxes.length > 0 && pmParagraph.content.size === 0;
   const { anchored, inFlow } = partitionTextBoxesByAnchor(textBoxes);

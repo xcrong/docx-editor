@@ -256,4 +256,132 @@ describe('commentParser', () => {
       expect(comments[1].parentId).toBe(1);
     });
   });
+
+  describe('self-written commentsExtensible shape (durableId + commentsIds)', () => {
+    // Our serializer writes <w16cex:commentExtensible w16cex:durableId="...">
+    // keyed by durableId (paired with commentsIds.xml). The parser must
+    // resolve those entries back to paraId so UTC dates round-trip.
+    const DURABLE_COMMENTS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">
+  <w:comment w:id="1" w:author="Alice" w:date="2024-02-10T15:30:00" w14:paraId="UNUSED">
+    <w:p w14:paraId="AAAABBBB">
+      <w:r><w:t>First comment</w:t></w:r>
+    </w:p>
+  </w:comment>
+</w:comments>`;
+
+    const DURABLE_EXTENSIBLE_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w16cex:commentsExtensible xmlns:w16cex="http://schemas.microsoft.com/office/word/2018/wordml/cex">
+  <w16cex:commentExtensible w16cex:durableId="CCCCDDDD" w16cex:dateUtc="2024-02-10T14:30:00Z"/>
+</w16cex:commentsExtensible>`;
+
+    const DURABLE_IDS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w16cid:commentsIds xmlns:w16cid="http://schemas.microsoft.com/office/word/2016/wordml/cid">
+  <w16cid:commentId w16cid:paraId="AAAABBBB" w16cid:durableId="CCCCDDDD"/>
+</w16cid:commentsIds>`;
+
+    test('resolves durableId entries through commentsIds.xml', () => {
+      const comments = parseComments(
+        DURABLE_COMMENTS_XML,
+        emptyStyles,
+        emptyTheme,
+        emptyRels,
+        emptyMedia,
+        DURABLE_EXTENSIBLE_XML,
+        null,
+        DURABLE_IDS_XML
+      );
+
+      expect(comments).toHaveLength(1);
+      // UTC date from the durableId entry wins over the local w:date
+      expect(comments[0].date).toBe('2024-02-10T14:30:00Z');
+    });
+
+    test('skips durableId entries when commentsIds.xml is absent', () => {
+      const comments = parseComments(
+        DURABLE_COMMENTS_XML,
+        emptyStyles,
+        emptyTheme,
+        emptyRels,
+        emptyMedia,
+        DURABLE_EXTENSIBLE_XML
+      );
+
+      expect(comments).toHaveLength(1);
+      // No paraId to attach the durableId entry to — falls back to local date
+      expect(comments[0].date).toBe('2024-02-10T15:30:00');
+    });
+
+    test('paraId entries still work when commentsIds.xml is present', () => {
+      const comments = parseComments(
+        COMMENTS_XML,
+        emptyStyles,
+        emptyTheme,
+        emptyRels,
+        emptyMedia,
+        COMMENTS_EXTENSIBLE_XML,
+        null,
+        DURABLE_IDS_XML
+      );
+
+      expect(comments[0].date).toBe('2024-02-10T14:30:00Z');
+      expect(comments[1].date).toBe('2024-03-05T08:15:00Z');
+    });
+  });
+
+  describe('commentsExtended.xml threading (w15:paraIdParent / w15:done)', () => {
+    const THREADED_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">
+  <w:comment w:id="1" w:author="Alice" w:date="2024-02-10T15:30:00">
+    <w:p w14:paraId="AAAABBBB"><w:r><w:t>Parent</w:t></w:r></w:p>
+  </w:comment>
+  <w:comment w:id="2" w:author="Bob" w:date="2024-02-11T15:30:00">
+    <w:p w14:paraId="CCCCDDDD"><w:r><w:t>Reply</w:t></w:r></w:p>
+  </w:comment>
+  <w:comment w:id="3" w:author="Carol" w:date="2024-02-12T15:30:00">
+    <w:p w14:paraId="EEEEFFFF"><w:r><w:t>Resolved top-level</w:t></w:r></w:p>
+  </w:comment>
+</w:comments>`;
+
+    const THREADED_EXTENDED_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w15:commentsEx xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml">
+  <w15:commentEx w15:paraId="AAAABBBB" w15:done="0"/>
+  <w15:commentEx w15:paraId="CCCCDDDD" w15:paraIdParent="AAAABBBB" w15:done="0"/>
+  <w15:commentEx w15:paraId="EEEEFFFF" w15:done="1"/>
+</w15:commentsEx>`;
+
+    test('resolves reply threading via paraIdParent', () => {
+      const comments = parseComments(
+        THREADED_XML,
+        emptyStyles,
+        emptyTheme,
+        emptyRels,
+        emptyMedia,
+        null,
+        THREADED_EXTENDED_XML
+      );
+
+      expect(comments).toHaveLength(3);
+      expect(comments[0].parentId).toBeUndefined();
+      expect(comments[1].parentId).toBe(1);
+      expect(comments[2].parentId).toBeUndefined();
+    });
+
+    test('resolves done state via w15:done', () => {
+      const comments = parseComments(
+        THREADED_XML,
+        emptyStyles,
+        emptyTheme,
+        emptyRels,
+        emptyMedia,
+        null,
+        THREADED_EXTENDED_XML
+      );
+
+      expect(comments[0].done).toBeUndefined();
+      expect(comments[2].done).toBe(true);
+    });
+  });
 });
