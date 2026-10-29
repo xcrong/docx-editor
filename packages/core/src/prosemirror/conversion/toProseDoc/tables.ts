@@ -755,11 +755,16 @@ function convertTableCell(
     attrs.tcPrChange = cell.propertyChanges;
   }
 
-  // Convert cell content (paragraphs and nested tables)
+  // Convert cell content (paragraphs and nested tables). Paragraphs inside
+  // one cell share the open-comment set so a comment range spanning cell
+  // paragraphs marks correctly (same as body-level convertBlocksToNodes).
   const contentNodes: PMNode[] = [];
+  const activeCommentIds = new Set<number>();
   for (const content of cell.content) {
     if (content.type === 'paragraph') {
-      contentNodes.push(convertParagraph(content, styleResolver, undefined, conditionalStyle?.rPr));
+      contentNodes.push(
+        convertParagraph(content, styleResolver, activeCommentIds, conditionalStyle?.rPr)
+      );
     } else if (content.type === 'table') {
       // Nested tables - recursively convert
       contentNodes.push(convertTable(content, styleResolver));

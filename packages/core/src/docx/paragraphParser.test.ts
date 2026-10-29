@@ -43,6 +43,29 @@ describe('parseParagraph run-boundary preservation', () => {
 });
 
 describe('parseParagraph tracked-change hardening', () => {
+  test('parses insertion runs from w:ins', () => {
+    const paragraph = parseParagraphXml(`
+      <w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:r><w:t>before </w:t></w:r>
+        <w:ins w:id="9" w:author="Alice" w:date="2024-03-01T10:00:00Z">
+          <w:r><w:t>inserted</w:t></w:r>
+        </w:ins>
+        <w:r><w:t> after</w:t></w:r>
+      </w:p>
+    `);
+
+    const insertion = paragraph.content[1];
+    expect(insertion?.type).toBe('insertion');
+    if (!insertion || insertion.type !== 'insertion') return;
+
+    expect(insertion.info.id).toBe(9);
+    expect(insertion.info.author).toBe('Alice');
+    expect(insertion.info.date).toBe('2024-03-01T10:00:00Z');
+    expect(insertion.content).toHaveLength(1);
+    const run = insertion.content[0];
+    expect(run.type).toBe('run');
+  });
+
   test('parses deletion text from w:delText runs', () => {
     const paragraph = parseParagraphXml(`
       <w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">

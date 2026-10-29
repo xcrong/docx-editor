@@ -278,7 +278,8 @@ export async function parseDocx(input: DocxInput, options: ParseOptions = {}): P
         rels,
         media,
         raw.commentsExtensibleXml,
-        raw.commentsExtendedXml
+        raw.commentsExtendedXml,
+        raw.commentsIdsXml
       )
     );
     if (comments.length > 0) {

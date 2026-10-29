@@ -236,7 +236,9 @@ function extractRunFormatting(marks: readonly Mark[], theme?: Theme | null): Run
 
       case 'comment': {
         const commentId = mark.attrs.commentId as number;
-        if (commentId) {
+        // Comment id 0 is valid (Word ids start at 0) — check for null,
+        // not truthiness.
+        if (commentId != null) {
           if (!formatting.commentIds) formatting.commentIds = [];
           formatting.commentIds.push(commentId);
         }

@@ -49,7 +49,10 @@ export function convertParagraph(
   let inlineEndIds: number[] | undefined;
   let originalRunBoundaries: ParagraphAttrs['_originalRunBoundaries'] = [];
 
-  // Track active comment ranges for this paragraph
+  // Track active comment ranges for this paragraph. When the caller passes
+  // a shared set (cross-paragraph ranges), mutate it in place: Start adds,
+  // End removes — so the caller observes closes and later paragraphs only
+  // inherit ranges that are genuinely still open.
   const commentIds = activeCommentIds ?? new Set<number>();
 
   // Get style-based text formatting (font size, bold, color, etc.)

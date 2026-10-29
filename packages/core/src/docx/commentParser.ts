@@ -23,12 +23,22 @@ import { parseParagraph } from './paragraphParser';
 /**
  * Build a lookup from paraId → dateUtc from commentsExtensible.xml
  *
- * The XML structure is:
- * <w16cex:commentsExtensible>
- *   <w16cex:comment w16cex:paraId="..." w16cex:dateUtc="2024-02-10T14:30:45Z"/>
- * </w16cex:commentsExtensible>
+ * Two shapes exist in the wild:
+ * - Word 2016+ writes `<w16cex:comment w16cex:paraId="..." w16cex:dateUtc="..."/>`
+ *   keyed by the comment paragraph's w14:paraId (see also the module docstring).
+ * - Our own serializer (commentSerializer.serializeCommentsExtensible) writes
+ *   `<w16cex:commentExtensible w16cex:durableId="..." w16cex:dateUtc="..."/>`
+ *   keyed by the w16cid durableId, paired with commentsIds.xml mapping
+ *   paraId ↔ durableId. Accept both so self-written files round-trip.
+ *
+ * When a commentsIds part is supplied, durableId-keyed entries are resolved
+ * through its paraId ↔ durableId map; without it those entries are skipped
+ * (no paraId to attach them to).
  */
-function parseCommentsExtensible(xml: string): Map<string, string> {
+function parseCommentsExtensible(
+  xml: string,
+  durableIdToParaId?: Map<string, string> | null
+): Map<string, string> {
   const dateUtcByParaId = new Map<string, string>();
 
   const root = parseXml(xml);
@@ -38,7 +48,7 @@ function parseCommentsExtensible(xml: string): Map<string, string> {
   const container = findChild(root, 'w16cex', 'commentsExtensible') ?? root;
   for (const child of getChildElements(container)) {
     const localName = child.name?.replace(/^.*:/, '') ?? '';
-    if (localName !== 'comment') continue;
+    if (localName !== 'comment' && localName !== 'commentExtensible') continue;
 
     // Try multiple namespace prefixes since they vary between Word versions
     const paraId =
@@ -47,18 +57,57 @@ function parseCommentsExtensible(xml: string): Map<string, string> {
       child.attributes?.['w16cex:paraId'] ??
       child.attributes?.['w15:paraId'];
 
+    // Self-written shape: resolve durableId → paraId via commentsIds.xml.
+    const rawDurableId =
+      getAttribute(child, 'w16cex', 'durableId') ?? child.attributes?.['w16cex:durableId'];
+    const durableParaId =
+      rawDurableId && durableIdToParaId
+        ? durableIdToParaId.get(String(rawDurableId).toUpperCase())
+        : undefined;
+
     const dateUtc =
       getAttribute(child, 'w16cex', 'dateUtc') ??
       getAttribute(child, 'w15', 'dateUtc') ??
       child.attributes?.['w16cex:dateUtc'] ??
       child.attributes?.['w15:dateUtc'];
 
-    if (paraId && dateUtc) {
-      dateUtcByParaId.set(String(paraId).toUpperCase(), String(dateUtc));
+    const key = paraId ?? durableParaId;
+    if (key && dateUtc) {
+      dateUtcByParaId.set(String(key).toUpperCase(), String(dateUtc));
     }
   }
 
   return dateUtcByParaId;
+}
+
+/**
+ * Parse commentsIds.xml (w16cid:commentsIds) into a durableId → paraId map.
+ *
+ * Each entry links a comment paragraph (`w16cid:paraId`, the w14:paraId on the
+ * comment's last paragraph) to its stable id (`w16cid:durableId`). Used to
+ * resolve `commentExtensible` date entries keyed by durableId.
+ */
+export function parseCommentsIds(xml: string | null | undefined): Map<string, string> {
+  const durableIdToParaId = new Map<string, string>();
+  if (!xml) return durableIdToParaId;
+
+  const root = parseXml(xml);
+  if (!root) return durableIdToParaId;
+
+  const container = findChild(root, 'w16cid', 'commentsIds') ?? root;
+  for (const child of getChildElements(container)) {
+    const localName = child.name?.replace(/^.*:/, '') ?? '';
+    if (localName !== 'commentId') continue;
+
+    const paraId = getAttribute(child, 'w16cid', 'paraId') ?? child.attributes?.['w16cid:paraId'];
+    const durableId =
+      getAttribute(child, 'w16cid', 'durableId') ?? child.attributes?.['w16cid:durableId'];
+    if (paraId && durableId) {
+      durableIdToParaId.set(String(durableId).toUpperCase(), String(paraId).toUpperCase());
+    }
+  }
+
+  return durableIdToParaId;
 }
 
 /**
@@ -115,16 +164,19 @@ export function parseComments(
   rels: RelationshipMap,
   media: Map<string, MediaFile>,
   commentsExtensibleXml?: string | null,
-  commentsExtendedXml?: string | null
+  commentsExtendedXml?: string | null,
+  commentsIdsXml?: string | null
 ): Comment[] {
   if (!commentsXml) return [];
 
   const root = parseXml(commentsXml);
   if (!root) return [];
 
-  // Build UTC date lookup from commentsExtensible.xml (if available)
+  // Build UTC date lookup from commentsExtensible.xml (if available).
+  // DurableId-keyed entries (our own serializer shape) resolve through
+  // commentsIds.xml; paraId-keyed entries (Word shape) need no map.
   const dateUtcByParaId = commentsExtensibleXml
-    ? parseCommentsExtensible(commentsExtensibleXml)
+    ? parseCommentsExtensible(commentsExtensibleXml, parseCommentsIds(commentsIdsXml))
     : new Map<string, string>();
 
   // Build threading lookup from commentsExtended.xml (if available)
@@ -147,29 +199,10 @@ export function parseComments(
     const rawDate = getAttribute(child, 'w', 'date');
     const localDate = rawDate != null ? String(rawDate) : undefined;
 
-    // Try to find the UTC date from commentsExtensible.xml via paraId
-    const paraId =
-      getAttribute(child, 'w14', 'paraId') ??
-      child.attributes?.['w14:paraId'] ??
-      getAttribute(child, 'w', 'paraId');
-    const dateUtc = paraId ? dateUtcByParaId.get(String(paraId).toUpperCase()) : undefined;
-
-    // Prefer UTC date over ambiguous local date
-    const date = dateUtc ?? localDate;
-
-    // Parse w:done attribute (resolved/done state)
-    const rawDone = getAttribute(child, 'w', 'done') ?? child.attributes?.['w:done'];
-    let done = rawDone === '1' || rawDone === 'true' ? true : undefined;
-
-    // Parse parent comment ID for replies (w16cid:parentId on w:comment)
-    const rawParentId =
-      getAttribute(child, 'w16cid', 'parentId') ??
-      getAttribute(child, 'w', 'parentId') ??
-      child.attributes?.['w16cid:parentId'] ??
-      child.attributes?.['w:parentId'];
-    const parentId = rawParentId != null ? parseInt(String(rawParentId), 10) : undefined;
-
-    // Parse comment content (paragraphs) and track the last paragraph's paraId
+    // Parse comment content (paragraphs) and track the last paragraph's paraId.
+    // The UTC date (commentsExtensible.xml), done state and threading
+    // (commentsExtended.xml) are all keyed by the LAST content paragraph's
+    // w14:paraId — not by any attribute on the w:comment element itself.
     const paragraphs: Paragraph[] = [];
     let lastParagraphParaId = '';
     for (const contentChild of getChildElements(child)) {
@@ -183,6 +216,31 @@ export function parseComments(
         if (pParaId) lastParagraphParaId = String(pParaId).toUpperCase();
       }
     }
+
+    // Prefer the UTC date (keyed by last-paragraph paraId) over the
+    // ambiguous local w:date. Fall back to a w14:paraId carried directly on
+    // the w:comment element — some producers put it there instead of (or in
+    // addition to) the content paragraph.
+    const elementParaId =
+      getAttribute(child, 'w14', 'paraId') ??
+      child.attributes?.['w14:paraId'] ??
+      getAttribute(child, 'w', 'paraId');
+    const dateUtc =
+      (lastParagraphParaId ? dateUtcByParaId.get(lastParagraphParaId) : undefined) ??
+      (elementParaId ? dateUtcByParaId.get(String(elementParaId).toUpperCase()) : undefined);
+    const date = dateUtc ?? localDate;
+
+    // Parse w:done attribute (resolved/done state)
+    const rawDone = getAttribute(child, 'w', 'done') ?? child.attributes?.['w:done'];
+    let done = rawDone === '1' || rawDone === 'true' ? true : undefined;
+
+    // Parse parent comment ID for replies (w16cid:parentId on w:comment)
+    const rawParentId =
+      getAttribute(child, 'w16cid', 'parentId') ??
+      getAttribute(child, 'w', 'parentId') ??
+      child.attributes?.['w16cid:parentId'] ??
+      child.attributes?.['w:parentId'];
+    const parentId = rawParentId != null ? parseInt(String(rawParentId), 10) : undefined;
 
     // Cross-reference done state from commentsExtended.xml
     if (done == null && extended && lastParagraphParaId) {
