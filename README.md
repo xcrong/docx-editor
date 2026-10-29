@@ -154,7 +154,7 @@ Examples: [Vite](examples/vite) | [Next.js](examples/nextjs) | [Remix](examples/
 
 ## Contributing
 
-Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, and the one-time CLA signature.
+Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, and the community contribution terms (no CLA to sign).
 
 ## Fork background
 

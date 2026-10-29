@@ -51,9 +51,17 @@ bun run lint:fix
 bun run format
 ```
 
-## Contributor License Agreement
+## Contribution Terms — Community Project
 
-Contributors are required to sign our [Contributor License Agreement](CLA.md). The CLA assistant will leave a comment on your first pull request with signing instructions — one short comment, about 30 seconds. That signature covers all of your future contributions.
+This is a community-maintained fork. There is **no CLA, no copyright assignment,
+and no company ownership**:
+
+- Everything merged stays under the [Apache-2.0 License](LICENSE) and belongs
+  to the community — not to any company, including EigenPal or xcrong.
+- Submitting a pull request means you agree your contribution is licensed under
+  Apache-2.0 (per LICENSE Section 5, inbound = outbound) and that you have the
+  right to submit it (it is your original work, or you have permission to submit it).
+- You keep your own copyright. No rights are transferred by contributing.
 
 ## Making Changes
 
@@ -65,7 +73,7 @@ Contributors are required to sign our [Contributor License Agreement](CLA.md). T
    ```bash
    bun run typecheck && bun test && bun run build:packages
    ```
-6. **Submit a PR** against `main` — the CLA bot will prompt you on your first one
+6. **Submit a PR** against `main` — no CLA to sign; submitting the PR is your agreement to the [contribution terms](#contribution-terms--community-project) above
 
 ## Architecture Overview
 
@@ -118,4 +126,4 @@ Open an issue at [github.com/xcrong/docx-editor/issues](https://github.com/xcron
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).
+By contributing, you agree that your contributions will be licensed under the [Apache-2.0 License](LICENSE).

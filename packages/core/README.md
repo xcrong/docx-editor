@@ -81,7 +81,7 @@ Dual-rendering: a hidden ProseMirror instance owns editing state (selection, und
 
 ## Contributing
 
-Contributions welcome. See [CONTRIBUTING.md](https://github.com/xcrong/docx-editor/blob/main/CONTRIBUTING.md) for setup, tests, and the one-time CLA signature.
+Contributions welcome. See [CONTRIBUTING.md](https://github.com/xcrong/docx-editor/blob/main/CONTRIBUTING.md) for setup, tests, and the community contribution terms (no CLA to sign).
 
 ## Commercial Support
 
