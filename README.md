@@ -14,10 +14,10 @@
 
 > **ℹ️ Maintained fork of EigenPal's docx-editor**
 >
-> The upstream `@eigenpal/*` packages are deprecated; this fork continues
-> maintenance and publishes under the **`@xcrong/*`** scope with the public API
-> unchanged. All changes follow the original Apache-2.0 license. See
-> [NOTICE](./NOTICE) for attribution and the full fork notice.
+> Upstream went commercial with 2.0 (Pro license for key modules); this fork
+> continues the last fully Apache-2.0 1.x line under the **`@xcrong/*`** scope
+> with the public API unchanged. See [Fork background](#fork-background) and
+> [NOTICE](./NOTICE) for the full story and attribution.
 
 Open-source WYSIWYG `.docx` editor for React and Vue with canonical OOXML, tracked changes, and real-time collaboration. Agent-ready. **[Live demo](https://docx-editor.xcrong.me)** | **[Documentation](https://www.docx-editor.dev/docs)**
 
@@ -156,6 +156,32 @@ Examples: [Vite](examples/vite) | [Next.js](examples/nextjs) | [Remix](examples/
 
 Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, and the one-time CLA signature.
 
+## Fork background
+
+This is a community-maintained fork of [EigenPal's docx-editor](https://github.com/eigenpal/docx-editor),
+created because a commercial product depends on it and needs a stable, fully open-source release line.
+
+**What happened upstream:**
+
+- Up to the **1.x** line (the `@eigenpal/*` npm scope), the whole editor — including tracked changes,
+  comments, and collaboration — was Apache-2.0.
+- On **2026-08-05** upstream shipped **2.0** under the new `@docx-editor.dev/*` scope and moved key
+  modules to the proprietary **EigenPal Pro License** (production use requires a commercial agreement):
+  `@docx-editor.dev/pro` (tracked changes, comments, collaboration, custom nodes),
+  `@docx-editor.dev/editor-api`, `@docx-editor.dev/docx-to-pdf`, and `@docx-editor.dev/telemetry`.
+  The old `@eigenpal/*` packages were deprecated.
+
+**What this fork is:**
+
+- Based on the last fully Apache-2.0 1.x codebase (forked mid-2026; republished as `@xcrong/*` 1.10.2,
+  currently at 1.10.3), with the public API unchanged.
+- Everything here stays **Apache-2.0** — no Pro-licensed code is included, and no commercial license
+  is needed to use any feature in this fork.
+- An independent release line: it does **not** track upstream 2.x. Upstream fixes are only backported
+  selectively, when they apply to the 1.x codebase and are Apache-2.0 licensed.
+- If you need upstream's newer Pro-only features (PDF export, Editor API, telemetry, …), evaluate
+  upstream's 2.x line and its commercial terms instead.
+
 ## Translations
 
 | Locale  | Language             |
@@ -180,7 +206,8 @@ bun run i18n:status      # check translation coverage
 ## Commercial Support
 
 > [!TIP]
-> Questions or custom features? Email **[docx-editor@eigenpal.com](mailto:docx-editor@eigenpal.com)**.
+> Questions about this fork? Please [open an issue](https://github.com/xcrong/docx-editor/issues).
+> For upstream 2.x licensing and commercial terms, contact EigenPal directly.
 
 ## License & Attribution
 
