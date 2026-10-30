@@ -45,12 +45,11 @@ import { ContentControlWidgets } from './DocxEditor/ContentControlWidgets';
 import { useResetEditorState } from './DocxEditor/hooks/useResetEditorState';
 import { DocxEditorShell } from './DocxEditor/DocxEditorShell';
 import type { FontOption } from './ui/FontPicker';
-import { OUTLINE_BUTTON_RESERVED_SPACE, OUTLINE_RESERVED_SPACE } from './DocumentOutline';
-import { RULER_WIDTH } from './ui/VerticalRuler';
-import { SIDEBAR_DOCUMENT_SHIFT } from './sidebar/constants';
+import { useSidebarNavigation } from './DocxEditor/hooks/useSidebarNavigation';
+import { useSidebarLayout } from './DocxEditor/hooks/useSidebarLayout';
 import { useCommentSidebarItems, type CommentCallbacks } from '../hooks/useCommentSidebarItems';
 import { extractTrackedChanges } from '../hooks/useTrackedChanges';
-import { type EditorState as PMEditorState } from 'prosemirror-state';
+import { type EditorState as PMEditorState, TextSelection } from 'prosemirror-state';
 import type { ReactSidebarItem } from '../plugin-api/types';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import type { Translations } from '@xcrong/docx-editor-i18n';
@@ -91,6 +90,10 @@ import {
   rejectChange,
   acceptChangeById,
   rejectChangeById,
+  acceptAllChanges,
+  rejectAllChanges,
+  findNextChange,
+  findPreviousChange,
 } from '@xcrong/docx-editor-core/prosemirror/commands';
 import { collectHeadings } from '@xcrong/docx-editor-core/utils';
 import {
@@ -100,7 +103,7 @@ import {
 } from '@xcrong/docx-editor-core/utils';
 
 // Paginated editor
-import { type PagedEditorRef, DEFAULT_PAGE_WIDTH } from './DocxEditor/PagedEditor';
+import { type PagedEditorRef } from './DocxEditor/PagedEditor';
 
 // Plugin API types
 import type { RenderedDomContext } from '../plugin-api/types';
@@ -699,8 +702,19 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
   const [expandedSidebarItem, setExpandedSidebarItem] = useState<string | null>(null);
   // PagedEditor ref declared early so useCommentManagement (which reads
   // pagedEditorRef.current.getView() for orphan cleanup) can be wired before
-  // the trackedChanges effect that drives `setComments`.
+  // the trackedChanges effect that drives `setComments`. scrollContainerRef
+  // rides along because useSidebarNavigation (overlay-mode observer) needs
+  // it at the same point.
   const pagedEditorRef = useRef<PagedEditorRef>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Narrow-container overlay mode + card → document navigation (spec
+  // 1.5/5.1) — owned by a hook so DocxEditor stays under its line cap.
+  // (Passing the ref objects themselves is fine — `useRef` identity is
+  // stable, only `.current` is populated later.)
+  const { sidebarOverlayMode, handleSidebarNavigate } = useSidebarNavigation({
+    pagedEditorRef,
+    scrollContainerRef,
+  });
 
   const {
     comments,
@@ -822,7 +836,6 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
   // Save the last known selection for restoring after toolbar interactions
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
   const editorContentRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [documentFonts, setDocumentFonts] = useState<FontOption[]>([]);
   const {
     showOutline,
@@ -1156,6 +1169,98 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
   const handleZoomChange = useCallback((zoom: number) => {
     setState((prev) => ({ ...prev, zoom }));
   }, []);
+
+  // Tracked-changes review toolbar (7.6/7.7). Accept/Reject act on the
+  // change under the active editor's cursor; the buttons disable via
+  // SelectionFormatting.inInsertion/inDeletion when there is none.
+  const getReviewView = useCallback(() => getActiveEditorView() ?? null, [getActiveEditorView]);
+
+  const handleReviewAcceptChange = useCallback(() => {
+    const view = getReviewView();
+    if (!view) return;
+    const { from } = view.state.selection;
+    const $from = view.state.selection.$from;
+    // Union all mark sources: at a mark boundary $from.marks() reports the
+    // right side, but a just-typed insertion sits to the left.
+    const boundaryMarks = [
+      ...(view.state.storedMarks ?? []),
+      ...($from.nodeAfter?.marks ?? []),
+      ...($from.nodeBefore?.marks ?? []),
+      ...$from.marks(),
+    ];
+    for (const mark of boundaryMarks) {
+      if (
+        (mark.type.name === 'insertion' || mark.type.name === 'deletion') &&
+        typeof mark.attrs.revisionId === 'number'
+      ) {
+        acceptChangeById(mark.attrs.revisionId)(view.state, view.dispatch);
+        return;
+      }
+    }
+    acceptChange(from, from)(view.state, view.dispatch);
+  }, [getReviewView]);
+
+  const handleReviewRejectChange = useCallback(() => {
+    const view = getReviewView();
+    if (!view) return;
+    const { from } = view.state.selection;
+    const $from = view.state.selection.$from;
+    const boundaryMarks = [
+      ...(view.state.storedMarks ?? []),
+      ...($from.nodeAfter?.marks ?? []),
+      ...($from.nodeBefore?.marks ?? []),
+      ...$from.marks(),
+    ];
+    for (const mark of boundaryMarks) {
+      if (
+        (mark.type.name === 'insertion' || mark.type.name === 'deletion') &&
+        typeof mark.attrs.revisionId === 'number'
+      ) {
+        rejectChangeById(mark.attrs.revisionId)(view.state, view.dispatch);
+        return;
+      }
+    }
+    rejectChange(from, from)(view.state, view.dispatch);
+  }, [getReviewView]);
+
+  const handleReviewAcceptAllChanges = useCallback(() => {
+    const view = getReviewView();
+    if (view) acceptAllChanges()(view.state, view.dispatch);
+  }, [getReviewView]);
+
+  const handleReviewRejectAllChanges = useCallback(() => {
+    const view = getReviewView();
+    if (view) rejectAllChanges()(view.state, view.dispatch);
+  }, [getReviewView]);
+
+  const handleReviewNavigateChange = useCallback(
+    (direction: 'next' | 'prev') => {
+      const view = getReviewView();
+      if (!view) return;
+      const { from } = view.state.selection;
+      const range =
+        direction === 'next'
+          ? findNextChange(view.state, from)
+          : findPreviousChange(view.state, from);
+      if (!range) return;
+      pagedEditorRef.current?.scrollToPosition(range.from);
+      view.dispatch(
+        view.state.tr.setSelection(TextSelection.create(view.state.doc, range.from, range.to))
+      );
+      view.focus();
+    },
+    [getReviewView]
+  );
+
+  const handleReviewPreviousChange = useCallback(
+    () => handleReviewNavigateChange('prev'),
+    [handleReviewNavigateChange]
+  );
+
+  const handleReviewNextChange = useCallback(
+    () => handleReviewNavigateChange('next'),
+    [handleReviewNavigateChange]
+  );
 
   const {
     hyperlinkPopupData,
@@ -1522,40 +1627,16 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
   }, [trackedChanges]);
 
   const sidebarOpen = allSidebarItems.length > 0;
-  // Reserve 2× the left-edge allowance so the centered page clears whatever
-  // outline UI is showing, without forcing a shift on wide viewports.
-  const outlineLeftAllowance =
-    (showOutline
-      ? OUTLINE_RESERVED_SPACE
-      : showOutlineButton
-        ? OUTLINE_BUTTON_RESERVED_SPACE
-        : 20) +
-    // The outline toggle/panel inset past the vertical ruler when it's shown,
-    // so the page must clear that extra width too.
-    (showRuler && (showOutline || showOutlineButton) ? RULER_WIDTH : 0);
-  // Reserve against the WIDEST page in the doc, not the portrait default: pages
-  // center via `alignItems:center`, so a landscape section (wider than
-  // DEFAULT_PAGE_WIDTH) gets a smaller side margin and, with the old default,
-  // slid left under the outline toggle/panel. Taking the max across all section
-  // widths also covers mixed-orientation docs.
-  const docBody = history.state?.package?.document;
-  const sectionPageWidths = [
-    docBody?.finalSectionProperties?.pageWidth,
-    ...(docBody?.sections?.map((s) => s.properties?.pageWidth) ?? []),
-  ].filter((w): w is number => typeof w === 'number' && w > 0);
-  const maxPageWidthPx = sectionPageWidths.length
-    ? Math.round(Math.max(...sectionPageWidths) / 15)
-    : DEFAULT_PAGE_WIDTH;
-
-  const minLayoutWidth =
-    2 * outlineLeftAllowance + maxPageWidthPx + (sidebarOpen ? SIDEBAR_DOCUMENT_SHIFT * 2 : 0);
-
-  // pageWidthPx — the final section's width — positions the sidebar / comment
-  // margin markers against the page most content lives under.
-  const sectionPropsPageWidth = docBody?.finalSectionProperties?.pageWidth;
-  const pageWidthPx = sectionPropsPageWidth
-    ? Math.round(sectionPropsPageWidth / 15)
-    : DEFAULT_PAGE_WIDTH;
+  // Shift reserve + widest-page widths — hook-owned so DocxEditor stays
+  // under its line cap. Overlay mode keeps the page centered (no shift).
+  const { sidebarShifted, minLayoutWidth, pageWidthPx } = useSidebarLayout({
+    sidebarOpen,
+    sidebarOverlayMode,
+    historyDocument: history.state,
+    showOutline,
+    showOutlineButton,
+    showRuler,
+  });
 
   const resolvedCommentIds = useMemo(() => {
     const ids = new Set<number>();
@@ -1734,7 +1815,7 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
       readOnlyProp={readOnlyProp}
       showOutline={showOutline}
       showOutlineButton={showOutlineButton}
-      sidebarOpen={sidebarOpen}
+      sidebarOpen={sidebarShifted}
       minLayoutWidth={minLayoutWidth}
       toolbarHeight={toolbarHeight}
       editorScrollLeft={editorScrollLeft}
@@ -1831,6 +1912,12 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
             onPageSetup={handleOpenPageSetup}
             onWatermark={handleOpenWatermark}
             onTableAction={handleTableAction}
+            onAcceptChange={handleReviewAcceptChange}
+            onRejectChange={handleReviewRejectChange}
+            onAcceptAllChanges={handleReviewAcceptAllChanges}
+            onRejectAllChanges={handleReviewRejectAllChanges}
+            onPreviousChange={handleReviewPreviousChange}
+            onNextChange={handleReviewNextChange}
           />
         ) : null
       }
@@ -1887,6 +1974,7 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
             onHyperlinkPopupClose={handleHyperlinkPopupClose}
             onContextMenu={handleContextMenu}
             sidebarOpen={sidebarOpen}
+            sidebarOverlayMode={sidebarOverlayMode}
             sidebarItems={allSidebarItems}
             anchorPositions={anchorPositions}
             onAnchorPositionsChange={setAnchorPositions}
@@ -1894,6 +1982,7 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
             pageWidthPx={pageWidthPx}
             expandedSidebarItem={expandedSidebarItem}
             setExpandedSidebarItem={setExpandedSidebarItem}
+            onSidebarNavigate={handleSidebarNavigate}
             comments={comments}
             resolvedCommentIds={resolvedCommentIds}
             resolvedIdsForRender={resolvedIdsForRender}

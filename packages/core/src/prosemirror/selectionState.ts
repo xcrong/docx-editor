@@ -29,6 +29,10 @@ export interface SelectionState {
   startParagraphIndex: number;
   /** End paragraph index */
   endParagraphIndex: number;
+  /** Whether cursor/selection is inside a tracked insertion */
+  inInsertion: boolean;
+  /** Whether cursor/selection is inside a tracked deletion */
+  inDeletion: boolean;
 }
 
 // ============================================================================
@@ -73,6 +77,35 @@ export function extractSelectionState(state: EditorState): SelectionState | null
   // For empty selection (cursor), use stored marks or marks at cursor position
   // For non-empty selection, check marks at the start of selection
   const marks = state.storedMarks || selection.$from.marks();
+
+  // Tracked-change presence drives the review toolbar's Accept/Reject
+  // disabled state (tasks 7.6/7.7). At a mark boundary $from.marks()
+  // reports the RIGHT side, but a just-typed insertion sits to the LEFT,
+  // so union all four mark sources (same pattern as DocxEditor's
+  // cursor-sidebar-item detection). For a range, also scan text inside
+  // it so selecting a change enables the buttons.
+  const boundaryMarks = [
+    ...(state.storedMarks ?? []),
+    ...($from.nodeAfter?.marks ?? []),
+    ...($from.nodeBefore?.marks ?? []),
+    ...$from.marks(),
+  ];
+  if (!selection.empty && !state.storedMarks) {
+    state.doc.nodesBetween(selection.from, selection.to, (node) => {
+      if (node.isText) {
+        boundaryMarks.push(...node.marks);
+        return false;
+      }
+      return true;
+    });
+  }
+  let inInsertion = false;
+  let inDeletion = false;
+  for (const mark of boundaryMarks) {
+    if (mark.type.name === 'insertion') inInsertion = true;
+    else if (mark.type.name === 'deletion') inDeletion = true;
+    if (inInsertion && inDeletion) break;
+  }
 
   // If in empty paragraph with no marks but has defaultTextFormatting, use that
   if (isEmptyParagraph && marks.length === 0 && paragraphDefaultFormatting) {
@@ -182,5 +215,7 @@ export function extractSelectionState(state: EditorState): SelectionState | null
     styleId,
     startParagraphIndex,
     endParagraphIndex,
+    inInsertion,
+    inDeletion,
   };
 }

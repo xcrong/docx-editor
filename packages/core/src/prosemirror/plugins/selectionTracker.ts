@@ -121,8 +121,26 @@ export function extractSelectionContext(state: EditorState): SelectionContext {
   const listType = numPr?.numId === 1 ? 'bullet' : numPr?.numId ? 'numbered' : undefined;
   const listLevel = numPr?.ilvl;
 
-  // Comment and tracked change detection
-  const allMarks = state.storedMarks || (empty ? $from.marks() : []);
+  // Comment and tracked change detection. For a cursor, union stored
+  // marks + boundary marks (a just-typed insertion sits left of $from).
+  // For a range, scan marks on text inside it (same as
+  // extractTextFormatting) so selecting a change enables Accept/Reject.
+  const boundaryMarks = [
+    ...(state.storedMarks ?? []),
+    ...($from.nodeAfter?.marks ?? []),
+    ...($from.nodeBefore?.marks ?? []),
+    ...$from.marks(),
+  ];
+  if (!empty && !state.storedMarks) {
+    doc.nodesBetween(from, to, (node) => {
+      if (node.isText) {
+        boundaryMarks.push(...node.marks);
+        return false;
+      }
+      return true;
+    });
+  }
+  const allMarks = boundaryMarks;
   const activeCommentIds: number[] = [];
   let inInsertion = false;
   let inDeletion = false;

@@ -87,6 +87,10 @@ export interface SelectionFormatting {
   indentLeft?: number;
   /** Whether the paragraph is RTL (bidi) */
   bidi?: boolean;
+  /** Whether cursor/selection is inside a tracked insertion (review toolbar state) */
+  inInsertion?: boolean;
+  /** Whether cursor/selection is inside a tracked deletion (review toolbar state) */
+  inDeletion?: boolean;
 }
 
 /**
@@ -246,6 +250,20 @@ export interface ToolbarProps {
   } | null;
   /** Callback when a table action is triggered */
   onTableAction?: (action: TableAction) => void;
+  /** Accept the tracked change at the cursor (review toolbar, 7.6) */
+  onAcceptChange?: () => void;
+  /** Reject the tracked change at the cursor (review toolbar, 7.6) */
+  onRejectChange?: () => void;
+  /** Accept all tracked changes in the document (review toolbar, 7.6) */
+  onAcceptAllChanges?: () => void;
+  /** Reject all tracked changes in the document (review toolbar, 7.6) */
+  onRejectAllChanges?: () => void;
+  /** Move cursor to the next tracked change (review toolbar, 7.6) */
+  onPreviousChange?: () => void;
+  /** Move cursor to the previous tracked change (review toolbar, 7.6) */
+  onNextChange?: () => void;
+  /** Whether to show the tracked-changes review group (default: true when any review callback is set) */
+  showReviewControls?: boolean;
 }
 
 /**
@@ -266,6 +284,8 @@ export interface ToolbarButtonProps {
   className?: string;
   /** ARIA label for accessibility */
   ariaLabel?: string;
+  /** Explicit test id suffix (rendered as `toolbar-<testId>`) */
+  testId?: string;
 }
 
 /**
@@ -295,8 +315,10 @@ export function ToolbarButton({
   children,
   className,
   ariaLabel,
+  testId: testIdProp,
 }: ToolbarButtonProps) {
   const testId =
+    testIdProp ||
     ariaLabel?.toLowerCase().replace(/\s+/g, '-') ||
     title
       ?.toLowerCase()
@@ -434,6 +456,13 @@ export function Toolbar(explicitProps: ToolbarProps) {
     onOpenImageProperties,
     tableContext,
     onTableAction,
+    onAcceptChange,
+    onRejectChange,
+    onAcceptAllChanges,
+    onRejectAllChanges,
+    onPreviousChange,
+    onNextChange,
+    showReviewControls,
     inline = false,
   } = props;
 
@@ -567,6 +596,63 @@ export function Toolbar(explicitProps: ToolbarProps) {
     },
     [disabled, onTableAction, onRefocusEditor]
   );
+
+  // Tracked-changes review group (7.6/7.7): visible when the host
+  // wires any review callback. Accept/Reject act on the change at the
+  // cursor and disable when the cursor is not inside one.
+  const hasReviewControls =
+    showReviewControls ??
+    !!(
+      onAcceptChange ||
+      onRejectChange ||
+      onAcceptAllChanges ||
+      onRejectAllChanges ||
+      onPreviousChange ||
+      onNextChange
+    );
+  const inTrackedChange = !!(currentFormatting.inInsertion || currentFormatting.inDeletion);
+
+  const handleAcceptChange = useCallback(() => {
+    if (!disabled && onAcceptChange) {
+      onAcceptChange();
+      requestAnimationFrame(() => onRefocusEditor?.());
+    }
+  }, [disabled, onAcceptChange, onRefocusEditor]);
+
+  const handleRejectChange = useCallback(() => {
+    if (!disabled && onRejectChange) {
+      onRejectChange();
+      requestAnimationFrame(() => onRefocusEditor?.());
+    }
+  }, [disabled, onRejectChange, onRefocusEditor]);
+
+  const handleAcceptAllChanges = useCallback(() => {
+    if (!disabled && onAcceptAllChanges) {
+      onAcceptAllChanges();
+      requestAnimationFrame(() => onRefocusEditor?.());
+    }
+  }, [disabled, onAcceptAllChanges, onRefocusEditor]);
+
+  const handleRejectAllChanges = useCallback(() => {
+    if (!disabled && onRejectAllChanges) {
+      onRejectAllChanges();
+      requestAnimationFrame(() => onRefocusEditor?.());
+    }
+  }, [disabled, onRejectAllChanges, onRefocusEditor]);
+
+  const handlePreviousChange = useCallback(() => {
+    if (!disabled && onPreviousChange) {
+      onPreviousChange();
+      requestAnimationFrame(() => onRefocusEditor?.());
+    }
+  }, [disabled, onPreviousChange, onRefocusEditor]);
+
+  const handleNextChange = useCallback(() => {
+    if (!disabled && onNextChange) {
+      onNextChange();
+      requestAnimationFrame(() => onRefocusEditor?.());
+    }
+  }, [disabled, onNextChange, onRefocusEditor]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────
 
@@ -932,6 +1018,78 @@ export function Toolbar(explicitProps: ToolbarProps) {
             disabled={disabled}
             tableContext={tableContext}
           />
+        </ToolbarGroup>
+      )}
+
+      {/* Tracked-changes review (7.6/7.7) */}
+      {hasReviewControls && (
+        <ToolbarGroup label={t('toolbar.reviewGroup')}>
+          {onPreviousChange && (
+            <ToolbarButton
+              onClick={handlePreviousChange}
+              disabled={disabled}
+              title={t('toolbar.reviewPrevious')}
+              ariaLabel={t('toolbar.reviewPrevious')}
+              testId="prev-change"
+            >
+              <MaterialSymbol name="keyboard_arrow_up" size={ICON_SIZE} />
+            </ToolbarButton>
+          )}
+          {onNextChange && (
+            <ToolbarButton
+              onClick={handleNextChange}
+              disabled={disabled}
+              title={t('toolbar.reviewNext')}
+              ariaLabel={t('toolbar.reviewNext')}
+              testId="next-change"
+            >
+              <MaterialSymbol name="keyboard_arrow_down" size={ICON_SIZE} />
+            </ToolbarButton>
+          )}
+          {onAcceptChange && (
+            <ToolbarButton
+              onClick={handleAcceptChange}
+              disabled={disabled || !inTrackedChange}
+              title={t('toolbar.reviewAccept')}
+              ariaLabel={t('toolbar.reviewAccept')}
+              testId="accept-change"
+            >
+              <MaterialSymbol name="check" size={ICON_SIZE} />
+            </ToolbarButton>
+          )}
+          {onRejectChange && (
+            <ToolbarButton
+              onClick={handleRejectChange}
+              disabled={disabled || !inTrackedChange}
+              title={t('toolbar.reviewReject')}
+              ariaLabel={t('toolbar.reviewReject')}
+              testId="reject-change"
+            >
+              <MaterialSymbol name="close" size={ICON_SIZE} />
+            </ToolbarButton>
+          )}
+          {onAcceptAllChanges && (
+            <ToolbarButton
+              onClick={handleAcceptAllChanges}
+              disabled={disabled}
+              title={t('toolbar.reviewAcceptAll')}
+              ariaLabel={t('toolbar.reviewAcceptAll')}
+              testId="accept-all"
+            >
+              <MaterialSymbol name="done_all" size={ICON_SIZE} />
+            </ToolbarButton>
+          )}
+          {onRejectAllChanges && (
+            <ToolbarButton
+              onClick={handleRejectAllChanges}
+              disabled={disabled}
+              title={t('toolbar.reviewRejectAll')}
+              ariaLabel={t('toolbar.reviewRejectAll')}
+              testId="reject-all"
+            >
+              <MaterialSymbol name="delete_sweep" size={ICON_SIZE} />
+            </ToolbarButton>
+          )}
         </ToolbarGroup>
       )}
 
