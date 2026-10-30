@@ -45,7 +45,14 @@
     "watermark": "Filigran",
     "break": null,
     "sectionBreakContinuous": null,
-    "sectionBreakNextPage": null
+    "sectionBreakNextPage": null,
+    "reviewAccept": null,
+    "reviewAcceptAll": null,
+    "reviewGroup": null,
+    "reviewNext": null,
+    "reviewPrevious": null,
+    "reviewReject": null,
+    "reviewRejectAll": null
   },
   "formattingBar": {
     "groups": {

@@ -44,11 +44,6 @@ describe('useOutlineSidebar.handleOutlineNavigate (#930)', () => {
 
     const { handleOutlineNavigate } = useOutlineSidebar({
       editorView: ref(view) as never,
-      showOutline: ref(false),
-      showSidebar: ref(false),
-      outlineHeadings: ref([]),
-      activeSidebarItem: ref<string | null>(null),
-      extractCommentsAndChanges: () => {},
       scrollToVisiblePosition,
     });
 
@@ -64,11 +59,6 @@ describe('useOutlineSidebar.handleOutlineNavigate (#930)', () => {
     const scrollToVisiblePosition = mock((_pmPos: number) => {});
     const { handleOutlineNavigate } = useOutlineSidebar({
       editorView: ref(null),
-      showOutline: ref(false),
-      showSidebar: ref(false),
-      outlineHeadings: ref([]),
-      activeSidebarItem: ref<string | null>(null),
-      extractCommentsAndChanges: () => {},
       scrollToVisiblePosition,
     });
 

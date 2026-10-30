@@ -45,7 +45,14 @@
     "symbol": "Simbol",
     "watermark": "Tanda Air",
     "help": "Bantuan",
-    "reportIssue": "Laporkan Masalah"
+    "reportIssue": "Laporkan Masalah",
+    "reviewAccept": null,
+    "reviewAcceptAll": null,
+    "reviewGroup": null,
+    "reviewNext": null,
+    "reviewPrevious": null,
+    "reviewReject": null,
+    "reviewRejectAll": null
   },
   "formattingBar": {
     "groups": {

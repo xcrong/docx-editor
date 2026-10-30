@@ -362,9 +362,9 @@ export function extractTrackedChanges(state: EditorState | null): TrackedChanges
       }
     }
     if (commentType) {
-      const commentMark = node.marks.find((m) => m.type === commentType);
-      if (commentMark) {
-        const cid = commentMark.attrs.commentId as number;
+      for (const m of node.marks) {
+        if (m.type !== commentType) continue;
+        const cid = m.attrs.commentId as number;
         let meta = commentMetadata.get(cid);
         if (!meta) {
           meta = { revisions: new Set(), hasCleanText: false };

@@ -1186,7 +1186,7 @@ export interface ToolbarItem {
 export type ToolbarItemPriority = 1 | 2 | 3 | 4 | 5;
 
 // @public
-export interface ToolbarProps {
+export interface ToolbarProps extends ReviewCallbacks {
     canRedo?: boolean;
     canUndo?: boolean;
     children?: ReactNode;
@@ -1240,6 +1240,7 @@ export interface ToolbarProps {
     showHighlightColorPicker?: boolean;
     showLineSpacingPicker?: boolean;
     showListButtons?: boolean;
+    showReviewControls?: boolean;
     showStylePicker?: boolean;
     showTableInsert?: boolean;
     showTextColorPicker?: boolean;

@@ -221,16 +221,23 @@ function runBoundaryFromConvertedRun(
 
 /**
  * Apply comment marks to PM nodes within a comment range.
- * Only the first active comment ID is used (comments don't overlap visually).
+ * All active comment IDs stack as separate marks (9.4: overlapping
+ * comments) — ProseMirror allows same-type marks to coexist and the
+ * painter layers their highlight opacity by count.
  */
 function applyCommentMarks(nodes: PMNode[], commentIds: Set<number>): PMNode[] {
   if (commentIds.size === 0) return nodes;
-  const commentId = [...commentIds][0]; // Use first active comment
-  const commentMark = schema.marks.comment.create({ commentId });
+  const commentMarks = [...commentIds].map((commentId) =>
+    schema.marks.comment.create({ commentId })
+  );
 
   return nodes.map((node) => {
     if (node.isText) {
-      return node.mark(commentMark.addToSet(node.marks));
+      let marks = node.marks;
+      for (const commentMark of commentMarks) {
+        marks = commentMark.addToSet(marks);
+      }
+      return node.mark(marks);
     }
     return node;
   });

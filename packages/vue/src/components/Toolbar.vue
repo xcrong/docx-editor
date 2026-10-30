@@ -397,6 +397,18 @@
       </div>
     </div>
 
+    <template v-if="showReviewGroup">
+      <ReviewButtons
+        :in-tracked-change="inTrackedChange"
+        @review-accept="$emit('review-accept')"
+        @review-reject="$emit('review-reject')"
+        @review-accept-all="$emit('review-accept-all')"
+        @review-reject-all="$emit('review-reject-all')"
+        @review-prev="$emit('review-prev')"
+        @review-next="$emit('review-next')"
+      />
+    </template>
+
     <!-- 14. Clear Formatting -->
     <button
       :title="t('formattingBar.clearFormatting')"
@@ -455,13 +467,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, getCurrentInstance } from 'vue';
 import type { EditorView } from 'prosemirror-view';
 import { undoDepth, redoDepth } from 'prosemirror-history';
 import { extractSelectionContext } from '@xcrong/docx-editor-core/prosemirror/plugins/selectionTracker';
 import { clearFormatting } from '@xcrong/docx-editor-core/prosemirror/commands/formatting';
 import MaterialSymbol from './ui/MaterialSymbol.vue';
 import ColorPicker from './ui/ColorPicker.vue';
+import ReviewButtons from './ReviewButtons.vue';
 import EditingModeDropdown, { type EditorMode } from './EditingModeDropdown.vue';
 import ImageWrapDropdown from './ui/ImageWrapDropdown.vue';
 import ImageTransformDropdown, {
@@ -528,6 +541,13 @@ const props = defineProps<{
       When present, the style picker shows the document's real styles + names,
       matching React's Toolbar `documentStyles` prop. Falls back to presets. */
   documentStyles?: Style[];
+  /**
+   * Whether to show the tracked-changes review group. When omitted, the
+   * group shows iff the host wires any `review-*` listener (mirrors React's
+   * "any review callback" rule). Note: presence is read from raw vnode
+   * props, since Vue Boolean-casts an absent optional boolean to `false`.
+   */
+  showReviewControls?: boolean;
 }>();
 
 const { t } = useTranslation();
@@ -548,6 +568,12 @@ const emit = defineEmits<{
   (e: 'toggle-sidebar'): void;
   (e: 'apply-style', styleId: string): void;
   (e: 'mode-change', mode: EditorMode): void;
+  (e: 'review-accept'): void;
+  (e: 'review-reject'): void;
+  (e: 'review-accept-all'): void;
+  (e: 'review-reject-all'): void;
+  (e: 'review-prev'): void;
+  (e: 'review-next'): void;
   (e: 'image-wrap-type', wrapType: string): void;
   (e: 'image-properties'): void;
   (e: 'image-transform', action: ImageTransformAction): void;
@@ -606,6 +632,38 @@ const ctx = computed<SelectionContext>(() => {
     };
   }
   return extractSelectionContext(v.state);
+});
+
+// Tracked-changes review state (7.6/7.7): Accept/Reject disable when the
+// cursor is not inside an insertion/deletion.
+const inTrackedChange = computed(() => ctx.value.inInsertion || ctx.value.inDeletion);
+// Mirror React: show the review group when the host wires any review
+// listener, unless `showReviewControls` explicitly overrides. Two Vue
+// gotchas documented here: (1) `useAttrs()` cannot be used — declared emit
+// listeners are excluded from attrs by `setFullProps` (`!isEmitListener`
+// guard), so `vnode.props` (raw props, listeners included) is the only
+// read that sees them. (2) Presence must be read via `'showReviewControls'
+// in vnodeProps` — Vue Boolean-casts an absent optional boolean prop to
+// `false`, so `props.showReviewControls !== undefined` would always be
+// true and permanently hide the group. The computed is deliberately named
+// `showReviewGroup` (not `showReviewControls`): the prop of the same name
+// would shadow it in the template.
+const instance = getCurrentInstance();
+const showReviewGroup = computed(() => {
+  const vnodeProps = instance?.vnode.props ?? {};
+  // Explicit opt-in/opt-out wins. NOTE: presence must be read from raw
+  // vnode props — `props.showReviewControls !== undefined` does NOT work
+  // here because Vue Boolean-casts an absent optional boolean prop to
+  // `false`, which would permanently shadow the listener sniffing below.
+  if ('showReviewControls' in vnodeProps) return !!props.showReviewControls;
+  return !!(
+    vnodeProps.onReviewAccept ||
+    vnodeProps.onReviewReject ||
+    vnodeProps.onReviewAcceptAll ||
+    vnodeProps.onReviewRejectAll ||
+    vnodeProps.onReviewPrev ||
+    vnodeProps.onReviewNext
+  );
 });
 
 // =========================================================================

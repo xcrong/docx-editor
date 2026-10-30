@@ -7,6 +7,7 @@
 import type { Command, Transaction } from 'prosemirror-state';
 import type { EditorState } from 'prosemirror-state';
 import { SUGGESTION_BYPASS_META } from '../plugins/suggestionMode';
+import { extractTrackedChanges } from '../utils/extractTrackedChanges';
 
 /**
  * Add a comment mark to the current selection.
@@ -252,48 +253,34 @@ export function rejectAllChanges(): Command {
 interface ChangeRange {
   from: number;
   to: number;
-  type: 'insertion' | 'deletion';
+  /** Entry type from `extractTrackedChanges` (insertion/deletion/replacement/structural…). */
+  type: string;
 }
 
 /**
- * Find the next tracked-change range (inline insertion / deletion mark)
- * after `startPos`. Wraps to the document start when no later change is
- * found. Useful for "next change" / "previous change" toolbar buttons.
+ * Find the next tracked-change range after `startPos`. Wraps to the
+ * document start when no later change is found. Useful for "next change"
+ * / "previous change" toolbar buttons.
  *
- * Only walks inline marks — structural revisions (pPrIns / pPrDel / row
- * / cell) are not surfaced here. Use {@link extractTrackedChanges} for a
- * complete revision list.
+ * Walks {@link extractTrackedChanges} entries (document order), so inline
+ * AND structural revisions (pPrIns / pPrDel / row / cell / table) are all
+ * navigable — matching what Accept All resolves.
  */
 export function findNextChange(state: EditorState, startPos: number): ChangeRange | null {
-  const insertionType = state.schema.marks.insertion;
-  const deletionType = state.schema.marks.deletion;
-  if (!insertionType && !deletionType) return null;
-
-  let result: ChangeRange | null = null;
-
-  state.doc.descendants((node, pos) => {
-    if (result) return false;
-    if (!node.isInline) return;
-    if (pos + node.nodeSize <= startPos) return;
-
-    for (const mark of node.marks) {
-      if (mark.type === insertionType || mark.type === deletionType) {
-        result = {
-          from: Math.max(pos, startPos),
-          to: pos + node.nodeSize,
-          type: mark.type === insertionType ? 'insertion' : 'deletion',
-        };
-        return false;
-      }
+  const { entries } = extractTrackedChanges(state);
+  for (const e of entries) {
+    if (e.to > startPos) {
+      return { from: Math.max(e.from, startPos), to: e.to, type: e.type };
     }
-  });
-
-  // Wrap around (only once)
-  if (!result && startPos > 0) {
-    return findNextChange(state, 0);
   }
 
-  return result;
+  // Wrap around (only once)
+  if (startPos > 0 && entries.length > 0) {
+    const first = entries[0];
+    return { from: first.from, to: first.to, type: first.type };
+  }
+
+  return null;
 }
 
 // ============================================================================
@@ -853,36 +840,24 @@ export function rejectChangeById(revisionId: number): Command {
 }
 
 /**
- * Find the previous tracked-change range (inline insertion / deletion
- * mark) before `startPos`. Wraps to the document end when no earlier
- * change is found. Counterpart to {@link findNextChange}.
+ * Find the previous tracked-change range before `startPos`. Wraps to the
+ * document end when no earlier change is found. Counterpart to
+ * {@link findNextChange} — covers inline and structural revisions alike.
  */
 export function findPreviousChange(state: EditorState, startPos: number): ChangeRange | null {
-  const insertionType = state.schema.marks.insertion;
-  const deletionType = state.schema.marks.deletion;
-  if (!insertionType && !deletionType) return null;
-
-  let result: ChangeRange | null = null;
-
-  state.doc.descendants((node, pos) => {
-    if (!node.isInline) return;
-    if (pos >= startPos) return false;
-
-    for (const mark of node.marks) {
-      if (mark.type === insertionType || mark.type === deletionType) {
-        result = {
-          from: pos,
-          to: pos + node.nodeSize,
-          type: mark.type === insertionType ? 'insertion' : 'deletion',
-        };
-      }
+  const { entries } = extractTrackedChanges(state);
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (e.from < startPos) {
+      return { from: e.from, to: e.to, type: e.type };
     }
-  });
-
-  // Wrap around (only once — guard prevents infinite recursion)
-  if (!result && startPos < state.doc.content.size) {
-    return findPreviousChange(state, state.doc.content.size);
   }
 
-  return result;
+  // Wrap around (only once — guard prevents infinite recursion)
+  if (startPos < state.doc.content.size && entries.length > 0) {
+    const last = entries[entries.length - 1];
+    return { from: last.from, to: last.to, type: last.type };
+  }
+
+  return null;
 }

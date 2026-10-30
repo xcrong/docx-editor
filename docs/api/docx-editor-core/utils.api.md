@@ -77,6 +77,9 @@ export type ColorMode = 'light' | 'dark' | 'system';
 export function colorsEqual(color1: ColorValue | undefined | null, color2: ColorValue | undefined | null, theme: Theme | null | undefined): boolean;
 
 // @public
+export function computeLeaderLineEndpoints(svgRect: LeaderLineRect, anchorRect: LeaderLineRect | null | undefined, cardRect: LeaderLineRect | null | undefined): LeaderLineEndpoints | null;
+
+// @public
 export function computeSplitDialogDefaults(rowspan: number, colspan: number): {
     minRows: number;
     minCols: number;
@@ -491,6 +494,30 @@ export interface KeyboardShortcut {
 }
 
 // @public
+export interface LeaderLineEndpoints {
+    // (undocumented)
+    x1: number;
+    // (undocumented)
+    x2: number;
+    // (undocumented)
+    y1: number;
+    // (undocumented)
+    y2: number;
+}
+
+// @public
+export interface LeaderLineRect {
+    // (undocumented)
+    bottom: number;
+    // (undocumented)
+    left: number;
+    // (undocumented)
+    right: number;
+    // (undocumented)
+    top: number;
+}
+
+// @public
 export function lightenColor(color: ColorValue | undefined | null, theme: Theme | null | undefined, percent: number): string;
 
 // @public
@@ -810,8 +837,14 @@ export function setGoogleFontsEnabled(enabled: boolean): void;
 // @public
 export function setSelectionPosition(node: Node, offset: number): void;
 
+// @public
+export function shouldUseSidebarOverlay(containerWidthPx: number): boolean;
+
 // @public (undocumented)
 export const SIDEBAR_DOCUMENT_SHIFT: number;
+
+// @public
+export const SIDEBAR_OVERLAY_BREAKPOINT = 1200;
 
 // @public (undocumented)
 export const SIDEBAR_PAGE_GAP = 12;

@@ -45,7 +45,14 @@
     "symbol": "Symbol",
     "watermark": "Watermark",
     "help": "Help",
-    "reportIssue": "Report issue"
+    "reportIssue": "Report issue",
+    "reviewGroup": "Track changes",
+    "reviewPrevious": "Previous change",
+    "reviewNext": "Next change",
+    "reviewAccept": "Accept change",
+    "reviewReject": "Reject change",
+    "reviewAcceptAll": "Accept all changes",
+    "reviewRejectAll": "Reject all changes"
   },
   "formattingBar": {
     "groups": {

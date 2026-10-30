@@ -4,8 +4,8 @@
 - [x] 1.2 Add CSS transition to pages container in `PagedEditor.tsx` for `transform: translateX()` shift when sidebar is active
 - [x] 1.3 Create `CommentsSidebar` shell component (320px fixed-width, absolutely positioned right, full height below toolbar, independently scrollable)
 - [x] 1.4 Integrate sidebar into `DocxEditor.tsx` layout (render alongside PagedEditor, pass toggle state)
-- [ ] 1.5 Handle narrow container case (< 1200px): overlay mode with semi-transparent backdrop instead of shift
-- [ ] 1.6 Add E2E test: sidebar opens/closes, document shifts left and re-centers
+- [x] 1.5 Handle narrow container case (< 1200px): overlay mode with semi-transparent backdrop instead of shift
+- [x] 1.6 Add E2E test: sidebar opens/closes, document shifts left and re-centers
 
 ## 2. Comment Data Layer
 
@@ -23,23 +23,23 @@
 - [x] 3.4 Implement comment card spacing/overlap avoidance (push lower cards down when they collide)
 - [x] 3.5 Add "New comment" input card: appears when user triggers add-comment, auto-focused, submit on Enter, cancel on Escape
 - [x] 3.6 Add resolved comments toggle in sidebar header (show/hide resolved)
-- [ ] 3.7 Add E2E test: add comment, reply, resolve, delete comment
+- [x] 3.7 Add E2E test: add comment, reply, resolve, delete comment
 
 ## 4. Leader Lines
 
-- [ ] 4.1 Create `LeaderLines` SVG overlay component positioned between document and sidebar
-- [ ] 4.2 Compute line endpoints: from right edge of highlighted text rect → left edge of corresponding sidebar card
-- [ ] 4.3 Update leader line positions on document scroll (debounced with `requestAnimationFrame`)
-- [ ] 4.4 Highlight active comment's leader line (darker/thicker) when comment is selected
-- [ ] 4.5 Add E2E test: leader lines render and connect correct elements
+- [x] 4.1 Create `LeaderLines` SVG overlay component positioned between document and sidebar
+- [x] 4.2 Compute line endpoints: from right edge of highlighted text rect → left edge of corresponding sidebar card
+- [x] 4.3 Update leader line positions on document scroll (debounced with `requestAnimationFrame`)
+- [x] 4.4 Highlight active comment's leader line (darker/thicker) when comment is selected
+- [x] 4.5 Add E2E test: leader lines render and connect correct elements
 
 ## 5. Comment Navigation & Interaction
 
-- [ ] 5.1 Click comment card → scroll document to commented text, select the range
-- [ ] 5.2 Click highlighted text in document → scroll sidebar to corresponding comment, highlight the card
+- [x] 5.1 Click comment card → scroll document to commented text, select the range
+- [x] 5.2 Click highlighted text in document → scroll sidebar to corresponding comment, highlight the card
 - [x] 5.3 Add "Add comment" button to toolbar (icon + Ctrl+Alt+M / Cmd+Alt+M shortcut)
 - [x] 5.4 Add comments toggle button to toolbar
-- [ ] 5.5 Add E2E test: bidirectional navigation between sidebar and document
+- [x] 5.5 Add E2E test: bidirectional navigation between sidebar and document
 
 ## 6. Suggestion Mode
 
@@ -49,7 +49,7 @@
 - [x] 6.4 Add author and timestamp metadata to all tracked change marks created in suggestion mode
 - [x] 6.5 Add mode toggle dropdown to toolbar ("Editing" / "Suggesting") with Ctrl+Shift+E shortcut
 - [x] 6.6 Add visual mode indicator in toolbar when suggestion mode is active
-- [ ] 6.7 Add E2E test: type text in suggestion mode → insertion mark applied; delete text → deletion mark applied
+- [x] 6.7 Add E2E test: type text in suggestion mode → insertion mark applied; delete text → deletion mark applied
 
 ## 7. Track Changes Review
 
@@ -58,10 +58,10 @@
 - [x] 7.3 Create `acceptAllChanges` PM command: single transaction processing all tracked changes
 - [x] 7.4 Create `rejectAllChanges` PM command: single transaction processing all tracked changes
 - [x] 7.5 Create `nextChange` / `previousChange` navigation commands (with wrap-around)
-- [ ] 7.6 Add review toolbar controls: Accept, Reject, Accept All, Reject All, Previous, Next buttons
-- [ ] 7.7 Disable individual Accept/Reject when cursor is not in a tracked change
+- [x] 7.6 Add review toolbar controls: Accept, Reject, Accept All, Reject All, Previous, Next buttons
+- [x] 7.7 Disable individual Accept/Reject when cursor is not in a tracked change
 - [x] 7.8 Add tracked change cards to sidebar: type indicator, text preview, author, date, accept/reject buttons
-- [ ] 7.9 Add E2E test: accept insertion, accept deletion, reject insertion, reject deletion, accept all, reject all
+- [x] 7.9 Add E2E test: accept insertion, accept deletion, reject insertion, reject deletion, accept all, reject all
 
 ## 8. DOCX Round-Trip Serialization
 
@@ -77,6 +77,6 @@
 - [x] 9.1 Enhance comment text highlighting in `renderParagraph.ts`: yellow/amber background with data-comment-id attribute
 - [x] 9.2 Ensure insertion mark renders with green color + underline in layout-painter
 - [x] 9.3 Ensure deletion mark renders with red color + strikethrough in layout-painter
-- [ ] 9.4 Handle overlapping comments (multiple comments on same text): stack highlights with different opacities
+- [x] 9.4 Handle overlapping comments (multiple comments on same text): stack highlights with different opacities
 - [x] 9.5 Prevent PM focus stealing from sidebar interactions (`onMouseDown` stopPropagation on sidebar)
 - [x] 9.6 Add smooth CSS transitions for sidebar open/close animation (200ms ease)

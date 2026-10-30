@@ -822,4 +822,117 @@ test.describe('Tracked paragraph-mark revisions (issue #614)', () => {
     await expect(card).toContainText('Jane');
     await expect(card).toContainText('Inserted paragraph break');
   });
+
+  test('Typing in suggesting mode wraps text in an insertion mark (6.7)', async ({ page }) => {
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    await editor.typeText('suggested');
+    await page.waitForTimeout(100);
+    const insertions = page.locator('.layout-page-content .docx-insertion[data-revision-id]');
+    expect(await insertions.count()).toBeGreaterThan(0);
+    await expect(insertions.first()).toContainText('suggested');
+  });
+
+  test('Deleting characters in suggesting mode wraps text in a deletion mark (6.7)', async ({
+    page,
+  }) => {
+    await editor.typeText('delete me');
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    // Select "me" via keyboard from the end and delete — the text stays
+    // with a deletion mark instead of being removed.
+    await page.keyboard.press('Shift+ArrowLeft');
+    await page.keyboard.press('Shift+ArrowLeft');
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(100);
+    const deletions = page.locator('.layout-page-content .docx-deletion[data-revision-id]');
+    expect(await deletions.count()).toBeGreaterThan(0);
+    await expect(deletions.first()).toContainText('e');
+  });
+
+  test('Inline insertion accept/reject via toolbar buttons (7.6/7.9)', async ({ page }) => {
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    await editor.typeText('toolbar review');
+    await page.waitForTimeout(100);
+    expect(await page.locator('.layout-page-content .docx-insertion').count()).toBeGreaterThan(0);
+
+    // Accept via the toolbar review button keeps the text, clears the mark.
+    await page.locator('[data-testid="toolbar-accept-change"]').click();
+    await page.waitForTimeout(100);
+    expect(await page.locator('.layout-page-content .docx-insertion').count()).toBe(0);
+    await expect(page.locator('.layout-page-content')).toContainText('toolbar review');
+
+    // Type again, then reject via the toolbar button removes text + mark.
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    await editor.typeText(' gone');
+    await page.waitForTimeout(100);
+    expect(await page.locator('.layout-page-content .docx-insertion').count()).toBeGreaterThan(0);
+    await page.locator('[data-testid="toolbar-reject-change"]').click();
+    await page.waitForTimeout(100);
+    expect(await page.locator('.layout-page-content .docx-insertion').count()).toBe(0);
+    await expect(page.locator('.layout-page-content')).not.toContainText('gone');
+  });
+
+  test('Inline deletion accept/reject by id (7.9)', async ({ page }) => {
+    await editor.typeText('keep remove');
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowLeft');
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(100);
+
+    const revId = await page.$$eval(
+      '.layout-page-content .docx-deletion[data-revision-id]',
+      (els) => Number((els[0] as HTMLElement).dataset.revisionId)
+    );
+    expect(Number.isFinite(revId)).toBe(true);
+
+    // Reject keeps the text, clears the mark.
+    expect(await rejectById(page, revId)).toBe(true);
+    await page.waitForTimeout(50);
+    expect(await page.locator('.layout-page-content .docx-deletion').count()).toBe(0);
+    await expect(page.locator('.layout-page-content')).toContainText('remove');
+
+    // Re-delete, then accept removes text + mark.
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowLeft');
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(100);
+    const revId2 = await page.$$eval(
+      '.layout-page-content .docx-deletion[data-revision-id]',
+      (els) => Number((els[0] as HTMLElement).dataset.revisionId)
+    );
+    expect(await acceptById(page, revId2)).toBe(true);
+    await page.waitForTimeout(50);
+    expect(await page.locator('.layout-page-content .docx-deletion').count()).toBe(0);
+    await expect(page.locator('.layout-page-content')).not.toContainText('remove');
+  });
+
+  test('rejectAllChanges clears inline insertions (7.9)', async ({ page }) => {
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    await editor.typeText('one');
+    await page.waitForTimeout(50);
+    expect(await page.locator('.layout-page-content .docx-insertion').count()).toBeGreaterThan(0);
+    const rejected = await page.evaluate(
+      () => window.__DOCX_EDITOR_E2E__?.rejectAllChanges?.() ?? false
+    );
+    expect(rejected).toBe(true);
+    await page.waitForTimeout(50);
+    expect(await page.locator('.layout-page-content .docx-insertion').count()).toBe(0);
+  });
+
+  test('Review Accept/Reject disable when cursor is outside a change (7.7)', async ({ page }) => {
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    await editor.typeText('reviewed');
+    await page.waitForTimeout(100);
+    // Cursor inside the insertion: buttons enabled.
+    await expect(page.locator('[data-testid="toolbar-accept-change"]')).toBeEnabled();
+    await expect(page.locator('[data-testid="toolbar-reject-change"]')).toBeEnabled();
+
+    // Move cursor to a clean position (new paragraph via double Enter is
+    // still tracked, so exit suggesting mode first then add a clean line).
+    expect(await setSuggestionMode(page, false)).toBe(true);
+    await editor.pressEnter();
+    await editor.typeText('clean');
+    await page.waitForTimeout(100);
+    await expect(page.locator('[data-testid="toolbar-accept-change"]')).toBeDisabled();
+    await expect(page.locator('[data-testid="toolbar-reject-change"]')).toBeDisabled();
+  });
 });

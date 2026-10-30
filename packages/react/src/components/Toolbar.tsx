@@ -1,13 +1,8 @@
 /**
- * Toolbar Component
- *
- * The customizable formatting rail — undo/redo, zoom, styles, fonts,
- * bold/italic/underline, colors, alignment, lists, table/image context,
- * clear formatting. Used standalone (`<Toolbar ...props>`), inside
- * `<EditorToolbar>` (reads from context via `EditorToolbar.Toolbar`), or
- * embedded inline. Also the home of the `ToolbarButton` / `ToolbarGroup` /
- * `ToolbarSeparator` primitives and the shared `FormattingAction` /
- * `SelectionFormatting` / `ToolbarProps` types.
+ * Toolbar Component — customizable formatting rail (undo/redo, zoom,
+ * styles, fonts, bold/italic/underline, colors, alignment, lists,
+ * table/image context, clear formatting). Home of `ToolbarButton` /
+ * `ToolbarGroup` / `ToolbarSeparator` and shared types.
  */
 
 import React, { useCallback, useEffect, useRef } from 'react';
@@ -44,6 +39,7 @@ import { ImageTransformDropdown } from './ui/ImageTransformDropdown';
 import type { TableAction } from './ui/TableToolbar';
 import { cn } from '../lib/utils';
 import { EditorToolbarContext } from './EditorToolbarContext';
+import { ToolbarReview, type ReviewCallbacks } from './ToolbarReview';
 
 const ICON_SIZE = 18;
 
@@ -87,6 +83,10 @@ export interface SelectionFormatting {
   indentLeft?: number;
   /** Whether the paragraph is RTL (bidi) */
   bidi?: boolean;
+  /** Whether cursor/selection is inside a tracked insertion (review toolbar state) */
+  inInsertion?: boolean;
+  /** Whether cursor/selection is inside a tracked deletion (review toolbar state) */
+  inDeletion?: boolean;
 }
 
 /**
@@ -118,7 +118,7 @@ export type FormattingAction =
 /**
  * Props for the Toolbar (formatting rail) component
  */
-export interface ToolbarProps {
+export interface ToolbarProps extends ReviewCallbacks {
   /** Current formatting of the selection */
   currentFormatting?: SelectionFormatting;
   /** Callback when a formatting action is triggered */
@@ -246,6 +246,8 @@ export interface ToolbarProps {
   } | null;
   /** Callback when a table action is triggered */
   onTableAction?: (action: TableAction) => void;
+  /** Whether to show the tracked-changes review group (default: true when any review callback is set) */
+  showReviewControls?: boolean;
 }
 
 /**
@@ -266,6 +268,8 @@ export interface ToolbarButtonProps {
   className?: string;
   /** ARIA label for accessibility */
   ariaLabel?: string;
+  /** Explicit test id suffix (rendered as `toolbar-<testId>`) */
+  testId?: string;
 }
 
 /**
@@ -295,8 +299,10 @@ export function ToolbarButton({
   children,
   className,
   ariaLabel,
+  testId: testIdProp,
 }: ToolbarButtonProps) {
   const testId =
+    testIdProp ||
     ariaLabel?.toLowerCase().replace(/\s+/g, '-') ||
     title
       ?.toLowerCase()
@@ -434,6 +440,13 @@ export function Toolbar(explicitProps: ToolbarProps) {
     onOpenImageProperties,
     tableContext,
     onTableAction,
+    onAcceptChange,
+    onRejectChange,
+    onAcceptAllChanges,
+    onRejectAllChanges,
+    onPreviousChange,
+    onNextChange,
+    showReviewControls,
     inline = false,
   } = props;
 
@@ -567,6 +580,12 @@ export function Toolbar(explicitProps: ToolbarProps) {
     },
     [disabled, onTableAction, onRefocusEditor]
   );
+
+  // Tracked-changes review group lives in ToolbarReview.tsx (keeps this
+  // file under the max-lines budget). It shows when the host wires any
+  // review callback; Accept/Reject disable when the cursor is not inside
+  // a tracked change (7.6/7.7).
+  const inTrackedChange = !!(currentFormatting.inInsertion || currentFormatting.inDeletion);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────
 
@@ -934,6 +953,22 @@ export function Toolbar(explicitProps: ToolbarProps) {
           />
         </ToolbarGroup>
       )}
+
+      {/* Tracked-changes review (7.6/7.7) — see ToolbarReview.tsx */}
+      <ToolbarReview
+        callbacks={{
+          onAcceptChange,
+          onRejectChange,
+          onAcceptAllChanges,
+          onRejectAllChanges,
+          onPreviousChange,
+          onNextChange,
+        }}
+        showReviewControls={showReviewControls}
+        inTrackedChange={inTrackedChange}
+        disabled={disabled}
+        onRefocusEditor={onRefocusEditor}
+      />
 
       {/* Clear Formatting */}
       <ToolbarButton
