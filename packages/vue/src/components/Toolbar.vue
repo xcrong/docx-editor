@@ -397,59 +397,16 @@
       </div>
     </div>
 
-    <!-- 13.5 Tracked-changes review (7.6/7.7) -->
     <template v-if="showReviewGroup">
-      <span class="divider" />
-      <button
-        :title="t('toolbar.reviewPrevious')"
-        :aria-label="t('toolbar.reviewPrevious')"
-        data-testid="toolbar-prev-change"
-        @mousedown.prevent="$emit('review-prev')"
-      >
-        <MaterialSymbol name="keyboard_arrow_up" />
-      </button>
-      <button
-        :title="t('toolbar.reviewNext')"
-        :aria-label="t('toolbar.reviewNext')"
-        data-testid="toolbar-next-change"
-        @mousedown.prevent="$emit('review-next')"
-      >
-        <MaterialSymbol name="keyboard_arrow_down" />
-      </button>
-      <button
-        :title="t('toolbar.reviewAccept')"
-        :aria-label="t('toolbar.reviewAccept')"
-        data-testid="toolbar-accept-change"
-        :disabled="!inTrackedChange"
-        @mousedown.prevent="$emit('review-accept')"
-      >
-        <MaterialSymbol name="check" />
-      </button>
-      <button
-        :title="t('toolbar.reviewReject')"
-        :aria-label="t('toolbar.reviewReject')"
-        data-testid="toolbar-reject-change"
-        :disabled="!inTrackedChange"
-        @mousedown.prevent="$emit('review-reject')"
-      >
-        <MaterialSymbol name="close" />
-      </button>
-      <button
-        :title="t('toolbar.reviewAcceptAll')"
-        :aria-label="t('toolbar.reviewAcceptAll')"
-        data-testid="toolbar-accept-all"
-        @mousedown.prevent="$emit('review-accept-all')"
-      >
-        <MaterialSymbol name="done_all" />
-      </button>
-      <button
-        :title="t('toolbar.reviewRejectAll')"
-        :aria-label="t('toolbar.reviewRejectAll')"
-        data-testid="toolbar-reject-all"
-        @mousedown.prevent="$emit('review-reject-all')"
-      >
-        <MaterialSymbol name="delete_sweep" />
-      </button>
+      <ReviewButtons
+        :in-tracked-change="inTrackedChange"
+        @review-accept="$emit('review-accept')"
+        @review-reject="$emit('review-reject')"
+        @review-accept-all="$emit('review-accept-all')"
+        @review-reject-all="$emit('review-reject-all')"
+        @review-prev="$emit('review-prev')"
+        @review-next="$emit('review-next')"
+      />
     </template>
 
     <!-- 14. Clear Formatting -->
@@ -517,6 +474,7 @@ import { extractSelectionContext } from '@xcrong/docx-editor-core/prosemirror/pl
 import { clearFormatting } from '@xcrong/docx-editor-core/prosemirror/commands/formatting';
 import MaterialSymbol from './ui/MaterialSymbol.vue';
 import ColorPicker from './ui/ColorPicker.vue';
+import ReviewButtons from './ReviewButtons.vue';
 import EditingModeDropdown, { type EditorMode } from './EditingModeDropdown.vue';
 import ImageWrapDropdown from './ui/ImageWrapDropdown.vue';
 import ImageTransformDropdown, {

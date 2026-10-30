@@ -441,6 +441,7 @@ import { useOutlineVisibility } from '../composables/useOutlineVisibility';
 import { useSidebarDeselect } from '../composables/useSidebarDeselect';
 import { useSidebarLayout } from '../composables/useSidebarLayout';
 import { useSidebarVisibility } from '../composables/useSidebarVisibility';
+import { useActiveFormattingView } from '../composables/useActiveFormattingView';
 import { useSidebarNavigate } from '../composables/useSidebarNavigate';
 import { useKeyboardShortcuts } from '../composables/useKeyboardShortcuts';
 import { provideDocxPortalClass } from '../composables/usePortalClass';
@@ -700,15 +701,11 @@ useFontLifecycle(
   }
 );
 
-// Memoized so the template doesn't walk the headers/footers Maps every tick.
-const activeHfView = computed<EditorView | null>(() =>
-  hfEdit.value?.headerFooter ? (getHfPmView(hfEdit.value.headerFooter) ?? null) : null
-);
-
-// Interactive toolbar formatting targets the edited header/footer, else body (#749).
-const activeFormattingView = computed<EditorView | null>(
-  () => activeHfView.value ?? editorView.value
-);
+const activeFormattingView = useActiveFormattingView({
+  getHfEdit: () => hfEdit.value, // Deferred: `hfEdit` destructured later (#749).
+  getHfPmView,
+  editorView,
+});
 
 // Registered in onMounted because `hfEdit` is destructured later in this script setup (TDZ).
 onMounted(() => {
@@ -785,9 +782,7 @@ onMounted(() => {
   });
 });
 
-// Sidebar-aware layout (shift transform, ruler padding, min width) —
-// composable-owned so DocxEditor stays under its line cap. Overlay mode
-// keeps the page centered (no shift).
+// Sidebar-aware layout (shift/ruler/min-width; overlay keeps page centered).
 const {
   minLayoutWidth,
   pagesContainerStyle,
@@ -864,9 +859,7 @@ const {
   getHfPmViews,
 });
 
-// Comments-sidebar visibility + overlay mode (spec 1.5). Declared AFTER
-// useCommentLifecycle (seeds `extractCommentsAndChanges`). `useSidebarLayout`
-// (above) reads `sidebarOverlayMode` via a getter so the order is TDZ-safe.
+// Sidebar visibility + overlay mode (1.5; layout reads it via getter, order TDZ-safe).
 const { sidebarOverlayMode, handleToggleSidebar } = useSidebarVisibility({
   showSidebar,
   extractCommentsAndChanges,
@@ -941,18 +934,13 @@ const { handleToggleOutline } = useOutlineVisibility({
   outlineHeadings,
 });
 
-const {
-  handleOutlineNavigate,
-} = useOutlineSidebar({
+const { handleOutlineNavigate } = useOutlineSidebar({
   editorView,
-  // Deferred closure: `scrollVisiblePositionIntoView` is destructured from
-  // usePagesPointer further down (TDZ-sensitive composable order). The arrow is
-  // only invoked on an outline click, long after setup, so the reference is safe.
+  // Deferred closure (TDZ-safe).
   scrollToVisiblePosition: (pmPos: number) => scrollVisiblePositionIntoView(pmPos),
 });
 
-// Outside-click collapses the expanded sidebar card.
-const { handleEditorScrollMouseDown } = useSidebarDeselect({ activeSidebarItem });
+const { handleEditorScrollMouseDown } = useSidebarDeselect({ activeSidebarItem }); // Outside-click collapses the expanded card.
 
 useKeyboardShortcuts({
   showKeyboardShortcuts,
@@ -980,6 +968,8 @@ const {
   handleReviewAcceptAll,
   handleReviewRejectAll,
   handleReviewNavigate,
+  handleReviewAcceptAtCursor,
+  handleReviewRejectAtCursor,
   handleTrackedChangeReply,
 } = useCommentManagement({
   editorView,
@@ -996,8 +986,7 @@ const {
   author: authorRef,
   commentCallbacks,
   getHfPmViews,
-  // Deferred closure (review prev/next click) so `scrollVisiblePositionIntoView`
-  // (declared below via usePagesPointer) is TDZ-safe — outline-navigate pattern.
+  // Deferred closures (TDZ-safe: invoked on click, long after setup).
   scrollToVisiblePosition: (pmPos: number) => scrollVisiblePositionIntoView(pmPos),
   getActiveView: () => activeFormattingView.value,
 });
@@ -1050,9 +1039,7 @@ const {
   setDocument,
 });
 
-// Card → document navigation + leader-line item ids (specs 4.x/5.1). The
-// scroll closure is deferred (card click) so `scrollVisiblePositionIntoView`
-// is TDZ-safe (outline-navigate pattern).
+// Card → document navigation + leader-line ids (4.x/5.1; deferred closure).
 const { handleSidebarNavigate, sidebarItemIds } = useSidebarNavigate({
   editorView,
   scrollToVisiblePosition: (pmPos: number) => scrollVisiblePositionIntoView(pmPos),
@@ -1130,53 +1117,6 @@ function setEditorMode(mode: EditorMode) {
   if (editorMode.value === mode) return;
   editorMode.value = mode;
   emit('mode-change', mode);
-}
-
-// Tracked-changes review toolbar (7.6/7.7). Accept/Reject act on the
-// change under the cursor: resolve the revisionId from stored/cursor
-// marks and dispatch the by-id command (coalesced-safe).
-function handleReviewAcceptAtCursor() {
-  const view = activeFormattingView.value;
-  if (!view) return;
-  const $from = view.state.selection.$from;
-  // Union all mark sources: at a mark boundary $from.marks() reports the
-  // right side, but a just-typed insertion sits to the left.
-  const boundaryMarks = [
-    ...(view.state.storedMarks ?? []),
-    ...($from.nodeAfter?.marks ?? []),
-    ...($from.nodeBefore?.marks ?? []),
-    ...$from.marks(),
-  ];
-  for (const mark of boundaryMarks) {
-    if (
-      (mark.type.name === 'insertion' || mark.type.name === 'deletion') &&
-      typeof mark.attrs.revisionId === 'number'
-    ) {
-      handleAcceptChangeById(mark.attrs.revisionId);
-      return;
-    }
-  }
-}
-
-function handleReviewRejectAtCursor() {
-  const view = activeFormattingView.value;
-  if (!view) return;
-  const $from = view.state.selection.$from;
-  const boundaryMarks = [
-    ...(view.state.storedMarks ?? []),
-    ...($from.nodeAfter?.marks ?? []),
-    ...($from.nodeBefore?.marks ?? []),
-    ...$from.marks(),
-  ];
-  for (const mark of boundaryMarks) {
-    if (
-      (mark.type.name === 'insertion' || mark.type.name === 'deletion') &&
-      typeof mark.attrs.revisionId === 'number'
-    ) {
-      handleRejectChangeById(mark.attrs.revisionId);
-      return;
-    }
-  }
 }
 
 onMounted(() => {

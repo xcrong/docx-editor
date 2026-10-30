@@ -311,6 +311,50 @@ export function useCommentManagement(opts: UseCommentManagementOptions) {
     view.focus();
   }
 
+  function handleReviewAcceptAtCursor() {
+    const view = opts.getActiveView?.() ?? opts.editorView.value;
+    if (!view) return;
+    const $from = view.state.selection.$from;
+    // Union all mark sources: at a mark boundary $from.marks() reports the
+    // right side, but a just-typed insertion sits to the left.
+    const boundaryMarks = [
+      ...(view.state.storedMarks ?? []),
+      ...($from.nodeAfter?.marks ?? []),
+      ...($from.nodeBefore?.marks ?? []),
+      ...$from.marks(),
+    ];
+    for (const mark of boundaryMarks) {
+      if (
+        (mark.type.name === 'insertion' || mark.type.name === 'deletion') &&
+        typeof mark.attrs.revisionId === 'number'
+      ) {
+        handleAcceptChangeById(mark.attrs.revisionId);
+        return;
+      }
+    }
+  }
+
+  function handleReviewRejectAtCursor() {
+    const view = opts.getActiveView?.() ?? opts.editorView.value;
+    if (!view) return;
+    const $from = view.state.selection.$from;
+    const boundaryMarks = [
+      ...(view.state.storedMarks ?? []),
+      ...($from.nodeAfter?.marks ?? []),
+      ...($from.nodeBefore?.marks ?? []),
+      ...$from.marks(),
+    ];
+    for (const mark of boundaryMarks) {
+      if (
+        (mark.type.name === 'insertion' || mark.type.name === 'deletion') &&
+        typeof mark.attrs.revisionId === 'number'
+      ) {
+        handleRejectChangeById(mark.attrs.revisionId);
+        return;
+      }
+    }
+  }
+
   // Thread a reply under a tracked change. Mirrors React's
   // onTrackedChangeReply (DocxEditor.tsx): the reply is a child comment
   // keyed by `parentId = revisionId`, NOT an independently anchored
@@ -345,6 +389,8 @@ export function useCommentManagement(opts: UseCommentManagementOptions) {
     handleReviewAcceptAll,
     handleReviewRejectAll,
     handleReviewNavigate,
+    handleReviewAcceptAtCursor,
+    handleReviewRejectAtCursor,
     handleTrackedChangeReply,
   };
 }

@@ -49,7 +49,7 @@ import { useSidebarNavigation } from './DocxEditor/hooks/useSidebarNavigation';
 import { useSidebarLayout } from './DocxEditor/hooks/useSidebarLayout';
 import { useCommentSidebarItems, type CommentCallbacks } from '../hooks/useCommentSidebarItems';
 import { extractTrackedChanges } from '../hooks/useTrackedChanges';
-import { type EditorState as PMEditorState, TextSelection } from 'prosemirror-state';
+import { type EditorState as PMEditorState } from 'prosemirror-state';
 import type { ReactSidebarItem } from '../plugin-api/types';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import type { Translations } from '@xcrong/docx-editor-i18n';
@@ -90,11 +90,8 @@ import {
   rejectChange,
   acceptChangeById,
   rejectChangeById,
-  acceptAllChanges,
-  rejectAllChanges,
-  findNextChange,
-  findPreviousChange,
 } from '@xcrong/docx-editor-core/prosemirror/commands';
+import { useReviewActions } from './DocxEditor/hooks/useReviewActions';
 import { collectHeadings } from '@xcrong/docx-editor-core/utils';
 import {
   prefersColorSchemeDark,
@@ -700,17 +697,12 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
   // a subsequent close stays closed; reset on doc reload.
   const sidebarAutoOpenedRef = useRef(false);
   const [expandedSidebarItem, setExpandedSidebarItem] = useState<string | null>(null);
-  // PagedEditor ref declared early so useCommentManagement (which reads
-  // pagedEditorRef.current.getView() for orphan cleanup) can be wired before
-  // the trackedChanges effect that drives `setComments`. scrollContainerRef
-  // rides along because useSidebarNavigation (overlay-mode observer) needs
-  // it at the same point.
+  // PagedEditor/scroll refs declared early: comment orphan cleanup and the
+  // sidebar navigation hook need them at the same point (ref identity is
+  // stable, only `.current` populates later).
   const pagedEditorRef = useRef<PagedEditorRef>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  // Narrow-container overlay mode + card → document navigation (spec
-  // 1.5/5.1) — owned by a hook so DocxEditor stays under its line cap.
-  // (Passing the ref objects themselves is fine — `useRef` identity is
-  // stable, only `.current` is populated later.)
+  // Narrow-container overlay mode + card → document navigation (1.5/5.1).
   const { sidebarOverlayMode, handleSidebarNavigate } = useSidebarNavigation({
     pagedEditorRef,
     scrollContainerRef,
@@ -1170,97 +1162,15 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
     setState((prev) => ({ ...prev, zoom }));
   }, []);
 
-  // Tracked-changes review toolbar (7.6/7.7). Accept/Reject act on the
-  // change under the active editor's cursor; the buttons disable via
-  // SelectionFormatting.inInsertion/inDeletion when there is none.
-  const getReviewView = useCallback(() => getActiveEditorView() ?? null, [getActiveEditorView]);
-
-  const handleReviewAcceptChange = useCallback(() => {
-    const view = getReviewView();
-    if (!view) return;
-    const { from } = view.state.selection;
-    const $from = view.state.selection.$from;
-    // Union all mark sources: at a mark boundary $from.marks() reports the
-    // right side, but a just-typed insertion sits to the left.
-    const boundaryMarks = [
-      ...(view.state.storedMarks ?? []),
-      ...($from.nodeAfter?.marks ?? []),
-      ...($from.nodeBefore?.marks ?? []),
-      ...$from.marks(),
-    ];
-    for (const mark of boundaryMarks) {
-      if (
-        (mark.type.name === 'insertion' || mark.type.name === 'deletion') &&
-        typeof mark.attrs.revisionId === 'number'
-      ) {
-        acceptChangeById(mark.attrs.revisionId)(view.state, view.dispatch);
-        return;
-      }
-    }
-    acceptChange(from, from)(view.state, view.dispatch);
-  }, [getReviewView]);
-
-  const handleReviewRejectChange = useCallback(() => {
-    const view = getReviewView();
-    if (!view) return;
-    const { from } = view.state.selection;
-    const $from = view.state.selection.$from;
-    const boundaryMarks = [
-      ...(view.state.storedMarks ?? []),
-      ...($from.nodeAfter?.marks ?? []),
-      ...($from.nodeBefore?.marks ?? []),
-      ...$from.marks(),
-    ];
-    for (const mark of boundaryMarks) {
-      if (
-        (mark.type.name === 'insertion' || mark.type.name === 'deletion') &&
-        typeof mark.attrs.revisionId === 'number'
-      ) {
-        rejectChangeById(mark.attrs.revisionId)(view.state, view.dispatch);
-        return;
-      }
-    }
-    rejectChange(from, from)(view.state, view.dispatch);
-  }, [getReviewView]);
-
-  const handleReviewAcceptAllChanges = useCallback(() => {
-    const view = getReviewView();
-    if (view) acceptAllChanges()(view.state, view.dispatch);
-  }, [getReviewView]);
-
-  const handleReviewRejectAllChanges = useCallback(() => {
-    const view = getReviewView();
-    if (view) rejectAllChanges()(view.state, view.dispatch);
-  }, [getReviewView]);
-
-  const handleReviewNavigateChange = useCallback(
-    (direction: 'next' | 'prev') => {
-      const view = getReviewView();
-      if (!view) return;
-      const { from } = view.state.selection;
-      const range =
-        direction === 'next'
-          ? findNextChange(view.state, from)
-          : findPreviousChange(view.state, from);
-      if (!range) return;
-      pagedEditorRef.current?.scrollToPosition(range.from);
-      view.dispatch(
-        view.state.tr.setSelection(TextSelection.create(view.state.doc, range.from, range.to))
-      );
-      view.focus();
-    },
-    [getReviewView]
-  );
-
-  const handleReviewPreviousChange = useCallback(
-    () => handleReviewNavigateChange('prev'),
-    [handleReviewNavigateChange]
-  );
-
-  const handleReviewNextChange = useCallback(
-    () => handleReviewNavigateChange('next'),
-    [handleReviewNavigateChange]
-  );
+  // Tracked-changes review actions (7.6/7.7) — hook-owned for the line cap.
+  const {
+    handleReviewAcceptChange,
+    handleReviewRejectChange,
+    handleReviewAcceptAllChanges,
+    handleReviewRejectAllChanges,
+    handleReviewPreviousChange,
+    handleReviewNextChange,
+  } = useReviewActions({ getActiveEditorView, pagedEditorRef });
 
   const {
     hyperlinkPopupData,

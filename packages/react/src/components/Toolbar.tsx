@@ -1,13 +1,8 @@
 /**
- * Toolbar Component
- *
- * The customizable formatting rail — undo/redo, zoom, styles, fonts,
- * bold/italic/underline, colors, alignment, lists, table/image context,
- * clear formatting. Used standalone (`<Toolbar ...props>`), inside
- * `<EditorToolbar>` (reads from context via `EditorToolbar.Toolbar`), or
- * embedded inline. Also the home of the `ToolbarButton` / `ToolbarGroup` /
- * `ToolbarSeparator` primitives and the shared `FormattingAction` /
- * `SelectionFormatting` / `ToolbarProps` types.
+ * Toolbar Component — customizable formatting rail (undo/redo, zoom,
+ * styles, fonts, bold/italic/underline, colors, alignment, lists,
+ * table/image context, clear formatting). Home of `ToolbarButton` /
+ * `ToolbarGroup` / `ToolbarSeparator` and shared types.
  */
 
 import React, { useCallback, useEffect, useRef } from 'react';
@@ -44,6 +39,7 @@ import { ImageTransformDropdown } from './ui/ImageTransformDropdown';
 import type { TableAction } from './ui/TableToolbar';
 import { cn } from '../lib/utils';
 import { EditorToolbarContext } from './EditorToolbarContext';
+import { ToolbarReview, type ReviewCallbacks } from './ToolbarReview';
 
 const ICON_SIZE = 18;
 
@@ -122,7 +118,7 @@ export type FormattingAction =
 /**
  * Props for the Toolbar (formatting rail) component
  */
-export interface ToolbarProps {
+export interface ToolbarProps extends ReviewCallbacks {
   /** Current formatting of the selection */
   currentFormatting?: SelectionFormatting;
   /** Callback when a formatting action is triggered */
@@ -250,18 +246,6 @@ export interface ToolbarProps {
   } | null;
   /** Callback when a table action is triggered */
   onTableAction?: (action: TableAction) => void;
-  /** Accept the tracked change at the cursor (review toolbar, 7.6) */
-  onAcceptChange?: () => void;
-  /** Reject the tracked change at the cursor (review toolbar, 7.6) */
-  onRejectChange?: () => void;
-  /** Accept all tracked changes in the document (review toolbar, 7.6) */
-  onAcceptAllChanges?: () => void;
-  /** Reject all tracked changes in the document (review toolbar, 7.6) */
-  onRejectAllChanges?: () => void;
-  /** Move cursor to the next tracked change (review toolbar, 7.6) */
-  onPreviousChange?: () => void;
-  /** Move cursor to the previous tracked change (review toolbar, 7.6) */
-  onNextChange?: () => void;
   /** Whether to show the tracked-changes review group (default: true when any review callback is set) */
   showReviewControls?: boolean;
 }
@@ -597,62 +581,11 @@ export function Toolbar(explicitProps: ToolbarProps) {
     [disabled, onTableAction, onRefocusEditor]
   );
 
-  // Tracked-changes review group (7.6/7.7): visible when the host
-  // wires any review callback. Accept/Reject act on the change at the
-  // cursor and disable when the cursor is not inside one.
-  const hasReviewControls =
-    showReviewControls ??
-    !!(
-      onAcceptChange ||
-      onRejectChange ||
-      onAcceptAllChanges ||
-      onRejectAllChanges ||
-      onPreviousChange ||
-      onNextChange
-    );
+  // Tracked-changes review group lives in ToolbarReview.tsx (keeps this
+  // file under the max-lines budget). It shows when the host wires any
+  // review callback; Accept/Reject disable when the cursor is not inside
+  // a tracked change (7.6/7.7).
   const inTrackedChange = !!(currentFormatting.inInsertion || currentFormatting.inDeletion);
-
-  const handleAcceptChange = useCallback(() => {
-    if (!disabled && onAcceptChange) {
-      onAcceptChange();
-      requestAnimationFrame(() => onRefocusEditor?.());
-    }
-  }, [disabled, onAcceptChange, onRefocusEditor]);
-
-  const handleRejectChange = useCallback(() => {
-    if (!disabled && onRejectChange) {
-      onRejectChange();
-      requestAnimationFrame(() => onRefocusEditor?.());
-    }
-  }, [disabled, onRejectChange, onRefocusEditor]);
-
-  const handleAcceptAllChanges = useCallback(() => {
-    if (!disabled && onAcceptAllChanges) {
-      onAcceptAllChanges();
-      requestAnimationFrame(() => onRefocusEditor?.());
-    }
-  }, [disabled, onAcceptAllChanges, onRefocusEditor]);
-
-  const handleRejectAllChanges = useCallback(() => {
-    if (!disabled && onRejectAllChanges) {
-      onRejectAllChanges();
-      requestAnimationFrame(() => onRefocusEditor?.());
-    }
-  }, [disabled, onRejectAllChanges, onRefocusEditor]);
-
-  const handlePreviousChange = useCallback(() => {
-    if (!disabled && onPreviousChange) {
-      onPreviousChange();
-      requestAnimationFrame(() => onRefocusEditor?.());
-    }
-  }, [disabled, onPreviousChange, onRefocusEditor]);
-
-  const handleNextChange = useCallback(() => {
-    if (!disabled && onNextChange) {
-      onNextChange();
-      requestAnimationFrame(() => onRefocusEditor?.());
-    }
-  }, [disabled, onNextChange, onRefocusEditor]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────
 
@@ -1021,77 +954,21 @@ export function Toolbar(explicitProps: ToolbarProps) {
         </ToolbarGroup>
       )}
 
-      {/* Tracked-changes review (7.6/7.7) */}
-      {hasReviewControls && (
-        <ToolbarGroup label={t('toolbar.reviewGroup')}>
-          {onPreviousChange && (
-            <ToolbarButton
-              onClick={handlePreviousChange}
-              disabled={disabled}
-              title={t('toolbar.reviewPrevious')}
-              ariaLabel={t('toolbar.reviewPrevious')}
-              testId="prev-change"
-            >
-              <MaterialSymbol name="keyboard_arrow_up" size={ICON_SIZE} />
-            </ToolbarButton>
-          )}
-          {onNextChange && (
-            <ToolbarButton
-              onClick={handleNextChange}
-              disabled={disabled}
-              title={t('toolbar.reviewNext')}
-              ariaLabel={t('toolbar.reviewNext')}
-              testId="next-change"
-            >
-              <MaterialSymbol name="keyboard_arrow_down" size={ICON_SIZE} />
-            </ToolbarButton>
-          )}
-          {onAcceptChange && (
-            <ToolbarButton
-              onClick={handleAcceptChange}
-              disabled={disabled || !inTrackedChange}
-              title={t('toolbar.reviewAccept')}
-              ariaLabel={t('toolbar.reviewAccept')}
-              testId="accept-change"
-            >
-              <MaterialSymbol name="check" size={ICON_SIZE} />
-            </ToolbarButton>
-          )}
-          {onRejectChange && (
-            <ToolbarButton
-              onClick={handleRejectChange}
-              disabled={disabled || !inTrackedChange}
-              title={t('toolbar.reviewReject')}
-              ariaLabel={t('toolbar.reviewReject')}
-              testId="reject-change"
-            >
-              <MaterialSymbol name="close" size={ICON_SIZE} />
-            </ToolbarButton>
-          )}
-          {onAcceptAllChanges && (
-            <ToolbarButton
-              onClick={handleAcceptAllChanges}
-              disabled={disabled}
-              title={t('toolbar.reviewAcceptAll')}
-              ariaLabel={t('toolbar.reviewAcceptAll')}
-              testId="accept-all"
-            >
-              <MaterialSymbol name="done_all" size={ICON_SIZE} />
-            </ToolbarButton>
-          )}
-          {onRejectAllChanges && (
-            <ToolbarButton
-              onClick={handleRejectAllChanges}
-              disabled={disabled}
-              title={t('toolbar.reviewRejectAll')}
-              ariaLabel={t('toolbar.reviewRejectAll')}
-              testId="reject-all"
-            >
-              <MaterialSymbol name="delete_sweep" size={ICON_SIZE} />
-            </ToolbarButton>
-          )}
-        </ToolbarGroup>
-      )}
+      {/* Tracked-changes review (7.6/7.7) — see ToolbarReview.tsx */}
+      <ToolbarReview
+        callbacks={{
+          onAcceptChange,
+          onRejectChange,
+          onAcceptAllChanges,
+          onRejectAllChanges,
+          onPreviousChange,
+          onNextChange,
+        }}
+        showReviewControls={showReviewControls}
+        inTrackedChange={inTrackedChange}
+        disabled={disabled}
+        onRefocusEditor={onRefocusEditor}
+      />
 
       {/* Clear Formatting */}
       <ToolbarButton
