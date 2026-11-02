@@ -841,6 +841,46 @@ export async function generateThemeColorRoundtripDocx(): Promise<void> {
 }
 
 /**
+ * East-Asian font round-trip fixture (change ooxml-roundtrip-fidelity, Font family fix).
+ *
+ * Body runs carry all four `w:rFonts` slots with CJK fonts (等线/DengXian,
+ * 宋体/SimSun). Used by e2e/tests/roundtrip-east-asian-font.spec.ts.
+ *
+ * Word真机核验见 e2e/fixtures/east-asian-font-roundtrip-word-check.md.
+ */
+export async function generateEastAsianFontRoundtripDocx(): Promise<void> {
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="等线" w:cs="Calibri"/></w:rPr>
+        <w:t>等线东亚字体行 DengXian CJK text.</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="宋体" w:cs="Times New Roman"/></w:rPr>
+        <w:t>宋体正文 SimSun body text.</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="等线"/><w:color w:val="2F5496" w:themeColor="accent1" w:themeShade="BF"/></w:rPr>
+        <w:t>等线主题色混合行 DengXian with theme color.</w:t>
+      </w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+  await createDocx(documentXml, 'east-asian-font-roundtrip.docx');
+}
+
+/**
  * Main function
  */
 async function main(): Promise<void> {
@@ -857,6 +897,7 @@ async function main(): Promise<void> {
   await generateTrackedChangesRoundtripDocx();
   await generateHighlightRoundtripDocx();
   await generateThemeColorRoundtripDocx();
+  await generateEastAsianFontRoundtripDocx();
 
   console.log('\nAll fixtures generated successfully!');
 }

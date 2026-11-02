@@ -156,8 +156,14 @@ export function extractSelectionState(state: EditorState): SelectionState | null
         break;
       case 'fontFamily':
         textFormatting.fontFamily = {
-          ascii: mark.attrs.ascii,
-          hAnsi: mark.attrs.hAnsi,
+          ascii: mark.attrs.ascii ?? undefined,
+          hAnsi: mark.attrs.hAnsi ?? undefined,
+          eastAsia: mark.attrs.eastAsia ?? undefined,
+          cs: mark.attrs.cs ?? undefined,
+          asciiTheme: mark.attrs.asciiTheme ?? undefined,
+          hAnsiTheme: mark.attrs.hAnsiTheme ?? undefined,
+          eastAsiaTheme: mark.attrs.eastAsiaTheme ?? undefined,
+          csTheme: mark.attrs.csTheme ?? undefined,
         };
         break;
       case 'superscript':

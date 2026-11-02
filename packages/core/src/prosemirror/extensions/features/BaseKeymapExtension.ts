@@ -211,13 +211,24 @@ export function applyPostSplitInheritance(
       }
     }
     if (m.type.name === 'fontFamily') {
-      const ascii = m.attrs.ascii as string | undefined;
-      if (ascii && (!dtf.fontFamily || dtf.fontFamily.ascii !== ascii)) {
-        dtf.fontFamily = mergeFontFamily(dtf.fontFamily, {
-          ascii,
-          hAnsi: m.attrs.hAnsi as string | undefined,
-        }) as TextFormatting['fontFamily'];
-        dtfChanged = true;
+      type FontTheme = NonNullable<TextFormatting['fontFamily']>['asciiTheme'];
+      const next = {
+        ascii: (m.attrs.ascii as string | null) ?? undefined,
+        hAnsi: (m.attrs.hAnsi as string | null) ?? undefined,
+        eastAsia: (m.attrs.eastAsia as string | null) ?? undefined,
+        cs: (m.attrs.cs as string | null) ?? undefined,
+        asciiTheme: ((m.attrs.asciiTheme as string | null) ?? undefined) as FontTheme,
+        hAnsiTheme: (m.attrs.hAnsiTheme as string | null) ?? undefined,
+        eastAsiaTheme: (m.attrs.eastAsiaTheme as string | null) ?? undefined,
+        csTheme: (m.attrs.csTheme as string | null) ?? undefined,
+      };
+      const hasFont = Object.values(next).some((v) => v !== undefined);
+      if (hasFont) {
+        const merged = mergeFontFamily(dtf.fontFamily, next) as TextFormatting['fontFamily'];
+        if (JSON.stringify(merged) !== JSON.stringify(dtf.fontFamily)) {
+          dtf.fontFamily = merged;
+          dtfChanged = true;
+        }
       }
     }
   }

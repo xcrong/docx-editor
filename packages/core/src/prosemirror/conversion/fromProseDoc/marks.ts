@@ -90,12 +90,15 @@ export function marksToTextFormatting(marks: readonly Mark[]): TextFormatting {
 
       case 'fontFamily': {
         const attrs = mark.attrs as FontFamilyAttrs;
+        // Preserve all four w:rFonts slots verbatim (null → undefined so
+        // nulls never leak into the Document model). Do NOT invent `cs`
+        // from `ascii`: a run without an explicit cs slot must round-trip
+        // without one, otherwise CJK/Latin docs gain a spurious w:cs.
         formatting.fontFamily = {
-          ascii: attrs.ascii,
-          hAnsi: attrs.hAnsi,
-          eastAsia: attrs.eastAsia || undefined,
-          // Use stored cs value, falling back to ascii for Complex Script compatibility
-          cs: attrs.cs || attrs.ascii || undefined,
+          ascii: attrs.ascii ?? undefined,
+          hAnsi: attrs.hAnsi ?? undefined,
+          eastAsia: attrs.eastAsia ?? undefined,
+          cs: attrs.cs ?? undefined,
           // asciiTheme needs to be cast to the proper type or undefined
           asciiTheme: attrs.asciiTheme as
             | 'majorAscii'
@@ -107,9 +110,9 @@ export function marksToTextFormatting(marks: readonly Mark[]): TextFormatting {
             | 'minorEastAsia'
             | 'minorBidi'
             | undefined,
-          hAnsiTheme: attrs.hAnsiTheme || undefined,
-          eastAsiaTheme: attrs.eastAsiaTheme || undefined,
-          csTheme: attrs.csTheme || undefined,
+          hAnsiTheme: attrs.hAnsiTheme ?? undefined,
+          eastAsiaTheme: attrs.eastAsiaTheme ?? undefined,
+          csTheme: attrs.csTheme ?? undefined,
         };
         break;
       }

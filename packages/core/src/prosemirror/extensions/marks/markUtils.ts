@@ -50,8 +50,14 @@ function marksToTextFormatting(marks: readonly Mark[]): TextFormatting {
         break;
       case 'fontFamily':
         formatting.fontFamily = {
-          ascii: mark.attrs.ascii,
-          hAnsi: mark.attrs.hAnsi,
+          ascii: mark.attrs.ascii ?? undefined,
+          hAnsi: mark.attrs.hAnsi ?? undefined,
+          eastAsia: mark.attrs.eastAsia ?? undefined,
+          cs: mark.attrs.cs ?? undefined,
+          asciiTheme: mark.attrs.asciiTheme ?? undefined,
+          hAnsiTheme: mark.attrs.hAnsiTheme ?? undefined,
+          eastAsiaTheme: mark.attrs.eastAsiaTheme ?? undefined,
+          csTheme: mark.attrs.csTheme ?? undefined,
         };
         break;
       case 'superscript':
@@ -295,9 +301,14 @@ export function textFormattingToMarks(formatting: TextFormatting, schema: Schema
   if (formatting.fontFamily) {
     marks.push(
       schema.marks.fontFamily.create({
-        ascii: formatting.fontFamily.ascii,
-        hAnsi: formatting.fontFamily.hAnsi,
-        asciiTheme: formatting.fontFamily.asciiTheme,
+        ascii: formatting.fontFamily.ascii ?? null,
+        hAnsi: formatting.fontFamily.hAnsi ?? null,
+        eastAsia: formatting.fontFamily.eastAsia ?? null,
+        cs: formatting.fontFamily.cs ?? null,
+        asciiTheme: formatting.fontFamily.asciiTheme ?? null,
+        hAnsiTheme: formatting.fontFamily.hAnsiTheme ?? null,
+        eastAsiaTheme: formatting.fontFamily.eastAsiaTheme ?? null,
+        csTheme: formatting.fontFamily.csTheme ?? null,
       })
     );
   }

@@ -300,7 +300,10 @@ export function parseRunProperties(
       }
     }
 
-    const csTheme = getAttribute(rFonts, 'w', 'cstheme');
+    // Schema spelling is lowercase `w:cstheme` (CT_Fonts); accept the
+    // camelCase `w:csTheme` form too for files saved by older editor
+    // versions whose serializer emitted it.
+    const csTheme = getAttribute(rFonts, 'w', 'cstheme') ?? getAttribute(rFonts, 'w', 'csTheme');
     if (csTheme) {
       formatting.fontFamily.csTheme = csTheme;
       if (theme && !formatting.fontFamily.cs) {

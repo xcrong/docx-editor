@@ -630,9 +630,14 @@ function makeApplyStyle(schema: Schema) {
         if (rpr.fontFamily) {
           styleMarks.push(
             schema.marks.fontFamily.create({
-              ascii: rpr.fontFamily.ascii,
-              hAnsi: rpr.fontFamily.hAnsi,
-              asciiTheme: rpr.fontFamily.asciiTheme,
+              ascii: rpr.fontFamily.ascii ?? null,
+              hAnsi: rpr.fontFamily.hAnsi ?? null,
+              eastAsia: rpr.fontFamily.eastAsia ?? null,
+              cs: rpr.fontFamily.cs ?? null,
+              asciiTheme: rpr.fontFamily.asciiTheme ?? null,
+              hAnsiTheme: rpr.fontFamily.hAnsiTheme ?? null,
+              eastAsiaTheme: rpr.fontFamily.eastAsiaTheme ?? null,
+              csTheme: rpr.fontFamily.csTheme ?? null,
             })
           );
         }
