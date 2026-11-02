@@ -21,6 +21,7 @@ import {
   type AgentMessage,
   getToolDisplayName,
 } from '@xcrong/docx-editor-agents/react';
+import { createReviewBridge } from '@xcrong/docx-editor-agents/bridge';
 import { ExampleSwitcher } from '../../shared/ExampleSwitcher';
 import { AdapterSwitcher } from '../../shared/AdapterSwitcher';
 import { BrandLogo } from '../../shared/BrandLogo';
@@ -280,6 +281,19 @@ export function App() {
     // Only expose Playwright/E2E hooks under an explicit opt-in. Otherwise
     // this leaks an internal API into the public demo at docx-editor.dev.
     if (!isE2E) return;
+    // Cached live-review bridge (see agentBridge* hooks below).
+    let cachedBridgeHandle: DocxEditorRef | null = null;
+    let cachedBridge: ReturnType<typeof createReviewBridge> | null = null;
+    const getReviewBridge = (author?: string) => {
+      const handle = editorRef.current;
+      if (!handle) return null;
+      if (author && author !== 'E2E') return createReviewBridge(handle, author);
+      if (!cachedBridge || cachedBridgeHandle !== handle) {
+        cachedBridge = createReviewBridge(handle, 'E2E');
+        cachedBridgeHandle = handle;
+      }
+      return cachedBridge;
+    };
     window.__DOCX_EDITOR_E2E__ = {
       // Raw body EditorView — lets specs build precise PM states (e.g. a line
       // with mixed font sizes) without driving the toolbar UI.
@@ -393,6 +407,43 @@ export function App() {
         }) ?? false,
       agentReplyComment: (commentId: number, text: string, author = 'E2E') =>
         editorRef.current?.replyToComment(commentId, text, author) ?? null,
+      // Review-plugin bridge surface (review-plugin 9.2) — goes through the
+      // real `createReviewBridge` instead of calling the ref directly, so the
+      // e2e covers the same paraId delegation path the agent uses (the
+      // adapter resolves each paraId to PM positions at call time).
+      // The default-author bridge is cached per editor handle: these methods
+      // register no listeners, but a fresh closure set per call would leak if
+      // the bridge ever gains subscription state. Custom-author calls still
+      // get a dedicated bridge.
+      agentBridgeGetContent: () => getReviewBridge()?.getContent() ?? [],
+      agentBridgeAddComment: (opts: {
+        paraId: string;
+        text: string;
+        author?: string;
+        search?: string;
+      }) => {
+        const bridge = getReviewBridge(opts.author);
+        if (!bridge) return null;
+        return bridge.addComment({
+          paraId: opts.paraId,
+          text: opts.text,
+          search: opts.search,
+        });
+      },
+      agentBridgeProposeChange: (opts: {
+        paraId: string;
+        search: string;
+        replaceWith: string;
+        author?: string;
+      }) => {
+        const bridge = getReviewBridge(opts.author);
+        if (!bridge) return false;
+        return bridge.proposeChange({
+          paraId: opts.paraId,
+          search: opts.search,
+          replaceWith: opts.replaceWith,
+        });
+      },
       agentResolveComment: (commentId: number) => editorRef.current?.resolveComment(commentId),
       agentFind: (query: string) => editorRef.current?.findInDocument(query) ?? [],
       agentSelection: () => editorRef.current?.getSelectionInfo() ?? null,

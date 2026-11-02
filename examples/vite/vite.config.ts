@@ -50,6 +50,10 @@ export default defineConfig(async () => {
               replacement: path.join(monorepoRoot, 'packages/agents/src/server.ts'),
             },
             {
+              find: '@xcrong/docx-editor-agents/bridge',
+              replacement: path.join(monorepoRoot, 'packages/agents/src/bridge.ts'),
+            },
+            {
               find: /^@xcrong\/docx-editor-agents$/,
               replacement: path.join(monorepoRoot, 'packages/agents/src/index.ts'),
             },

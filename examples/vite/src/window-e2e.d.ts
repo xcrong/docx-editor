@@ -1,4 +1,6 @@
 /** Playwright-only hooks on the Vite demo (not a public API). */
+import type { ContentBlock } from '@xcrong/docx-editor-agents';
+
 declare global {
   interface Window {
     __DOCX_EDITOR_E2E__?: {
@@ -92,6 +94,21 @@ declare global {
         paragraphs: Array<{ paraId: string; text: string; styleId?: string }>;
       } | null;
       agentGetDocumentText: () => string;
+      // Review-plugin bridge surface (review-plugin 9.2) — backed by the real
+      // `createReviewBridge`, not direct ref calls.
+      agentBridgeGetContent: () => ContentBlock[];
+      agentBridgeAddComment: (opts: {
+        paraId: string;
+        text: string;
+        author?: string;
+        search?: string;
+      }) => number | null;
+      agentBridgeProposeChange: (opts: {
+        paraId: string;
+        search: string;
+        replaceWith: string;
+        author?: string;
+      }) => boolean;
       // Tracked structural revisions (#614).
       setSuggestionMode: (active: boolean, authorOverride?: string) => boolean;
       getParagraphRevisionAt: (index: number) => {
