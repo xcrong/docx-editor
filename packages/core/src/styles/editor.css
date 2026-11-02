@@ -277,6 +277,44 @@
   .ep-root.dark .layout-page video {
     filter: none;
   }
+  /* Sidebar chrome never prints — overlay, leader lines, margin markers. */
+  .ep-root .docx-leader-lines,
+  .ep-root svg.docx-leader-lines[data-leader-svg],
+  .ep-root .docx-sidebar-backdrop,
+  .ep-root .docx-comment-margin-markers,
+  .ep-root .docx-unified-sidebar,
+  .ep-root .unified-sidebar {
+    display: none !important;
+  }
+}
+
+/* ============================================================================
+ * COMMENTS SIDEBAR — NARROW OVERLAY BACKDROP + LEADER LINES
+ * ============================================================================ */
+
+/* Narrow-container overlay mode (< SIDEBAR_OVERLAY_BREAKPOINT): the sidebar
+ * floats over the document's right portion instead of shifting it. The
+ * backdrop dims the overlapped area; clicking it closes the sidebar. */
+.ep-root .docx-sidebar-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--doc-text) 22%, transparent);
+  cursor: default;
+}
+
+/* SVG layer drawing leader lines from highlighted anchors to sidebar
+ * cards. Positioned fixed + recomputed on scroll (rAF) by the owning
+ * component; fixed so no explicit size bookkeeping is needed.
+ * `data-leader-svg` distinguishes it from document-content SVGs. */
+.ep-root svg.docx-leader-lines[data-leader-svg] {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 35;
+  overflow: visible;
 }
 
 /* ============================================================================

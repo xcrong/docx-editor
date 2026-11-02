@@ -128,6 +128,8 @@ const emit = defineEmits<{
   (e: 'reject-change-by-id', revisionId: number): void;
   (e: 'tracked-change-reply', revisionId: number, text: string): void;
   (e: 'update:activeItemId', id: string | null): void;
+  /** Card click → parent scrolls the document to the card's anchor. */
+  (e: 'navigate', id: string): void;
 }>();
 
 // Local fallback for uncontrolled use; when `activeItemId` is bound
@@ -142,6 +144,9 @@ function toggleExpanded(id: string) {
   const next = expandedId.value === id ? null : id;
   localExpanded.value = next;
   emit('update:activeItemId', next);
+  // Card click also navigates: scroll the document to the anchor.
+  // Selection is intentionally untouched — cursor-driven expansion owns it.
+  emit('navigate', id);
 }
 
 // Always stop sidebar mousedowns from reaching the editor (was `@mousedown.stop`,

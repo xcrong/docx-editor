@@ -23,6 +23,12 @@ export interface UnifiedSidebarProps {
   onExpandedItemChange?: (itemId: string | null) => void;
   /** Controlled: sidebar item to expand based on cursor position. */
   activeItemId?: string | null;
+  /**
+   * Fires when the user clicks a card (expand toggle) so the parent can
+   * also scroll the document to the card's anchor (comment navigation).
+   * Fires for both expand and collapse clicks.
+   */
+  onItemNavigate?: (itemId: string) => void;
 }
 
 export function UnifiedSidebar({
@@ -34,6 +40,7 @@ export function UnifiedSidebar({
   editorContainerRef,
   onExpandedItemChange,
   activeItemId,
+  onItemNavigate,
 }: UnifiedSidebarProps) {
   const { t } = useTranslation();
   // Fully controlled: parent owns expansion state via activeItemId
@@ -41,6 +48,9 @@ export function UnifiedSidebar({
   // Ref keeps toggleExpand stable so card children don't re-render on every cursor move
   const expandedItemRef = useRef(expandedItem);
   expandedItemRef.current = expandedItem;
+  // Same stability treatment for the navigate callback.
+  const onItemNavigateRef = useRef(onItemNavigate);
+  onItemNavigateRef.current = onItemNavigate;
 
   const [initialPositionsDone, setInitialPositionsDone] = useState(false);
   const cardHeightsRef = useRef<Map<string, number>>(new Map());
@@ -177,6 +187,10 @@ export function UnifiedSidebar({
   const toggleExpand = useCallback(
     (itemId: string) => {
       onExpandedItemChange?.(expandedItemRef.current === itemId ? null : itemId);
+      // Card click also navigates: scroll the document to the anchor.
+      // Selection is intentionally untouched — moving the PM cursor here
+      // would fight the cursor-driven expansion model.
+      onItemNavigateRef.current?.(itemId);
     },
     [onExpandedItemChange]
   );
@@ -234,7 +248,7 @@ export function UnifiedSidebar({
                 : 'none';
 
           return (
-            <div key={item.id} style={{ ...style, transition }}>
+            <div key={item.id} data-card-id={item.id} style={{ ...style, transition }}>
               {item.render({
                 isExpanded,
                 onToggleExpand: () => toggleExpand(item.id),

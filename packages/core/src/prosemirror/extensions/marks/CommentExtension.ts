@@ -16,6 +16,10 @@ export const CommentExtension = createMarkExtension({
       commentId: { default: 0 },
     },
     inclusive: false,
+    // Allow same-type marks to coexist so overlapping comments stack
+    // (9.4). Without this, PM defaults `excluded=[self]` and
+    // `Mark.addToSet` drops the earlier commentId.
+    excludes: '',
     parseDOM: [
       {
         tag: 'span.docx-comment',

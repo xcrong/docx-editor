@@ -272,7 +272,11 @@ export {
   SIDEBAR_PAGE_GAP,
   SIDEBAR_DOCUMENT_SHIFT,
   MIN_CARD_GAP,
+  SIDEBAR_OVERLAY_BREAKPOINT,
+  shouldUseSidebarOverlay,
+  computeLeaderLineEndpoints,
 } from './sidebarConstants';
+export type { LeaderLineRect, LeaderLineEndpoints } from './sidebarConstants';
 
 // File-input reader — shared between every adapter's `<input type=file>`
 // → `loadBuffer` glue so filename normalization and the input-reset

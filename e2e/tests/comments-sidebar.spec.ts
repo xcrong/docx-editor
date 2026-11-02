@@ -631,3 +631,51 @@ test.describe('Comments sidebar — feedback-loop stability', () => {
     expect(posAfter).toEqual(posBefore);
   });
 });
+
+test.describe('Comments sidebar — add / reply / resolve / delete (3.7)', () => {
+  test('add comment, reply, resolve, reopen, delete', async ({ page }) => {
+    const editor = await setupEmptyDoc(page);
+    await openSidebar(page);
+    await editor.typeText(`Lifecycle alpha beta gamma delta ${CLEAN}.`);
+
+    // Add.
+    await addCommentOn(editor, 'beta', 'lifecycle note');
+    const [id] = await getSidebarCommentIds(page);
+    expect(id).toBeDefined();
+    expect(await getCommentHighlight(page, id)).not.toBe('');
+    expect(await isCommentExpanded(page, id)).toBe(true);
+
+    // Reply: click the placeholder to activate, fill, Enter.
+    const card = commentCard(page, id);
+    await card.locator('input[placeholder]').first().click();
+    const replyInput = card.locator('input[type="text"]').first();
+    await replyInput.fill('first reply');
+    await replyInput.press('Enter');
+    await page.waitForTimeout(300);
+    await expect(card.getByText('first reply')).toBeVisible();
+
+    // Resolve: highlight hides, card collapses to the checkmark marker.
+    await card.locator('button[title="Resolve"]').click();
+    await page.waitForTimeout(300);
+    expect(await getCommentHighlight(page, id)).toBe('');
+    await expect(resolvedMarker(page, id)).toBeVisible();
+
+    // Reopen: highlight restores.
+    await resolvedMarker(page, id).click();
+    await page.waitForTimeout(300);
+    expect(await isCommentExpanded(page, id)).toBe(true);
+    const reopenBtn = commentCard(page, id).locator('button[title="Reopen"]');
+    await reopenBtn.click();
+    await page.waitForTimeout(300);
+    expect(await isCommentExpanded(page, id)).toBe(true);
+    expect(await getCommentHighlight(page, id)).not.toBe('');
+
+    // Delete via the overflow menu.
+    const liveCard = commentCard(page, id);
+    await liveCard.locator('button[title="More options"]').click();
+    await liveCard.getByText('Delete', { exact: true }).click();
+    await page.waitForTimeout(300);
+    expect(await getSidebarCommentIds(page)).toEqual([]);
+    expect(await getCommentHighlight(page, id)).toBe('');
+  });
+});

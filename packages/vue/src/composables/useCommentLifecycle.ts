@@ -286,10 +286,12 @@ export function useCommentLifecycle(opts: UseCommentLifecycleOptions) {
     opts.isAddingComment.value = false;
   }
 
-  function handleMarkerClick(_commentId: number) {
-    // Mirrors React: marker click opens the sidebar; the card itself
-    // re-anchors to the click target via the comment-id selector.
+  function handleMarkerClick(commentId: number) {
+    // Mirrors React: marker click opens the sidebar AND focuses the card —
+    // without setting the active item, doc→card navigation would highlight
+    // nothing and the leader line would stay thin.
     opts.showSidebar.value = true;
+    opts.activeSidebarItem.value = `comment-${commentId}`;
   }
 
   watch([opts.stateTick, opts.isAddingComment, opts.zoom], () => recomputeFloatingCommentBtn());

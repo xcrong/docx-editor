@@ -58,6 +58,12 @@
         @zoom-set="setZoom"
         @toggle-sidebar="handleToggleSidebar"
         @mode-change="setEditorMode"
+        @review-accept="handleReviewAcceptAtCursor"
+        @review-reject="handleReviewRejectAtCursor"
+        @review-accept-all="handleReviewAcceptAll"
+        @review-reject-all="handleReviewRejectAll"
+        @review-prev="handleReviewNavigate('prev')"
+        @review-next="handleReviewNavigate('next')"
         @image-wrap-type="handleToolbarImageWrap"
         @image-properties="showImageProperties = true"
         @image-transform="handleImageTransform"
@@ -281,6 +287,15 @@
             @marker-click="handleMarkerClick"
           />
 
+          <SidebarChromeOverlay
+            :overlay-mode="sidebarOverlayMode"
+            :is-open="showSidebar"
+            :item-ids="sidebarItemIds"
+            :active-item-id="activeSidebarItem"
+            :pages-container="pagesRef"
+            @close="showSidebar = false"
+          />
+
           <UnifiedSidebar
             :is-open="showSidebar"
             :comments="comments"
@@ -305,6 +320,7 @@
             @reject-change-by-id="handleRejectChangeById"
             @tracked-change-reply="handleTrackedChangeReply"
             @update:active-item-id="(id: string | null) => (activeSidebarItem = id)"
+            @navigate="handleSidebarNavigate"
           />
 
           <!-- Hyperlink popup — lives inside the scroll container so it
@@ -399,6 +415,7 @@ import DocumentOutline from './DocumentOutline.vue';
 import OutlineToggleButton from './OutlineToggleButton.vue';
 import UnifiedSidebar from './UnifiedSidebar.vue';
 import CommentMarginMarkers from './CommentMarginMarkers.vue';
+import SidebarChromeOverlay from './SidebarChromeOverlay.vue';
 import MaterialSymbol from './ui/MaterialSymbol.vue';
 import PageIndicator from './PageIndicator.vue';
 import InlineHeaderFooterEditor from './InlineHeaderFooterEditor.vue';
@@ -420,6 +437,12 @@ import { useFormattingActions } from '../composables/useFormattingActions';
 import { usePageSetupControls } from '../composables/usePageSetupControls';
 import { useWatermarkControls } from '../composables/useWatermarkControls';
 import { useOutlineSidebar } from '../composables/useOutlineSidebar';
+import { useOutlineVisibility } from '../composables/useOutlineVisibility';
+import { useSidebarDeselect } from '../composables/useSidebarDeselect';
+import { useSidebarLayout } from '../composables/useSidebarLayout';
+import { useSidebarVisibility } from '../composables/useSidebarVisibility';
+import { useActiveFormattingView } from '../composables/useActiveFormattingView';
+import { useSidebarNavigate } from '../composables/useSidebarNavigate';
 import { useKeyboardShortcuts } from '../composables/useKeyboardShortcuts';
 import { provideDocxPortalClass } from '../composables/usePortalClass';
 import { useCommentManagement } from '../composables/useCommentManagement';
@@ -437,8 +460,6 @@ import type { Document } from '@xcrong/docx-editor-core/types/document';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import type { HeadingInfo } from '@xcrong/docx-editor-core/utils/headingCollector';
 import { createTranslator, provideLocale } from '../i18n';
-import { twipsToPixels } from '@xcrong/docx-editor-core/utils/units';
-import { SIDEBAR_DOCUMENT_SHIFT } from '@xcrong/docx-editor-core/utils';
 import { useColorMode } from '../composables/useColorMode';
 import { useFontLifecycle } from '../composables/useFontLifecycle';
 import { LayoutSelectionGate } from '@xcrong/docx-editor-core/prosemirror';
@@ -680,15 +701,11 @@ useFontLifecycle(
   }
 );
 
-// Memoized so the template doesn't walk the headers/footers Maps every tick.
-const activeHfView = computed<EditorView | null>(() =>
-  hfEdit.value?.headerFooter ? (getHfPmView(hfEdit.value.headerFooter) ?? null) : null
-);
-
-// Interactive toolbar formatting targets the edited header/footer, else body (#749).
-const activeFormattingView = computed<EditorView | null>(
-  () => activeHfView.value ?? editorView.value
-);
+const activeFormattingView = useActiveFormattingView({
+  getHfEdit: () => hfEdit.value, // Deferred: `hfEdit` destructured later (#749).
+  getHfPmView,
+  editorView,
+});
 
 // Registered in onMounted because `hfEdit` is destructured later in this script setup (TDZ).
 onMounted(() => {
@@ -765,41 +782,22 @@ onMounted(() => {
   });
 });
 
-const OUTLINE_RESERVED_SPACE = 268;
-const OUTLINE_BUTTON_RESERVED_SPACE = 64;
-const RULER_WIDTH = 20;
-const DEFAULT_PAGE_WIDTH = 816;
-const minLayoutWidth = computed(() => {
-  void stateTick.value;
-  const outlineLeftAllowance = (showOutline.value ? OUTLINE_RESERVED_SPACE : props.showOutlineButton ? OUTLINE_BUTTON_RESERVED_SPACE : 20) + (props.showRuler && (showOutline.value || props.showOutlineButton) ? RULER_WIDTH : 0);
-  const doc = getDocument();
-  const docBody = doc?.package?.document;
-  const sectionPageWidths = [docBody?.finalSectionProperties?.pageWidth, ...(docBody?.sections?.map((s) => s.properties?.pageWidth) ?? [])].filter((w): w is number => typeof w === 'number' && w > 0);
-  const maxPageWidthPx = sectionPageWidths.length ? Math.round(Math.max(...sectionPageWidths) / 15) : DEFAULT_PAGE_WIDTH;
-  return 2 * outlineLeftAllowance + maxPageWidthPx + (showSidebar.value ? SIDEBAR_DOCUMENT_SHIFT * 2 : 0);
-});
-
-// When the comments sidebar opens, shift the pages container (NOT the
-// scrolling viewport) left by SIDEBAR_DOCUMENT_SHIFT. Applied on the
-// inner `__pages` container so the viewport's scrollbar stays at the
-// real right edge instead of moving with the page.
-const pagesContainerStyle = computed(() => {
-  const parts: string[] = [];
-  if (showSidebar.value) parts.push(`translateX(-${SIDEBAR_DOCUMENT_SHIFT}px)`);
-  if (zoom.value !== 1) parts.push(`scale(${zoom.value})`);
-  return { transform: parts.length > 0 ? parts.join(' ') : undefined, transformOrigin: 'top center', transition: 'transform 0.2s ease' };
-});
-
-const rulerRowStyle = computed(() => ({
-  paddingLeft: '20px',
-  paddingRight: 20 + (showSidebar.value ? SIDEBAR_DOCUMENT_SHIFT * 2 : 0) + 'px',
-  transition: 'padding 0.2s ease',
-  minWidth: minLayoutWidth.value + 'px',
-}));
-
-const pageWidthPx = computed(() => {
-  const sp = currentSectionProps.value;
-  return twipsToPixels(sp?.pageWidth ?? 12240) * zoom.value;
+// Sidebar-aware layout (shift/ruler/min-width; overlay keeps page centered).
+const {
+  minLayoutWidth,
+  pagesContainerStyle,
+  rulerRowStyle,
+  pageWidthPx,
+} = useSidebarLayout({
+  showSidebar,
+  sidebarOverlayMode: () => sidebarOverlayMode.value,
+  showOutline,
+  showOutlineButton: () => props.showOutlineButton,
+  showRuler: () => props.showRuler,
+  zoom,
+  stateTick,
+  getDocument,
+  currentSectionPageWidthTwips: computed(() => currentSectionProps.value?.pageWidth),
 });
 
 const resolvedCommentIds = computed(() => new Set(comments.value.filter(c => c.parentId == null && c.done).map(c => c.id)));
@@ -859,6 +857,12 @@ const {
   author: authorRef,
   commentCallbacks,
   getHfPmViews,
+});
+
+// Sidebar visibility + overlay mode (1.5; layout reads it via getter, order TDZ-safe).
+const { sidebarOverlayMode, handleToggleSidebar } = useSidebarVisibility({
+  showSidebar,
+  extractCommentsAndChanges,
 });
 
 const {
@@ -924,23 +928,19 @@ const { showWatermark, currentWatermark, handleWatermarkApply } = useWatermarkCo
   stateTick,
 });
 
-const {
-  handleToggleOutline,
-  handleOutlineNavigate,
-  handleToggleSidebar,
-  handleEditorScrollMouseDown,
-} = useOutlineSidebar({
+const { handleToggleOutline } = useOutlineVisibility({
   editorView,
   showOutline,
-  showSidebar,
   outlineHeadings,
-  activeSidebarItem,
-  extractCommentsAndChanges,
-  // Deferred closure: `scrollVisiblePositionIntoView` is destructured from
-  // usePagesPointer further down (TDZ-sensitive composable order). The arrow is
-  // only invoked on an outline click, long after setup, so the reference is safe.
+});
+
+const { handleOutlineNavigate } = useOutlineSidebar({
+  editorView,
+  // Deferred closure (TDZ-safe).
   scrollToVisiblePosition: (pmPos: number) => scrollVisiblePositionIntoView(pmPos),
 });
+
+const { handleEditorScrollMouseDown } = useSidebarDeselect({ activeSidebarItem }); // Outside-click collapses the expanded card.
 
 useKeyboardShortcuts({
   showKeyboardShortcuts,
@@ -965,6 +965,11 @@ const {
   handleRejectChange,
   handleAcceptChangeById,
   handleRejectChangeById,
+  handleReviewAcceptAll,
+  handleReviewRejectAll,
+  handleReviewNavigate,
+  handleReviewAcceptAtCursor,
+  handleReviewRejectAtCursor,
   handleTrackedChangeReply,
 } = useCommentManagement({
   editorView,
@@ -981,6 +986,9 @@ const {
   author: authorRef,
   commentCallbacks,
   getHfPmViews,
+  // Deferred closures (TDZ-safe: invoked on click, long after setup).
+  scrollToVisiblePosition: (pmPos: number) => scrollVisiblePositionIntoView(pmPos),
+  getActiveView: () => activeFormattingView.value,
 });
 
 // Composable order (TDZ-sensitive): useImageActions → usePagesPointer → useContextMenus → useSelectionSync → useDocxEditorRefApi.
@@ -1029,6 +1037,16 @@ const {
   syncHfPMs,
   getHfPmView,
   setDocument,
+});
+
+// Card → document navigation + leader-line ids (4.x/5.1; deferred closure).
+const { handleSidebarNavigate, sidebarItemIds } = useSidebarNavigate({
+  editorView,
+  scrollToVisiblePosition: (pmPos: number) => scrollVisiblePositionIntoView(pmPos),
+  comments,
+  trackedChanges,
+  isAddingComment,
+  addCommentYPosition,
 });
 
 const {

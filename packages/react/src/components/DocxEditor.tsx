@@ -45,9 +45,8 @@ import { ContentControlWidgets } from './DocxEditor/ContentControlWidgets';
 import { useResetEditorState } from './DocxEditor/hooks/useResetEditorState';
 import { DocxEditorShell } from './DocxEditor/DocxEditorShell';
 import type { FontOption } from './ui/FontPicker';
-import { OUTLINE_BUTTON_RESERVED_SPACE, OUTLINE_RESERVED_SPACE } from './DocumentOutline';
-import { RULER_WIDTH } from './ui/VerticalRuler';
-import { SIDEBAR_DOCUMENT_SHIFT } from './sidebar/constants';
+import { useSidebarNavigation } from './DocxEditor/hooks/useSidebarNavigation';
+import { useSidebarLayout } from './DocxEditor/hooks/useSidebarLayout';
 import { useCommentSidebarItems, type CommentCallbacks } from '../hooks/useCommentSidebarItems';
 import { extractTrackedChanges } from '../hooks/useTrackedChanges';
 import { type EditorState as PMEditorState } from 'prosemirror-state';
@@ -92,6 +91,7 @@ import {
   acceptChangeById,
   rejectChangeById,
 } from '@xcrong/docx-editor-core/prosemirror/commands';
+import { useReviewActions } from './DocxEditor/hooks/useReviewActions';
 import { collectHeadings } from '@xcrong/docx-editor-core/utils';
 import {
   prefersColorSchemeDark,
@@ -100,7 +100,7 @@ import {
 } from '@xcrong/docx-editor-core/utils';
 
 // Paginated editor
-import { type PagedEditorRef, DEFAULT_PAGE_WIDTH } from './DocxEditor/PagedEditor';
+import { type PagedEditorRef } from './DocxEditor/PagedEditor';
 
 // Plugin API types
 import type { RenderedDomContext } from '../plugin-api/types';
@@ -697,10 +697,16 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
   // a subsequent close stays closed; reset on doc reload.
   const sidebarAutoOpenedRef = useRef(false);
   const [expandedSidebarItem, setExpandedSidebarItem] = useState<string | null>(null);
-  // PagedEditor ref declared early so useCommentManagement (which reads
-  // pagedEditorRef.current.getView() for orphan cleanup) can be wired before
-  // the trackedChanges effect that drives `setComments`.
+  // PagedEditor/scroll refs declared early: comment orphan cleanup and the
+  // sidebar navigation hook need them at the same point (ref identity is
+  // stable, only `.current` populates later).
   const pagedEditorRef = useRef<PagedEditorRef>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Narrow-container overlay mode + card → document navigation (1.5/5.1).
+  const { sidebarOverlayMode, handleSidebarNavigate } = useSidebarNavigation({
+    pagedEditorRef,
+    scrollContainerRef,
+  });
 
   const {
     comments,
@@ -822,7 +828,6 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
   // Save the last known selection for restoring after toolbar interactions
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
   const editorContentRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [documentFonts, setDocumentFonts] = useState<FontOption[]>([]);
   const {
     showOutline,
@@ -1156,6 +1161,16 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
   const handleZoomChange = useCallback((zoom: number) => {
     setState((prev) => ({ ...prev, zoom }));
   }, []);
+
+  // Tracked-changes review actions (7.6/7.7) — hook-owned for the line cap.
+  const {
+    handleReviewAcceptChange,
+    handleReviewRejectChange,
+    handleReviewAcceptAllChanges,
+    handleReviewRejectAllChanges,
+    handleReviewPreviousChange,
+    handleReviewNextChange,
+  } = useReviewActions({ getActiveEditorView, pagedEditorRef });
 
   const {
     hyperlinkPopupData,
@@ -1522,40 +1537,16 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
   }, [trackedChanges]);
 
   const sidebarOpen = allSidebarItems.length > 0;
-  // Reserve 2× the left-edge allowance so the centered page clears whatever
-  // outline UI is showing, without forcing a shift on wide viewports.
-  const outlineLeftAllowance =
-    (showOutline
-      ? OUTLINE_RESERVED_SPACE
-      : showOutlineButton
-        ? OUTLINE_BUTTON_RESERVED_SPACE
-        : 20) +
-    // The outline toggle/panel inset past the vertical ruler when it's shown,
-    // so the page must clear that extra width too.
-    (showRuler && (showOutline || showOutlineButton) ? RULER_WIDTH : 0);
-  // Reserve against the WIDEST page in the doc, not the portrait default: pages
-  // center via `alignItems:center`, so a landscape section (wider than
-  // DEFAULT_PAGE_WIDTH) gets a smaller side margin and, with the old default,
-  // slid left under the outline toggle/panel. Taking the max across all section
-  // widths also covers mixed-orientation docs.
-  const docBody = history.state?.package?.document;
-  const sectionPageWidths = [
-    docBody?.finalSectionProperties?.pageWidth,
-    ...(docBody?.sections?.map((s) => s.properties?.pageWidth) ?? []),
-  ].filter((w): w is number => typeof w === 'number' && w > 0);
-  const maxPageWidthPx = sectionPageWidths.length
-    ? Math.round(Math.max(...sectionPageWidths) / 15)
-    : DEFAULT_PAGE_WIDTH;
-
-  const minLayoutWidth =
-    2 * outlineLeftAllowance + maxPageWidthPx + (sidebarOpen ? SIDEBAR_DOCUMENT_SHIFT * 2 : 0);
-
-  // pageWidthPx — the final section's width — positions the sidebar / comment
-  // margin markers against the page most content lives under.
-  const sectionPropsPageWidth = docBody?.finalSectionProperties?.pageWidth;
-  const pageWidthPx = sectionPropsPageWidth
-    ? Math.round(sectionPropsPageWidth / 15)
-    : DEFAULT_PAGE_WIDTH;
+  // Shift reserve + widest-page widths — hook-owned so DocxEditor stays
+  // under its line cap. Overlay mode keeps the page centered (no shift).
+  const { sidebarShifted, minLayoutWidth, pageWidthPx } = useSidebarLayout({
+    sidebarOpen,
+    sidebarOverlayMode,
+    historyDocument: history.state,
+    showOutline,
+    showOutlineButton,
+    showRuler,
+  });
 
   const resolvedCommentIds = useMemo(() => {
     const ids = new Set<number>();
@@ -1734,7 +1725,7 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
       readOnlyProp={readOnlyProp}
       showOutline={showOutline}
       showOutlineButton={showOutlineButton}
-      sidebarOpen={sidebarOpen}
+      sidebarOpen={sidebarShifted}
       minLayoutWidth={minLayoutWidth}
       toolbarHeight={toolbarHeight}
       editorScrollLeft={editorScrollLeft}
@@ -1831,6 +1822,12 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
             onPageSetup={handleOpenPageSetup}
             onWatermark={handleOpenWatermark}
             onTableAction={handleTableAction}
+            onAcceptChange={handleReviewAcceptChange}
+            onRejectChange={handleReviewRejectChange}
+            onAcceptAllChanges={handleReviewAcceptAllChanges}
+            onRejectAllChanges={handleReviewRejectAllChanges}
+            onPreviousChange={handleReviewPreviousChange}
+            onNextChange={handleReviewNextChange}
           />
         ) : null
       }
@@ -1887,6 +1884,7 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
             onHyperlinkPopupClose={handleHyperlinkPopupClose}
             onContextMenu={handleContextMenu}
             sidebarOpen={sidebarOpen}
+            sidebarOverlayMode={sidebarOverlayMode}
             sidebarItems={allSidebarItems}
             anchorPositions={anchorPositions}
             onAnchorPositionsChange={setAnchorPositions}
@@ -1894,6 +1892,7 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
             pageWidthPx={pageWidthPx}
             expandedSidebarItem={expandedSidebarItem}
             setExpandedSidebarItem={setExpandedSidebarItem}
+            onSidebarNavigate={handleSidebarNavigate}
             comments={comments}
             resolvedCommentIds={resolvedCommentIds}
             resolvedIdsForRender={resolvedIdsForRender}

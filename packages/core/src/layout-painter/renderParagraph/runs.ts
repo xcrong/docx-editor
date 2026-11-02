@@ -162,17 +162,24 @@ function applyRunStyles(
     decorations.push('line-through');
   }
 
-  // Comment highlight (skip for resolved comments)
+  // Comment highlight (skip for resolved comments). Overlapping comments
+  // (9.4) stack: every unresolved id is exposed via `data-comment-ids`
+  // and the background/border opacity deepens with the overlap count.
   if (run.commentIds && run.commentIds.length > 0) {
-    const activeCommentId = run.commentIds.find(
+    const activeCommentIds = run.commentIds.filter(
       (id) => !resolvedCommentIds || !resolvedCommentIds.has(id)
     );
-    if (activeCommentId != null) {
-      element.style.backgroundColor = 'rgba(255, 212, 0, 0.15)';
-      element.style.borderBottom = '1px solid rgba(255, 212, 0, 0.4)';
+    if (activeCommentIds.length > 0) {
+      const overlap = activeCommentIds.length;
+      const bgAlpha = Math.min(0.15 + 0.12 * (overlap - 1), 0.55);
+      const borderAlpha = Math.min(0.4 + 0.2 * (overlap - 1), 0.9);
+      element.style.backgroundColor = `rgba(255, 212, 0, ${bgAlpha})`;
+      element.style.borderBottom = `1px solid rgba(255, 212, 0, ${borderAlpha})`;
       element.style.cursor = 'pointer';
       element.style.transition = 'background-color 0.15s ease';
-      element.dataset.commentId = String(activeCommentId);
+      element.dataset.commentId = String(activeCommentIds[0]);
+      // Space-separated so `[data-comment-ids~="id"]` matches per id.
+      element.dataset.commentIds = activeCommentIds.join(' ');
     }
   }
 

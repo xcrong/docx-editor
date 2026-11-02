@@ -10,6 +10,7 @@
  */
 
 import { unref, type MaybeRef, type Ref } from 'vue';
+import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import type { Comment, Document } from '@xcrong/docx-editor-core/types/document';
 import {
@@ -17,6 +18,10 @@ import {
   rejectChange,
   acceptChangeById,
   rejectChangeById,
+  acceptAllChanges,
+  rejectAllChanges,
+  findNextChange,
+  findPreviousChange,
 } from '@xcrong/docx-editor-core/prosemirror/commands';
 import { extractTrackedChanges } from '@xcrong/docx-editor-core/prosemirror/utils/extractTrackedChanges';
 import {
@@ -65,6 +70,14 @@ export interface UseCommentManagementOptions {
   commentCallbacks?: CommentCallbacks;
   /** Get all active header/footer ProseMirror EditorViews. */
   getHfPmViews?: () => Map<string, EditorView>;
+  /** Scroll the visible pages viewport to a PM position (review prev/next). */
+  scrollToVisiblePosition?: (pmPos: number) => void;
+  /**
+   * Active editor view for review actions (HF view when header/footer is
+   * being edited, else body) — mirrors React's `getActiveEditorView`.
+   * Falls back to `editorView` when omitted.
+   */
+  getActiveView?: () => EditorView | null;
 }
 
 export function useCommentManagement(opts: UseCommentManagementOptions) {
@@ -266,6 +279,82 @@ export function useCommentManagement(opts: UseCommentManagementOptions) {
     view.focus();
   }
 
+  function handleReviewAcceptAll() {
+    const view = opts.getActiveView?.() ?? opts.editorView.value;
+    if (!view) return;
+    acceptAllChanges()(view.state, view.dispatch);
+    opts.extractCommentsAndChanges();
+    view.focus();
+  }
+
+  function handleReviewRejectAll() {
+    const view = opts.getActiveView?.() ?? opts.editorView.value;
+    if (!view) return;
+    rejectAllChanges()(view.state, view.dispatch);
+    opts.extractCommentsAndChanges();
+    view.focus();
+  }
+
+  function handleReviewNavigate(direction: 'next' | 'prev') {
+    const view = opts.getActiveView?.() ?? opts.editorView.value;
+    if (!view) return;
+    const { from } = view.state.selection;
+    const range =
+      direction === 'next'
+        ? findNextChange(view.state, from)
+        : findPreviousChange(view.state, from);
+    if (!range) return;
+    opts.scrollToVisiblePosition?.(range.from);
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, range.from, range.to))
+    );
+    view.focus();
+  }
+
+  function handleReviewAcceptAtCursor() {
+    const view = opts.getActiveView?.() ?? opts.editorView.value;
+    if (!view) return;
+    const $from = view.state.selection.$from;
+    // Union all mark sources: at a mark boundary $from.marks() reports the
+    // right side, but a just-typed insertion sits to the left.
+    const boundaryMarks = [
+      ...(view.state.storedMarks ?? []),
+      ...($from.nodeAfter?.marks ?? []),
+      ...($from.nodeBefore?.marks ?? []),
+      ...$from.marks(),
+    ];
+    for (const mark of boundaryMarks) {
+      if (
+        (mark.type.name === 'insertion' || mark.type.name === 'deletion') &&
+        typeof mark.attrs.revisionId === 'number'
+      ) {
+        handleAcceptChangeById(mark.attrs.revisionId);
+        return;
+      }
+    }
+  }
+
+  function handleReviewRejectAtCursor() {
+    const view = opts.getActiveView?.() ?? opts.editorView.value;
+    if (!view) return;
+    const $from = view.state.selection.$from;
+    const boundaryMarks = [
+      ...(view.state.storedMarks ?? []),
+      ...($from.nodeAfter?.marks ?? []),
+      ...($from.nodeBefore?.marks ?? []),
+      ...$from.marks(),
+    ];
+    for (const mark of boundaryMarks) {
+      if (
+        (mark.type.name === 'insertion' || mark.type.name === 'deletion') &&
+        typeof mark.attrs.revisionId === 'number'
+      ) {
+        handleRejectChangeById(mark.attrs.revisionId);
+        return;
+      }
+    }
+  }
+
   // Thread a reply under a tracked change. Mirrors React's
   // onTrackedChangeReply (DocxEditor.tsx): the reply is a child comment
   // keyed by `parentId = revisionId`, NOT an independently anchored
@@ -297,6 +386,11 @@ export function useCommentManagement(opts: UseCommentManagementOptions) {
     handleRejectChange,
     handleAcceptChangeById,
     handleRejectChangeById,
+    handleReviewAcceptAll,
+    handleReviewRejectAll,
+    handleReviewNavigate,
+    handleReviewAcceptAtCursor,
+    handleReviewRejectAtCursor,
     handleTrackedChangeReply,
   };
 }

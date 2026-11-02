@@ -538,6 +538,8 @@ export interface SelectionContext {
 export interface SelectionState {
     endParagraphIndex: number;
     hasSelection: boolean;
+    inDeletion: boolean;
+    inInsertion: boolean;
     isMultiParagraph: boolean;
     paragraphFormatting: ParagraphFormatting;
     startParagraphIndex: number;

@@ -27,6 +27,7 @@ import {
   type InlineHeaderFooterEditorRef,
 } from '../InlineHeaderFooterEditor';
 import { UnifiedSidebar } from '../UnifiedSidebar';
+import { LeaderLines } from '../sidebar/LeaderLines';
 import { CommentMarginMarkers } from '../CommentMarginMarkers';
 import { Tooltip } from '../ui/Tooltip';
 import { MaterialSymbol } from '../ui/Icons';
@@ -92,6 +93,7 @@ export function DocxEditorPagedArea({
   onContextMenu,
   // Sidebar
   sidebarOpen,
+  sidebarOverlayMode = false,
   sidebarItems,
   anchorPositions,
   onAnchorPositionsChange,
@@ -99,6 +101,7 @@ export function DocxEditorPagedArea({
   pageWidthPx,
   expandedSidebarItem,
   setExpandedSidebarItem,
+  onSidebarNavigate,
   comments,
   resolvedCommentIds,
   resolvedIdsForRender,
@@ -167,6 +170,8 @@ export function DocxEditorPagedArea({
     } | null;
   }) => void;
   sidebarOpen: boolean;
+  /** Narrow-container overlay mode: no page shift + backdrop over the doc. */
+  sidebarOverlayMode?: boolean;
   sidebarItems: ReactSidebarItem[];
   anchorPositions: Map<string, number>;
   onAnchorPositionsChange: (positions: Map<string, number>) => void;
@@ -174,6 +179,8 @@ export function DocxEditorPagedArea({
   pageWidthPx: number;
   expandedSidebarItem: string | null;
   setExpandedSidebarItem: React.Dispatch<React.SetStateAction<string | null>>;
+  /** Card click → scroll the document to the card's anchor (no selection). */
+  onSidebarNavigate?: (itemId: string) => void;
   comments: Comment[];
   resolvedCommentIds: Set<number>;
   resolvedIdsForRender: Set<number>;
@@ -390,7 +397,7 @@ export function DocxEditorPagedArea({
         onHyperlinkPopupRemove={onHyperlinkPopupRemove}
         onHyperlinkPopupClose={onHyperlinkPopupClose}
         onContextMenu={onContextMenu}
-        commentsSidebarOpen={sidebarOpen}
+        commentsSidebarOpen={sidebarOpen && !sidebarOverlayMode}
         onAnchorPositionsChange={onAnchorPositionsChange}
         onTotalPagesChange={onTotalPagesChange}
         resolvedCommentIds={resolvedIdsForRender}
@@ -407,6 +414,22 @@ export function DocxEditorPagedArea({
                 editorContainerRef={scrollContainerRef}
                 onExpandedItemChange={setExpandedSidebarItem}
                 activeItemId={expandedSidebarItem}
+                onItemNavigate={onSidebarNavigate}
+              />
+            )}
+            <LeaderLines
+              itemIds={sidebarItems.map((i) => i.id)}
+              activeItemId={expandedSidebarItem}
+              scopeRef={editorContentRef}
+              scrollContainerRef={scrollContainerRef}
+            />
+            {sidebarOverlayMode && sidebarOpen && (
+              <button
+                type="button"
+                aria-label="Close comments sidebar"
+                className="docx-sidebar-backdrop"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={() => setShowCommentsSidebar(false)}
               />
             )}
             <CommentMarginMarkers

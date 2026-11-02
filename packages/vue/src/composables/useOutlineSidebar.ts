@@ -1,24 +1,17 @@
 /**
- * Outline + sidebar composable — owns the outline panel toggle (which
- * lazily collects headings from the PM doc on open), the sidebar
- * toggle (which seeds extractCommentsAndChanges so the panel opens
- * with fresh data), the outline-navigate scroll-into-view, and the
- * "click-outside-sidebar clears active item" mouse-down handler.
+ * Outline-navigate handler: puts the caret on the heading in the hidden PM
+ * (so typing continues from there), then scrolls the VISIBLE pages to it.
+ * (The outline visibility toggle lives in `useOutlineVisibility`; the
+ * outside-click clearer lives in `useSidebarDeselect`; each split keeps
+ * `DocxEditor.vue` under its line cap.)
  */
 
 import type { Ref } from 'vue';
 import type { EditorView } from 'prosemirror-view';
 import { TextSelection } from 'prosemirror-state';
-import { collectHeadings } from '@xcrong/docx-editor-core/utils/headingCollector';
-import type { HeadingInfo } from '@xcrong/docx-editor-core/utils/headingCollector';
 
 export interface UseOutlineSidebarOptions {
   editorView: Ref<EditorView | null>;
-  showOutline: Ref<boolean>;
-  showSidebar: Ref<boolean>;
-  outlineHeadings: Ref<HeadingInfo[]>;
-  activeSidebarItem: Ref<string | null>;
-  extractCommentsAndChanges: () => void;
   /**
    * Scroll the VISIBLE paged viewport to a PM position. The hidden PM
    * (`left: -9999px`) is never what the user sees, so `tr.scrollIntoView()`
@@ -29,17 +22,6 @@ export interface UseOutlineSidebarOptions {
 }
 
 export function useOutlineSidebar(opts: UseOutlineSidebarOptions) {
-  function handleToggleOutline() {
-    if (!opts.showOutline.value) {
-      // Opening: collect headings
-      const view = opts.editorView.value;
-      if (view) {
-        opts.outlineHeadings.value = collectHeadings(view.state.doc);
-      }
-    }
-    opts.showOutline.value = !opts.showOutline.value;
-  }
-
   function handleOutlineNavigate(pmPos: number) {
     const view = opts.editorView.value;
     if (!view) return;
@@ -52,32 +34,7 @@ export function useOutlineSidebar(opts: UseOutlineSidebarOptions) {
     view.focus();
   }
 
-  function handleToggleSidebar() {
-    if (!opts.showSidebar.value) {
-      opts.extractCommentsAndChanges();
-    }
-    opts.showSidebar.value = !opts.showSidebar.value;
-  }
-
-  function handleEditorScrollMouseDown(event: MouseEvent) {
-    const target = event.target as HTMLElement | null;
-    if (!target) return;
-    // Clicks inside the editor pages, sidebar card, or comment margin
-    // markers are real interactions — leave activeSidebarItem alone.
-    if (
-      target.closest('.paged-editor__pages') ||
-      target.closest('.unified-sidebar') ||
-      target.closest('.docx-comment-margin-markers')
-    ) {
-      return;
-    }
-    opts.activeSidebarItem.value = null;
-  }
-
   return {
-    handleToggleOutline,
     handleOutlineNavigate,
-    handleToggleSidebar,
-    handleEditorScrollMouseDown,
   };
 }
