@@ -34,6 +34,10 @@ export default defineConfig(async () => {
             // Resolve package imports to source for live development
             // Order matters: more-specific prefixes before less-specific ones
             {
+              find: '@xcrong/docx-editor-react/plugin-api',
+              replacement: path.join(monorepoRoot, 'packages/react/src/plugin-api/index.ts'),
+            },
+            {
               find: '@xcrong/docx-editor-react',
               replacement: path.join(monorepoRoot, 'packages/react/src/index.ts'),
             },

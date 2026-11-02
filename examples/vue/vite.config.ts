@@ -58,6 +58,10 @@ export default defineConfig({
             replacement: path.join(monorepoRoot, 'packages/vue/src/styles/editor.css'),
           },
           {
+            find: '@xcrong/docx-editor-vue/plugin-api',
+            replacement: path.join(monorepoRoot, 'packages/vue/src/plugin-api/index.ts'),
+          },
+          {
             find: /^@xcrong\/docx-editor-vue$/,
             replacement: path.join(monorepoRoot, 'packages/vue/src/index.ts'),
           },

@@ -17,13 +17,41 @@ export type {
   PanelConfig,
   RenderedDomContext,
   PositionCoordinates,
+  SidebarItem,
+  SidebarItemContext,
 } from '@xcrong/docx-editor-core/plugin-api';
 
 import type {
   EditorPluginCore,
   PluginPanelProps,
   RenderedDomContext,
+  SidebarItem,
+  SidebarItemContext,
 } from '@xcrong/docx-editor-core/plugin-api';
+
+/**
+ * Render props passed to each sidebar item (mirrors React's
+ * `SidebarItemRenderProps` — same contract, VNode rendering).
+ */
+export interface SidebarItemRenderProps {
+  /** Whether this item is currently expanded/active. */
+  isExpanded: boolean;
+  /** Toggle expand/collapse for this item. */
+  onToggleExpand: () => void;
+  /** Ref callback to measure the rendered card height. */
+  measureRef: (el: HTMLElement | null) => void;
+}
+
+/**
+ * A sidebar item with Vue rendering, anchored to a document position.
+ * Mirrors React's `ReactSidebarItem`.
+ */
+export interface VueSidebarItem extends SidebarItem {
+  /** Render the card content. */
+  render: (props: SidebarItemRenderProps) => VNode | null;
+  /** Estimated height in pixels (for pre-layout before measurement). Default: 40. */
+  estimatedHeight?: number;
+}
 
 /**
  * Vue-specific editor plugin interface.
@@ -47,6 +75,14 @@ export interface VueEditorPlugin<TState = any> extends EditorPluginCore<TState> 
     state: TState,
     editorView: EditorView | null
   ) => VNode | null;
+
+  /**
+   * Provide sidebar items anchored to document positions.
+   * Called whenever plugin state changes.
+   * Items from all plugins are merged and laid out together in a unified sidebar.
+   * Mirrors React's `getSidebarItems`.
+   */
+  getSidebarItems?: (state: TState | undefined, context: SidebarItemContext) => VueSidebarItem[];
 }
 
 /**
