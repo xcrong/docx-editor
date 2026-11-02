@@ -906,16 +906,15 @@ export function renderTableFragment(
   // Visible height of this fragment's window. For a clean bottom (a real row
   // boundary) use the rounded row stack so the last row's bottom border sits
   // exactly on the clip edge (not 1px past it, which overflow:hidden would eat);
-  // for a mid-content break, clip at the rounded fragment height.
-  // Clamp to the engine-reserved `fragment.height` (which already includes
-  // all rows + padding + borders) so the paint never overlaps following
-  // content — worst case is a sub-pixel border clip, never text overlap.
+  // for a mid-content break, clip at the rounded fragment height. The stack
+  // already includes all rows + cell padding + borders; the padding default
+  // above is aligned with the measurer so the paint agrees with the reserved
+  // block height and following content is not overlapped.
   const visibleHeight =
     fragment.bottomClip !== undefined
       ? Math.round(fragment.height)
       : toFragmentY(rowYPositions[fragment.toRow] ?? 0);
-  const paintedHeight = Math.min(visibleHeight, fragment.height);
-  tableEl.style.height = `${paintedHeight}px`;
+  tableEl.style.height = `${visibleHeight}px`;
 
   // A repeated header occupies [0, headerHeight]; the windowed body gets its own
   // clip box below it so a row resumed mid-content doesn't paint over the header
@@ -923,7 +922,7 @@ export function renderTableFragment(
   const { bodyParent, bodyOriginY } = makeTableBodyClip(
     tableEl,
     headerHeight,
-    paintedHeight,
+    visibleHeight,
     fragment.width,
     doc
   );
@@ -1052,18 +1051,15 @@ export function renderTableFragment(
   if (fragment.topClip) drawCutEdge(fragment.fromRow, 'top', headerHeight, false);
   else if (fragment.continuesFromPrev) drawCutEdge(fragment.fromRow, 'top', headerHeight, true);
   // Bottom edge: same, mirrored. Anchor to the element's actual bottom
-  // (`paintedHeight`) so the rule sits exactly on the clip edge.
+  // (`visibleHeight`) so the rule sits exactly on the clip edge.
   if (fragment.bottomClip !== undefined)
-    drawCutEdge(fragment.toRow - 1, 'bottom', paintedHeight, false);
-  else if (fragment.continuesOnNext) drawCutEdge(fragment.toRow - 1, 'bottom', paintedHeight, true);
+    drawCutEdge(fragment.toRow - 1, 'bottom', visibleHeight, false);
+  else if (fragment.continuesOnNext) drawCutEdge(fragment.toRow - 1, 'bottom', visibleHeight, true);
 
-  // Row resize handles at row boundaries that fall inside the visible window
-  // (culled against the actual painted height so the last handle can't sit
-  // on the clipped edge when rounding makes `paintedHeight` a hair shorter
-  // than the engine height).
+  // Row resize handles at row boundaries that fall inside the visible window.
   for (let rowIdx = fragment.fromRow; rowIdx < fragment.toRow - 1; rowIdx++) {
     const boundaryY = toFragmentY(rowYPositions[rowIdx + 1] ?? 0);
-    if (boundaryY <= headerHeight || boundaryY >= paintedHeight) continue;
+    if (boundaryY <= headerHeight || boundaryY >= fragment.height) continue;
     const rowHandle = doc.createElement('div');
     rowHandle.className = TABLE_CLASS_NAMES.rowResizeHandle;
     rowHandle.style.position = 'absolute';
