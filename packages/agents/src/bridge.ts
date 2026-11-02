@@ -226,6 +226,30 @@ function getDocumentBody(
 }
 
 /**
+ * Spec-named entry point for the live-editor bridge.
+ *
+ * `openspec/changes/review-plugin` names this constructor `createReviewBridge`.
+ * It builds the same `EditorBridge` surface as {@link createEditorBridge} —
+ * both names construct the identical bridge, so prefer `createEditorBridge`
+ * in new code. Not to be confused with `createReviewerBridge`, which wraps a
+ * headless `DocxReviewer` (a parsed file with no editor) instead of a live ref.
+ *
+ * Paragraph anchors are Word `w14:paraId`s (as surfaced by `getContent()`).
+ * The bridge forwards them verbatim to the adapter ref, which resolves each
+ * paraId to ProseMirror positions at call time inside `addComment` /
+ * `proposeChange` / `scrollToParaId`; `getChanges()` surfaces the live
+ * tracked-change ids from the same document.
+ *
+ * @param editorRef - A DocxEditorRef (or anything matching EditorRefLike)
+ * @param author - Default author name for comments and changes. (default: 'AI')
+ *
+ * @public
+ */
+export function createReviewBridge(editorRef: EditorRefLike, author = 'AI'): EditorBridge {
+  return createEditorBridge(editorRef, author);
+}
+
+/**
  * Create an EditorBridge from a DocxEditorRef.
  *
  * @param editorRef - A DocxEditorRef (or anything matching EditorRefLike)

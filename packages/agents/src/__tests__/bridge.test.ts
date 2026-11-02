@@ -7,7 +7,7 @@ import type {
   DocumentBody,
   ParagraphContent,
 } from '@xcrong/docx-editor-core/headless';
-import { createEditorBridge, type EditorRefLike } from '../bridge';
+import { createEditorBridge, createReviewBridge, type EditorRefLike } from '../bridge';
 
 // ============================================================================
 // HELPERS
@@ -498,5 +498,85 @@ describe('createEditorBridge', () => {
     expect(bridge.getContent()).toEqual([]);
     expect(bridge.getComments()).toEqual([]);
     expect(bridge.getChanges()).toEqual([]);
+  });
+});
+
+// ============================================================================
+// createReviewBridge — spec-named live-editor entry point (review-plugin 9.1)
+//
+// Same EditorBridge surface as createEditorBridge: paraId-anchored calls
+// delegate to the ref, which maps paraIds to ProseMirror positions at call
+// time. These tests pin the alias to that delegation contract.
+// ============================================================================
+
+describe('createReviewBridge', () => {
+  test('delegates getContent / getChanges through the live document', () => {
+    const ref = makeMockRef([makeParagraph('Hello'), makeParagraph('World')]);
+    const bridge = createReviewBridge(ref, 'TestAgent');
+
+    expect(bridge.getContent()).toHaveLength(2);
+    expect(bridge.getContentAsText()).toContain('Hello');
+    expect(bridge.getChanges()).toEqual([]);
+  });
+
+  test('maps paraId-anchored addComment to the ref (PM position resolution)', () => {
+    let capturedParaId: string | undefined;
+    const ref = makeMockRef([makeParagraph('Hello')]);
+    const origAdd = ref.addComment.bind(ref);
+    ref.addComment = (opts) => {
+      capturedParaId = opts.paraId;
+      return origAdd(opts);
+    };
+    const bridge = createReviewBridge(ref, 'Agent');
+
+    const id = bridge.addComment({ paraId: 'p_a3f', text: 'Nice paragraph' });
+    expect(id).not.toBeNull();
+    expect(capturedParaId).toBe('p_a3f');
+  });
+
+  test('maps paraId-anchored proposeChange to the ref with resolved author', () => {
+    const captures: Array<{ paraId: string; author: string }> = [];
+    const ref = makeMockRef([makeParagraph('Hello world')]);
+    ref.proposeChange = (opts) => {
+      captures.push({ paraId: opts.paraId, author: opts.author });
+      return true;
+    };
+    const bridge = createReviewBridge(ref, 'DefaultAgent');
+
+    expect(bridge.proposeChange({ paraId: 'p_a3f', search: 'Hello', replaceWith: 'Hi' })).toBe(
+      true
+    );
+    expect(captures).toEqual([{ paraId: 'p_a3f', author: 'DefaultAgent' }]);
+  });
+
+  test('resolves change discovery and comment lifecycle through the same bridge', () => {
+    const ref = makeMockRef([makeParagraph('Hello')]);
+    ref.scrollToParaId = (paraId) => paraId === 'p_a3f';
+    const bridge = createReviewBridge(ref);
+
+    const id = bridge.addComment({ paraId: 'p_a3f', text: 'note' });
+    expect(typeof id).toBe('number');
+    expect(bridge.getComments()).toHaveLength(1);
+    expect(bridge.scrollTo('p_a3f')).toBe(true);
+    expect(bridge.scrollTo('p_missing')).toBe(false);
+  });
+
+  test('stays identical to createEditorBridge (same surface, same author resolution)', () => {
+    const refA = makeMockRef([makeParagraph('Hello world')]);
+    const refB = makeMockRef([makeParagraph('Hello world')]);
+    const viaAlias = createReviewBridge(refA, 'Agent');
+    const viaCanonical = createEditorBridge(refB, 'Agent');
+
+    // Same method surface — a method added to one but not the other fails here.
+    expect(Object.keys(viaAlias).sort()).toEqual(Object.keys(viaCanonical).sort());
+
+    // Same behavior on the same inputs.
+    expect(viaAlias.getContentAsText()).toBe(viaCanonical.getContentAsText());
+    expect(viaAlias.addComment({ paraId: 'p_x', text: 'note' })).toBe(
+      viaCanonical.addComment({ paraId: 'p_x', text: 'note' })
+    );
+    expect(viaAlias.proposeChange({ paraId: 'p_x', search: 'Hello', replaceWith: 'Hi' })).toBe(
+      viaCanonical.proposeChange({ paraId: 'p_x', search: 'Hello', replaceWith: 'Hi' })
+    );
   });
 });

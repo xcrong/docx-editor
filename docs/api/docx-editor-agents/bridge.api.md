@@ -38,6 +38,9 @@ export interface ContentChangeEvent {
 export function createEditorBridge(editorRef: EditorRefLike, author?: string): EditorBridge;
 
 // @public
+export function createReviewBridge(editorRef: EditorRefLike, author?: string): EditorBridge;
+
+// @public
 export function createReviewerBridge(reviewer: DocxReviewer): EditorBridge;
 
 // @public

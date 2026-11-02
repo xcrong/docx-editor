@@ -54,10 +54,10 @@
 
 ## 9. Bridge (Client-Side, Optional)
 
-- [ ] 9.1 Implement `createReviewBridge(editorRef)` in `bridge.ts`: returns object with same method signatures, internally maps paragraph indices / change IDs to PM positions
-- [ ] 9.2 Write Playwright E2E tests: load DOCX → call bridge methods → verify rendering
+- [x] 9.1 Implement `createReviewBridge(editorRef)` in `bridge.ts`: returns object with same method signatures, internally maps paragraph indices / change IDs to PM positions
+- [x] 9.2 Write Playwright E2E tests: load DOCX → call bridge methods → verify rendering
 
 ## 10. Integration Tests
 
-- [ ] 10.1 Full headless workflow: parse DOCX → getContent → getChanges → accept/reject → addComment → export → re-parse → verify
-- [ ] 10.2 Simulated agent workflow: getContent → feed to mock LLM → applyReview batch → export → verify comments and tracked changes in output
+- [x] 10.1 Full headless workflow: parse DOCX → getContent → getChanges → accept/reject → addComment → export → re-parse → verify
+- [x] 10.2 Simulated agent workflow: getContent → feed to mock LLM → applyReview batch → export → verify comments and tracked changes in output
