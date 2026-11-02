@@ -1021,6 +1021,150 @@ export async function generateTableTextOverlapDocx(): Promise<void> {
 }
 
 /**
+ * Table rendering fidelity fixtures (change table-rendering-fidelity, T10).
+ *
+ * 4. table-wide-adaptive.docx — 4 columns at 4000 dxa each (16000 dxa total,
+ *    ~1067px) against a ~624px content area with `w:tblLayout autofit`. Word
+ *    scales columns proportionally to fit; the painter must do the same
+ *    (no horizontal overflow).
+ * 5. table-multipage-header.docx — 1 `w:tblHeader` header row + 45 body rows
+ *    (incl. a gridSpan merge, a vMerge span, and one tall multi-paragraph
+ *    cell that forces a mid-row break). The table spans 2+ pages; the header
+ *    row must repeat on every continuation fragment and row splits must land
+ *    on paragraph boundaries with coordinated fragment heights.
+ */
+export async function generateTableWideAdaptiveDocx(): Promise<void> {
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>WIDE ADAPTIVE TABLE</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="0" w:type="auto"/>
+        <w:tblLayout w:type="autofit"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid><w:gridCol w:w="4000"/><w:gridCol w:w="4000"/><w:gridCol w:w="4000"/><w:gridCol w:w="4000"/></w:tblGrid>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="4000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>WIDE-A1</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>WIDE-B1</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>WIDE-C1</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>WIDE-D1</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="4000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>WIDE-A2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>WIDE-B2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>WIDE-C2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>WIDE-D2</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>AFTER WIDE TABLE MARKER</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+  await createDocx(documentXml, 'table-wide-adaptive.docx');
+}
+
+export async function generateTableMultipageHeaderDocx(): Promise<void> {
+  const borders = `<w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tblBorders>`;
+
+  const headerRow = `<w:tr>
+        <w:trPr><w:tblHeader/></w:trPr>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>HDR-REPEAT-A</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>HDR-REPEAT-B</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>HDR-REPEAT-C</w:t></w:r></w:p></w:tc>
+      </w:tr>`;
+
+  let bodyRows = '';
+  for (let n = 1; n <= 45; n++) {
+    if (n === 10) {
+      // Horizontal merge: B+C merged via gridSpan (complex-merge coverage).
+      bodyRows += `<w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>R10C1</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="6000" w:type="dxa"/><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>R10BC-MERGED</w:t></w:r></w:p></w:tc>
+      </w:tr>`;
+      continue;
+    }
+    if (n === 20) {
+      bodyRows += `<w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/><w:vMerge w:val="restart"/></w:tcPr><w:p><w:r><w:t>R20-SPAN-START</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>R20C2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>R20C3</w:t></w:r></w:p></w:tc>
+      </w:tr>`;
+      continue;
+    }
+    if (n === 21) {
+      bodyRows += `<w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/><w:vMerge/></w:tcPr><w:p/></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>R21C2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>R21C3</w:t></w:r></w:p></w:tc>
+      </w:tr>`;
+      continue;
+    }
+    if (n === 30) {
+      // Tall multi-paragraph cell: forces a mid-row break at a paragraph
+      // boundary (not mid-line) with coordinated fragment heights.
+      let paras = '';
+      for (let p = 1; p <= 10; p++) {
+        paras += `<w:p><w:r><w:t>TALL R30C1 para ${p} of 10 with enough text to wrap across lines in the cell.</w:t></w:r></w:p>`;
+      }
+      bodyRows += `<w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr>${paras}</w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>R30C2 short</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>R30C3 short</w:t></w:r></w:p></w:tc>
+      </w:tr>`;
+      continue;
+    }
+    bodyRows += `<w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>R${n}C1</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>R${n}C2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>R${n}C3</w:t></w:r></w:p></w:tc>
+      </w:tr>`;
+  }
+
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>MULTIPAGE HEADER TABLE</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="9000" w:type="dxa"/>
+        ${borders}
+      </w:tblPr>
+      <w:tblGrid><w:gridCol w:w="3000"/><w:gridCol w:w="3000"/><w:gridCol w:w="3000"/></w:tblGrid>
+      ${headerRow}
+      ${bodyRows}
+    </w:tbl>
+    <w:p><w:r><w:t>AFTER MULTIPAGE TABLE MARKER</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+  await createDocx(documentXml, 'table-multipage-header.docx');
+}
+
+/**
  * Main function
  */
 async function main(): Promise<void> {
@@ -1041,6 +1185,8 @@ async function main(): Promise<void> {
   await generateTableMergeBeyondFirstColDocx();
   await generateTableIndentationDocx();
   await generateTableTextOverlapDocx();
+  await generateTableWideAdaptiveDocx();
+  await generateTableMultipageHeaderDocx();
 
   console.log('\nAll fixtures generated successfully!');
 }

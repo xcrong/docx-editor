@@ -5,8 +5,8 @@
 - [x] Audit merged cell span tracking in `renderTable.ts`
 - [x] Check table indentation source (w:tblInd vs paragraph indent)
 - [x] Identify table height measurement in layout flow
-- [ ] Check if `w:tblHeader` is parsed and available in PM node attrs
-- [ ] Create test DOCX with: complex merges, wide table, multi-page table with headers
+- [x] Check if `w:tblHeader` is parsed and available in PM node attrs
+- [x] Create test DOCX with: complex merges, wide table, multi-page table with headers
 
 ## Merged cells
 
@@ -26,21 +26,21 @@
 
 ## Adaptive margins
 
-- [ ] Detect when total column width exceeds content area
-- [ ] Scale column widths proportionally to fit within content area
+- [x] Detect when total column width exceeds content area
+- [x] Scale column widths proportionally to fit within content area
 
 ## Table pagination
 
-- [ ] Detect when table crosses page boundary
-- [ ] Re-render header rows (`w:tblHeader`) at top of continuation fragment
-- [ ] Split rows at paragraph boundaries, not mid-line
-- [ ] Coordinate fragment heights across all cells in a split row
+- [x] Detect when table crosses page boundary
+- [x] Re-render header rows (`w:tblHeader`) at top of continuation fragment
+- [x] Split rows at paragraph boundaries, not mid-line
+- [x] Coordinate fragment heights across all cells in a split row
 
 ## Testing
 
 - [x] E2E test: complex merged cells (beyond first column)
 - [x] E2E test: table indentation matches Word
 - [x] E2E test: table followed by text — no overlap
-- [ ] E2E test: wide table fits within page
-- [ ] E2E test: multi-page table with repeated headers
+- [x] E2E test: wide table fits within page
+- [x] E2E test: multi-page table with repeated headers
 - [x] Run `bun run typecheck`

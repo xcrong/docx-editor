@@ -156,6 +156,18 @@ export function resolveTableColumnWidths(tableBlock: TableBlock, contentWidth: n
     }
   }
 
+  // Adaptive margins (Word fidelity): when the grid's total column width
+  // exceeds the content area, scale columns proportionally to fit instead of
+  // overflowing horizontally (design option 1 — matches Word's auto-fit).
+  // Floating (`w:tblpPr`) tables are anchored, not flow-laid — leave them alone.
+  if (!tableBlock.floating && contentWidth > 0 && columnWidths.length > 0) {
+    const total = columnWidths.reduce((sum, w) => sum + w, 0);
+    if (total > contentWidth) {
+      const scale = contentWidth / total;
+      columnWidths = columnWidths.map((w) => w * scale);
+    }
+  }
+
   return columnWidths;
 }
 
