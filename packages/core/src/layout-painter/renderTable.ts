@@ -242,13 +242,24 @@ function renderNestedTable(
   tableEl.style.width = `${measure.totalWidth}px`;
   tableEl.style.display = 'block';
 
-  if (block.justification === 'center') {
-    tableEl.style.marginLeft = 'auto';
-    tableEl.style.marginRight = 'auto';
-  } else if (block.justification === 'right') {
-    tableEl.style.marginLeft = 'auto';
-  } else if (block.indent) {
-    tableEl.style.marginLeft = `${block.indent}px`;
+  // Table container left offset comes SOLELY from `w:tblInd`
+  // (`block.indent`, derived in `toFlowBlocks` from
+  // `_originalFormatting.indent[type === 'dxa']`). Never inherit paragraph
+  // indent, cell padding, or `fragment.x` arithmetic here — those belong
+  // inside the table (cell content / `renderParagraphFragment`), not on the
+  // wrapper. Justification wins over indent, matching the layout engine
+  // precedence (`layout-engine/index.ts`) and Word (`w:jc` beats `w:tblInd`).
+  // Intentionally skipped for floating tables: a floating (`w:tblpPr`) table
+  // is anchored via its floating placement, not via indent offset.
+  if (!block.floating) {
+    if (block.justification === 'center') {
+      tableEl.style.marginLeft = 'auto';
+      tableEl.style.marginRight = 'auto';
+    } else if (block.justification === 'right') {
+      tableEl.style.marginLeft = 'auto';
+    } else if (block.indent) {
+      tableEl.style.marginLeft = `${block.indent}px`;
+    }
   }
 
   // Store metadata
@@ -294,6 +305,13 @@ function renderNestedTable(
   const bidi = block.bidi === true;
   const tableWidth = measure.columnWidths.reduce((w, cw) => w + (cw ?? 0), 0);
 
+  // Shared grid placement so merged cells after the first group land in
+  // their Word columns (same source the measurer uses).
+  const nestedGrid = computeCellGrid(block, measure.columnWidths);
+  const nestedGridLookup = new Map<string, GridCell>(
+    nestedGrid.map((g) => [`${g.rowIndex}-${g.cellIndex}`, g])
+  );
+
   // Track spanning cells across rows
   const spanningCells = new Map<string, SpanningCell>();
 
@@ -318,7 +336,8 @@ function renderNestedTable(
       undefined,
       wholeTableTracked,
       bidi,
-      tableWidth
+      tableWidth,
+      nestedGridLookup
     );
     tableEl.appendChild(rowEl);
   }
@@ -366,10 +385,14 @@ function renderTableCell(
   cellEl.style.height = `${rowHeight}px`;
   cellEl.style.overflow = 'hidden';
   cellEl.style.boxSizing = 'border-box';
-  // Use per-cell padding from DOCX margins, default to Word's visual rendering
-  const padTop = cell.padding?.top ?? 1;
+  // Per-cell padding from DOCX margins. Top/bottom default to 0 to match
+  // the measurer (`measureTableBlock`, DEFAULT_CELL_PADDING_Y = 0) — the
+  // painter must not reserve 2px/cell the layout engine didn't account
+  // for, otherwise the painted stack exceeds the reserved block height
+  // and overlaps following content.
+  const padTop = cell.padding?.top ?? 0;
   const padRight = cell.padding?.right ?? 7;
-  const padBottom = cell.padding?.bottom ?? 1;
+  const padBottom = cell.padding?.bottom ?? 0;
   const padLeft = cell.padding?.left ?? 7;
   cellEl.style.padding = `${padTop}px ${padRight}px ${padBottom}px ${padLeft}px`;
 
@@ -519,7 +542,14 @@ function renderTableRow(
   /** RTL table (`w:bidiVisual`): mirror cell x and swap first/last column. */
   bidi = false,
   /** Sum of `columnWidths`, used to mirror x when `bidi`. */
-  tableWidth = 0
+  tableWidth = 0,
+  /** Shared grid placement (`computeCellGrid` / `resolveCellGrid`) keyed
+   * `${rowIndex}-${cellIndex}`. When present, the painter uses the grid's
+   * `columnIndex` (not its own sequential walk) so it agrees with the
+   * measurer (`measureTableBlock`) and the row-break paginator — this is
+   * what keeps cells after the first merged group and non-first-column
+   * `w:vMerge` continuations in their Word columns. */
+  gridLookup?: Map<string, GridCell>
 ): HTMLElement {
   const rowEl = doc.createElement('div');
   rowEl.className = TABLE_CLASS_NAMES.row;
@@ -553,9 +583,22 @@ function renderTableRow(
   // Data attributes
   rowEl.dataset.rowIndex = String(rowIndex);
 
-  // Build set of columns occupied by spanning cells from previous rows
+  // Build set of columns occupied by spanning cells from previous rows.
+  // Prefer the shared grid (all merges spanning this row) over the
+  // incremental `spanningCells` map so placement agrees with the measurer
+  // even for non-rectangular input (orphan `w:vMerge` continuations,
+  // L-shaped merges) — the sequential walk alone drifts after the first
+  // merged group in those cases.
   const occupiedColumns = new Set<number>();
-  if (spanningCells) {
+  if (gridLookup) {
+    for (const g of gridLookup.values()) {
+      if (g.rowIndex < rowIndex && g.rowIndex + g.rowSpan > rowIndex) {
+        for (let c = 0; c < g.colSpan; c++) {
+          occupiedColumns.add(g.columnIndex + c);
+        }
+      }
+    }
+  } else if (spanningCells) {
     for (const [, spanCell] of spanningCells) {
       // Check if this spanning cell covers the current row
       if (spanCell.startRow < rowIndex && spanCell.startRow + spanCell.rowSpan > rowIndex) {
@@ -587,6 +630,19 @@ function renderTableRow(
     const colSpan = cell.colSpan ?? 1;
     const rowSpan = cell.rowSpan ?? 1;
 
+    // Prefer the shared grid placement so cells after the first merged
+    // group and non-first-column `w:vMerge` continuations land in their
+    // Word columns. The sequential `x`/`columnIndex` walk stays as the
+    // fallback when a grid entry is missing (defensive).
+    const gridEntry = gridLookup?.get(`${rowIndex}-${cellIndex}`);
+    let effectiveColumnIndex = columnIndex;
+    let effectiveX = x;
+    if (gridEntry) {
+      effectiveColumnIndex = gridEntry.columnIndex;
+      effectiveX = 0;
+      for (let c = 0; c < effectiveColumnIndex; c++) effectiveX += columnWidths[c] ?? 0;
+    }
+
     // Calculate cell height - for spanning cells, use total height of spanned rows
     let cellHeight = renderedRowHeight;
     if (rowSpan > 1 && rowYPositions) {
@@ -601,21 +657,27 @@ function renderTableRow(
     }
 
     // Column-span width, computed up front so an RTL cell can mirror its x.
+    // Index by the grid column so a drifted sequential walk can't size the
+    // cell from the wrong columns.
     let cellWidth = 0;
-    for (let c = 0; c < colSpan && columnIndex + c < columnWidths.length; c++) {
-      cellWidth += columnWidths[columnIndex + c] ?? 0;
+    for (let c = 0; c < colSpan && effectiveColumnIndex + c < columnWidths.length; c++) {
+      cellWidth += columnWidths[effectiveColumnIndex + c] ?? 0;
     }
 
     const isFirstRow = rowIndex === 0 || isFirstRowInFragment === true;
     const isLastRow = rowIndex + rowSpan >= totalRows;
     // In an RTL table the visual first/last columns are the logical last/first.
-    const isFirstCol = bidi ? columnIndex + colSpan >= columnWidths.length : columnIndex === 0;
-    const isLastCol = bidi ? columnIndex === 0 : columnIndex + colSpan >= columnWidths.length;
+    const isFirstCol = bidi
+      ? effectiveColumnIndex + colSpan >= columnWidths.length
+      : effectiveColumnIndex === 0;
+    const isLastCol = bidi
+      ? effectiveColumnIndex === 0
+      : effectiveColumnIndex + colSpan >= columnWidths.length;
 
     const cellEl = renderTableCell(
       cell,
       cellMeasure,
-      bidi ? tableWidth - x - cellWidth : x,
+      bidi ? tableWidth - effectiveX - cellWidth : effectiveX,
       cellHeight,
       { isFirstRow, isLastRow, isFirstCol, isLastCol },
       context,
@@ -623,7 +685,7 @@ function renderTableRow(
       row.trackedIns?.revisionId ?? row.trackedDel?.revisionId
     );
     cellEl.dataset.cellIndex = String(cellIndex);
-    cellEl.dataset.columnIndex = String(columnIndex);
+    cellEl.dataset.columnIndex = String(effectiveColumnIndex);
 
     // Store rowSpan info for styling
     if (rowSpan > 1) {
@@ -634,25 +696,27 @@ function renderTableRow(
 
     // Track this cell as spanning if it spans multiple rows
     if (rowSpan > 1 && spanningCells) {
-      const key = `${rowIndex}-${columnIndex}`;
+      const key = `${rowIndex}-${effectiveColumnIndex}`;
       spanningCells.set(key, {
         cell,
         cellMeasure,
-        columnIndex,
+        columnIndex: effectiveColumnIndex,
         startRow: rowIndex,
         rowSpan,
         colSpan,
-        x,
+        x: effectiveX,
         totalHeight: cellHeight,
       });
     }
 
     // Move x by the width of columns this cell spans (logical left-to-right;
     // the mirror is applied per-cell above, not to this running accumulator).
-    x += cellWidth;
+    // Keep the sequential walk in lockstep with the grid so fallback cells
+    // without a grid entry still advance from the right base.
+    x = effectiveX + cellWidth;
 
     // Advance column index by colSpan
-    columnIndex += colSpan;
+    columnIndex = effectiveColumnIndex + colSpan;
 
     // Skip columns occupied by spanning cells
     while (occupiedColumns.has(columnIndex)) {
@@ -693,9 +757,26 @@ export function renderTableFragment(
   // style after the renderer call.
   tableEl.style.position = context.positioning === 'flow' ? 'relative' : 'absolute';
   tableEl.style.width = `${fragment.width}px`;
-  // Height is set below from the rounded row stack (`visibleHeight`) once the
-  // window geometry is known — fragment.height (engine, unrounded) can be ~1px
-  // short of the painter's rounded rows and would clip the bottom border.
+  // Table container left offset in flow mode (HF / textbox) comes SOLELY
+  // from `w:tblInd` (`block.indent`). The absolute body path intentionally
+  // sets no margin — `applyFragmentStyles` already placed `left` from
+  // `fragment.x` (column origin + `w:tblInd`), so adding a margin there
+  // would double-count the indent. Never read paragraph indent here.
+  if (context.positioning === 'flow' && !block.floating) {
+    if (block.justification === 'center') {
+      tableEl.style.marginLeft = 'auto';
+      tableEl.style.marginRight = 'auto';
+    } else if (block.justification === 'right') {
+      tableEl.style.marginLeft = 'auto';
+    } else if (block.indent) {
+      tableEl.style.marginLeft = `${block.indent}px`;
+    }
+  }
+  // Height is set below from the rounded row stack (`paintedHeight`) once the
+  // window geometry is known — clamped to the engine's `fragment.height` so
+  // the paint never runs taller than the reserved block height (which would
+  // overlap following content). The engine height already includes all rows
+  // + cell padding + borders; the painter only snaps it to whole pixels.
   tableEl.style.overflow = 'hidden';
 
   // Store metadata
@@ -771,6 +852,12 @@ export function renderTableFragment(
 
   // Resolve cell grid placement once (column index + x per cell).
   const grid = computeCellGrid(block, measure.columnWidths);
+  // Shared lookup for `renderTableRow` so the painter, the measurer, and
+  // the row-break paginator agree on every cell's column (fixes drift
+  // after the first merged group and non-first-column `w:vMerge`).
+  const gridLookup = new Map<string, GridCell>(
+    grid.map((g) => [`${g.rowIndex}-${g.cellIndex}`, g])
+  );
 
   // Render repeated header rows for continuation fragments at the very top of
   // the fragment, in their own coordinate space above the windowed body.
@@ -797,11 +884,14 @@ export function renderTableFragment(
         hdrIdx === 0, // first header row draws top border
         fragWholeTableTracked,
         bidi,
-        tableWidth
+        tableWidth,
+        gridLookup
       );
       rowEl.dataset.repeatedHeader = 'true';
       tableEl.appendChild(rowEl);
-      headerHeight += hdrRowMeasure.height;
+      // Accumulate from the rounded row stack (not the unrounded measure)
+      // so the header and the windowed body share one pixel grid.
+      headerHeight += (rowYPositions[hdrIdx + 1] ?? 0) - (rowYPositions[hdrIdx] ?? 0);
     }
   }
 
@@ -817,11 +907,15 @@ export function renderTableFragment(
   // boundary) use the rounded row stack so the last row's bottom border sits
   // exactly on the clip edge (not 1px past it, which overflow:hidden would eat);
   // for a mid-content break, clip at the rounded fragment height.
+  // Clamp to the engine-reserved `fragment.height` (which already includes
+  // all rows + padding + borders) so the paint never overlaps following
+  // content — worst case is a sub-pixel border clip, never text overlap.
   const visibleHeight =
     fragment.bottomClip !== undefined
       ? Math.round(fragment.height)
       : toFragmentY(rowYPositions[fragment.toRow] ?? 0);
-  tableEl.style.height = `${visibleHeight}px`;
+  const paintedHeight = Math.min(visibleHeight, fragment.height);
+  tableEl.style.height = `${paintedHeight}px`;
 
   // A repeated header occupies [0, headerHeight]; the windowed body gets its own
   // clip box below it so a row resumed mid-content doesn't paint over the header
@@ -829,7 +923,7 @@ export function renderTableFragment(
   const { bodyParent, bodyOriginY } = makeTableBodyClip(
     tableEl,
     headerHeight,
-    visibleHeight,
+    paintedHeight,
     fragment.width,
     doc
   );
@@ -840,10 +934,11 @@ export function renderTableFragment(
   const spanningCells = new Map<string, SpanningCell>();
 
   // Re-emit vertically-merged cells whose restart row is on an EARLIER
-  // fragment but whose span reaches into this one. This keeps their column
-  // occupied (so body cells keep their grid columns) and flows the merged
+  // fragment but whose span reaches into this one. This flows the merged
   // content across the break: the cell is positioned at its true (negative)
   // top, and overflow:hidden hides the slice already shown on the prior page.
+  // (Column occupancy for body rows comes from the shared `gridLookup`, not
+  // from this map — so no occupancy seeding is needed here.)
   const drawsHeaderRows = headerRowCount > 0 && fragment.continuesFromPrev;
   for (const g of grid) {
     if (g.rowSpan <= 1) continue;
@@ -859,17 +954,6 @@ export function renderTableFragment(
     for (let r = g.rowIndex; r < g.rowIndex + g.rowSpan && r < rowYPositions.length - 1; r++) {
       spanHeight += (rowYPositions[r + 1] ?? 0) - (rowYPositions[r] ?? 0);
     }
-
-    spanningCells.set(`${g.rowIndex}-${g.columnIndex}`, {
-      cell: g.cell,
-      cellMeasure,
-      columnIndex: g.columnIndex,
-      startRow: g.rowIndex,
-      rowSpan: g.rowSpan,
-      colSpan: g.colSpan,
-      x: g.x,
-      totalHeight: spanHeight,
-    });
 
     const isLastRow = g.rowIndex + g.rowSpan >= block.rows.length;
     // RTL: visual first/last columns are the logical last/first.
@@ -926,7 +1010,8 @@ export function renderTableFragment(
       isFirstRowInFragment,
       fragWholeTableTracked,
       bidi,
-      tableWidth
+      tableWidth,
+      gridLookup
     );
 
     bodyParent.appendChild(rowEl);
@@ -967,15 +1052,18 @@ export function renderTableFragment(
   if (fragment.topClip) drawCutEdge(fragment.fromRow, 'top', headerHeight, false);
   else if (fragment.continuesFromPrev) drawCutEdge(fragment.fromRow, 'top', headerHeight, true);
   // Bottom edge: same, mirrored. Anchor to the element's actual bottom
-  // (`visibleHeight`) so the rule sits exactly on the clip edge.
+  // (`paintedHeight`) so the rule sits exactly on the clip edge.
   if (fragment.bottomClip !== undefined)
-    drawCutEdge(fragment.toRow - 1, 'bottom', visibleHeight, false);
-  else if (fragment.continuesOnNext) drawCutEdge(fragment.toRow - 1, 'bottom', visibleHeight, true);
+    drawCutEdge(fragment.toRow - 1, 'bottom', paintedHeight, false);
+  else if (fragment.continuesOnNext) drawCutEdge(fragment.toRow - 1, 'bottom', paintedHeight, true);
 
-  // Row resize handles at row boundaries that fall inside the visible window.
+  // Row resize handles at row boundaries that fall inside the visible window
+  // (culled against the actual painted height so the last handle can't sit
+  // on the clipped edge when rounding makes `paintedHeight` a hair shorter
+  // than the engine height).
   for (let rowIdx = fragment.fromRow; rowIdx < fragment.toRow - 1; rowIdx++) {
     const boundaryY = toFragmentY(rowYPositions[rowIdx + 1] ?? 0);
-    if (boundaryY <= headerHeight || boundaryY >= fragment.height) continue;
+    if (boundaryY <= headerHeight || boundaryY >= paintedHeight) continue;
     const rowHandle = doc.createElement('div');
     rowHandle.className = TABLE_CLASS_NAMES.rowResizeHandle;
     rowHandle.style.position = 'absolute';

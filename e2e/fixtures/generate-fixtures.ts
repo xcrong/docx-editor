@@ -881,6 +881,146 @@ export async function generateEastAsianFontRoundtripDocx(): Promise<void> {
 }
 
 /**
+ * Table rendering fidelity fixtures (change table-rendering-fidelity).
+ *
+ * 1. table-merge-beyond-first-col.docx — horizontal merge after the first
+ *    column (B1:C1 via gridSpan) plus a vertical merge in a non-first
+ *    column (B2:B3 via vMerge restart/continue). Exercises grid placement
+ *    for cells after the first merged group.
+ * 2. table-indentation.docx — 2x2 table with `w:tblInd` (720 dxa). The table
+ *    container must offset by exactly `w:tblInd`, no paragraph indent.
+ * 3. table-text-overlap.docx — 3-row bordered table followed by a marker
+ *    paragraph. The table must reserve its full height (rows + padding +
+ *    borders) so the marker never overlaps.
+ */
+export async function generateTableMergeBeyondFirstColDocx(): Promise<void> {
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>MERGE FIDELITY HEADER</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="9000" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid><w:gridCol w:w="2250"/><w:gridCol w:w="2250"/><w:gridCol w:w="2250"/><w:gridCol w:w="2250"/></w:tblGrid>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="2250" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>A1</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>B1C1-MERGED</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="2250" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>D1</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="2250" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>A2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="2250" w:type="dxa"/><w:vMerge w:val="restart"/></w:tcPr><w:p><w:r><w:t>B2-SPAN</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="2250" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>C2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="2250" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>D2</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="2250" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>A3</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="2250" w:type="dxa"/><w:vMerge/></w:tcPr><w:p/></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="2250" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>C3</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="2250" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>D3</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+  await createDocx(documentXml, 'table-merge-beyond-first-col.docx');
+}
+
+export async function generateTableIndentationDocx(): Promise<void> {
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>BEFORE INDENTED TABLE</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="9000" w:type="dxa"/>
+        <w:tblInd w:w="720" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid><w:gridCol w:w="4500"/><w:gridCol w:w="4500"/></w:tblGrid>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>IND-A1</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>IND-B1</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>IND-A2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>IND-B2</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>AFTER INDENTED TABLE</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+  await createDocx(documentXml, 'table-indentation.docx');
+}
+
+export async function generateTableTextOverlapDocx(): Promise<void> {
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>BEFORE OVERLAP TABLE</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="9000" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="12" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="12" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="12" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="12" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="12" w:space="0" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="12" w:space="0" w:color="000000"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid><w:gridCol w:w="4500"/><w:gridCol w:w="4500"/></w:tblGrid>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/><w:tcMar><w:top w:w="100" w:type="dxa"/><w:bottom w:w="100" w:type="dxa"/></w:tcMar></w:tcPr><w:p><w:r><w:t>OVERLAP R1C1 with padding and thick borders</w:t></w:r></w:p><w:p><w:r><w:t>Second line R1C1</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/><w:tcMar><w:top w:w="100" w:type="dxa"/><w:bottom w:w="100" w:type="dxa"/></w:tcMar></w:tcPr><w:p><w:r><w:t>OVERLAP R1C2 with padding and thick borders</w:t></w:r></w:p><w:p><w:r><w:t>Second line R1C2</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>OVERLAP R2C1</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>OVERLAP R2C2</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>OVERLAP R3C1 final row content</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>OVERLAP R3C2 final row content</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>AFTER TABLE MARKER MUST NOT OVERLAP</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+  await createDocx(documentXml, 'table-text-overlap.docx');
+}
+
+/**
  * Main function
  */
 async function main(): Promise<void> {
@@ -898,6 +1038,9 @@ async function main(): Promise<void> {
   await generateHighlightRoundtripDocx();
   await generateThemeColorRoundtripDocx();
   await generateEastAsianFontRoundtripDocx();
+  await generateTableMergeBeyondFirstColDocx();
+  await generateTableIndentationDocx();
+  await generateTableTextOverlapDocx();
 
   console.log('\nAll fixtures generated successfully!');
 }

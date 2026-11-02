@@ -619,3 +619,121 @@ test.describe('Table Edge Cases', () => {
     expect(content).toContain('Line 2');
   });
 });
+
+test.describe('Table Rendering Fidelity', () => {
+  test('complex merged cells beyond first column keep grid columns', async ({ page }) => {
+    const editor = new EditorPage(page);
+    await editor.goto();
+    await editor.waitForReady();
+    await editor.loadDocxFile('fixtures/table-merge-beyond-first-col.docx');
+    await page.waitForTimeout(800);
+
+    const metrics = await page.evaluate(() => {
+      const table = document.querySelector(
+        '.paged-editor__pages .layout-table'
+      ) as HTMLElement | null;
+      if (!table) return null;
+      const rows = Array.from(table.querySelectorAll(':scope > .layout-table-row'));
+      const rowData = rows.map((row) => {
+        const cells = Array.from(
+          row.querySelectorAll(':scope > .layout-table-cell')
+        ) as HTMLElement[];
+        return cells.map((cell) => {
+          const r = cell.getBoundingClientRect();
+          return {
+            text: (cell.textContent ?? '').trim().slice(0, 20),
+            col: cell.dataset.columnIndex,
+            rowSpan: cell.dataset.rowSpan ?? '1',
+            left: Math.round(r.left),
+            width: Math.round(r.width),
+          };
+        });
+      });
+      // Overlap check: no two cells in the same painted row may overlap.
+      let overlapCount = 0;
+      for (const cells of rowData) {
+        const sorted = [...cells].sort((a, b) => a.left - b.left);
+        for (let i = 1; i < sorted.length; i++) {
+          if (sorted[i]!.left < sorted[i - 1]!.left + sorted[i - 1]!.width - 2) {
+            overlapCount++;
+          }
+        }
+      }
+      return { rowData, overlapCount };
+    });
+
+    expect(metrics).not.toBeNull();
+    // Row 0: A1 (col 0), B1C1 merged (col 1, spans 2 cols), D1 (col 3).
+    expect(metrics!.rowData[0]!.length).toBe(3);
+    expect(metrics!.rowData[0]!.map((c) => c.col)).toEqual(['0', '1', '3']);
+    // Row 1: four cells in columns 0-3.
+    expect(metrics!.rowData[1]!.map((c) => c.col)).toEqual(['0', '1', '2', '3']);
+    // Row 2: vMerge continuation in col 1 is absorbed — A3 (0), C3 (2), D3 (3).
+    expect(metrics!.rowData[2]!.map((c) => c.col)).toEqual(['0', '2', '3']);
+    // Merged B1C1 is ~2x a single column; D1 starts after it (no drift).
+    const [a1, b1c1, d1] = metrics!.rowData[0]!;
+    expect(b1c1!.width).toBeGreaterThan(a1!.width * 1.7);
+    expect(d1!.left).toBeGreaterThanOrEqual(b1c1!.left + b1c1!.width - 2);
+    // B2 spans two rows.
+    const b2 = metrics!.rowData[1]!.find((c) => c.text.includes('B2-SPAN'));
+    expect(b2?.rowSpan).toBe('2');
+    // No overlaps in any painted row.
+    expect(metrics!.overlapCount).toBe(0);
+  });
+
+  test('table indentation matches w:tblInd only', async ({ page }) => {
+    const editor = new EditorPage(page);
+    await editor.goto();
+    await editor.waitForReady();
+    await editor.loadDocxFile('fixtures/table-indentation.docx');
+    await page.waitForTimeout(800);
+
+    const metrics = await page.evaluate(() => {
+      const content = document.querySelector('.layout-page-content') as HTMLElement | null;
+      const table = document.querySelector(
+        '.paged-editor__pages .layout-table'
+      ) as HTMLElement | null;
+      if (!content || !table) return null;
+      const contentRect = content.getBoundingClientRect();
+      const tableRect = table.getBoundingClientRect();
+      return { offset: Math.round(tableRect.left - contentRect.left) };
+    });
+
+    expect(metrics).not.toBeNull();
+    // 720 twips = 48px at 96dpi. Tolerance covers sub-pixel rounding, but a
+    // doubled indent (paragraph + tblInd) or a dropped indent fails.
+    expect(metrics!.offset).toBeGreaterThanOrEqual(44);
+    expect(metrics!.offset).toBeLessThanOrEqual(52);
+  });
+
+  test('table followed by text does not overlap', async ({ page }) => {
+    const editor = new EditorPage(page);
+    await editor.goto();
+    await editor.waitForReady();
+    await editor.loadDocxFile('fixtures/table-text-overlap.docx');
+    await page.waitForTimeout(800);
+
+    const metrics = await page.evaluate(() => {
+      const table = document.querySelector(
+        '.paged-editor__pages .layout-table'
+      ) as HTMLElement | null;
+      const afterEls = Array.from(document.querySelectorAll('.layout-paragraph')).filter((el) =>
+        (el.textContent ?? '').includes('AFTER TABLE MARKER')
+      ) as HTMLElement[];
+      if (!table || afterEls.length === 0) return null;
+      const tableRect = table.getBoundingClientRect();
+      const afterRect = afterEls[0]!.getBoundingClientRect();
+      return {
+        tableBottom: Math.round(tableRect.bottom),
+        afterTop: Math.round(afterRect.top),
+        gap: Math.round(afterRect.top - tableRect.bottom),
+      };
+    });
+
+    expect(metrics).not.toBeNull();
+    // Following content must start at or after the table's measured bottom
+    // (rows + padding + borders). 2px tolerance for rounding; the overlap
+    // bug painted the marker several px inside the table.
+    expect(metrics!.gap).toBeGreaterThanOrEqual(-2);
+  });
+});
