@@ -34,10 +34,7 @@ import {
 } from '@xcrong/docx-editor-core/prosemirror/template/prosemirror-plugin';
 import TemplateHighlightOverlay from './components/TemplateHighlightOverlay.vue';
 import TemplateChip from './components/TemplateChip.vue';
-import {
-  TEMPLATE_CHIP_STYLES,
-  TEMPLATE_HIGHLIGHT_OVERLAY_STYLES,
-} from './styles';
+import { TEMPLATE_CHIP_STYLES, TEMPLATE_HIGHLIGHT_OVERLAY_STYLES } from './styles';
 
 /** Plugin state interface (mirrors the React twin). */
 export interface TemplatePluginState {
@@ -151,7 +148,10 @@ ${TEMPLATE_HIGHLIGHT_OVERLAY_STYLES}
 export const templatePlugin = createPlugin();
 
 // Re-export types and utilities (mirrors the React subpath surface)
-export type { TemplateTag, TagType } from '@xcrong/docx-editor-core/prosemirror/template/prosemirror-plugin';
+export type {
+  TemplateTag,
+  TagType,
+} from '@xcrong/docx-editor-core/prosemirror/template/prosemirror-plugin';
 export {
   createTemplatePlugin,
   templatePluginKey,
