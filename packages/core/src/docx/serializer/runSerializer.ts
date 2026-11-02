@@ -187,7 +187,10 @@ export function serializeTextFormatting(formatting: TextFormatting | undefined):
       fontAttrs.push(`w:eastAsiaTheme="${formatting.fontFamily.eastAsiaTheme}"`);
     }
     if (formatting.fontFamily.csTheme) {
-      fontAttrs.push(`w:csTheme="${formatting.fontFamily.csTheme}"`);
+      // NOTE: ECMA-376 CT_Fonts spells this attribute all-lowercase
+      // `w:cstheme` (unlike asciiTheme/hAnsiTheme/eastAsiaTheme). Word
+      // ignores the camelCase `w:csTheme` form, so emit the schema spelling.
+      fontAttrs.push(`w:cstheme="${formatting.fontFamily.csTheme}"`);
     }
     if (fontAttrs.length > 0) {
       parts.push(`<w:rFonts ${fontAttrs.join(' ')}/>`);

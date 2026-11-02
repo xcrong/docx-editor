@@ -23,10 +23,10 @@
 
 ## Font family fix
 
-- [ ] Parse all 4 `w:rFonts` attributes: ascii, hAnsi, eastAsia, cs
-- [ ] Store all 4 in run properties type
-- [ ] Serialize all 4 back on export
-- [ ] Test with East Asian font document (DengXian, SimSun, etc.)
+- [x] Parse all 4 `w:rFonts` attributes: ascii, hAnsi, eastAsia, cs
+- [x] Store all 4 in run properties type
+- [x] Serialize all 4 back on export
+- [x] Test with East Asian font document (DengXian, SimSun, etc.)
 
 ## Field code fix
 
@@ -51,7 +51,7 @@
 
 - [x] E2E test: custom highlight color roundtrip
 - [x] E2E test: theme color roundtrip
-- [ ] E2E test: East Asian font preservation
+- [x] E2E test: East Asian font preservation
 - [ ] E2E test: footer with field codes roundtrip
 - [ ] E2E test: multiple images with duplicate IDs
 - [x] Run `bun run typecheck`
