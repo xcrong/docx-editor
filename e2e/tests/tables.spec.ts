@@ -736,4 +736,102 @@ test.describe('Table Rendering Fidelity', () => {
     // bug painted the marker several px inside the table.
     expect(metrics!.gap).toBeGreaterThanOrEqual(-2);
   });
+
+  test('wide table scales columns proportionally to fit within page', async ({ page }) => {
+    const editor = new EditorPage(page);
+    await editor.goto();
+    await editor.waitForReady();
+    await editor.loadDocxFile('fixtures/table-wide-adaptive.docx');
+    await page.waitForTimeout(800);
+
+    const metrics = await page.evaluate(() => {
+      const pageEl = document.querySelector('.layout-page') as HTMLElement | null;
+      const content = document.querySelector('.layout-page-content') as HTMLElement | null;
+      const table = document.querySelector(
+        '.paged-editor__pages .layout-table'
+      ) as HTMLElement | null;
+      if (!pageEl || !content || !table) return null;
+      const contentRect = content.getBoundingClientRect();
+      const tableRect = table.getBoundingClientRect();
+      const firstRow = table.querySelector(':scope > .layout-table-row') as HTMLElement | null;
+      const cells = firstRow
+        ? Array.from(
+            firstRow.querySelectorAll(':scope > .layout-table-cell')
+          ) as HTMLElement[]
+        : [];
+      return {
+        contentLeft: Math.round(contentRect.left),
+        contentRight: Math.round(contentRect.right),
+        tableLeft: Math.round(tableRect.left),
+        tableRight: Math.round(tableRect.right),
+        tableWidth: Math.round(tableRect.width),
+        contentWidth: Math.round(contentRect.width),
+        cellWidths: cells.map((c) => Math.round(c.getBoundingClientRect().width)),
+      };
+    });
+
+    expect(metrics).not.toBeNull();
+    // Grid total (16000 dxa ≈ 1067px) exceeds the ~624px content area: the
+    // table must shrink to fit instead of overflowing horizontally.
+    expect(metrics!.tableRight).toBeLessThanOrEqual(metrics!.contentRight + 2);
+    expect(metrics!.tableLeft).toBeGreaterThanOrEqual(metrics!.contentLeft - 2);
+    expect(metrics!.tableWidth).toBeLessThanOrEqual(metrics!.contentWidth + 2);
+    // Four equal grid columns stay proportional after scaling (~25% each).
+    expect(metrics!.cellWidths.length).toBe(4);
+    const avg = metrics!.cellWidths.reduce((a, b) => a + b, 0) / metrics!.cellWidths.length;
+    for (const w of metrics!.cellWidths) {
+      expect(Math.abs(w - avg)).toBeLessThanOrEqual(Math.max(4, avg * 0.15));
+    }
+  });
+
+  test('multi-page table repeats header rows on continuation pages', async ({ page }) => {
+    test.setTimeout(120000);
+    const editor = new EditorPage(page);
+    await editor.goto();
+    await editor.waitForReady();
+    await editor.loadDocxFile('fixtures/table-multipage-header.docx');
+    await page.waitForTimeout(1200);
+
+    const metrics = await page.evaluate(() => {
+      const pages = Array.from(document.querySelectorAll('.layout-page')) as HTMLElement[];
+      const tableFragments: { page: number; hasRepeatedHeader: boolean; headerText: string }[] =
+        [];
+      const pagesWithTable = new Set<number>();
+      pages.forEach((pageEl, pageIdx) => {
+        const content = pageEl.querySelector('.layout-page-content') as HTMLElement | null;
+        if (!content) return;
+        for (const t of Array.from(
+          content.querySelectorAll('.layout-table')
+        ) as HTMLElement[]) {
+          const repeated = Array.from(
+            t.querySelectorAll('[data-repeated-header="true"]')
+          ) as HTMLElement[];
+          pagesWithTable.add(pageIdx);
+          tableFragments.push({
+            page: pageIdx,
+            hasRepeatedHeader: repeated.length > 0,
+            headerText: repeated.map((r) => r.textContent ?? '').join('|').slice(0, 80),
+          });
+        }
+      });
+      return {
+        totalPages: pages.length,
+        tableFragmentCount: tableFragments.length,
+        pagesWithTableCount: pagesWithTable.size,
+        fragments: tableFragments,
+      };
+    });
+
+    // The 46-row table (header + 45 body rows incl. merges and a tall
+    // multi-paragraph cell) spans multiple pages.
+    expect(metrics.tableFragmentCount).toBeGreaterThan(1);
+    expect(metrics.pagesWithTableCount).toBeGreaterThan(1);
+    // Every continuation fragment re-renders the w:tblHeader row.
+    const continuations = metrics.fragments.slice(1);
+    expect(continuations.length).toBeGreaterThan(0);
+    for (const frag of continuations) {
+      expect(frag.hasRepeatedHeader).toBe(true);
+      expect(frag.headerText).toContain('HDR-REPEAT-A');
+    }
+  });
 });
