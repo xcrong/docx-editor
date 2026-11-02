@@ -191,6 +191,16 @@ export default [
     },
   },
 
+  // generate-fixtures.ts is the synthetic DOCX fixture factory — one function
+  // per fixture, growing with each fidelity fix. Single file by design (shared
+  // zip scaffolding); the cap still enforces a ceiling so it can't grow unbounded.
+  {
+    files: ['e2e/fixtures/generate-fixtures.ts'],
+    rules: {
+      'max-lines': ['error', { max: 1100, skipBlankLines: false, skipComments: false }],
+    },
+  },
+
   // layout-engine/types.ts is the canonical schema definition for the
   // layout model — single file by design (cross-referencing types). Bumped
   // modestly above the default to accommodate new revision-tracking and
@@ -206,11 +216,13 @@ export default [
   // renderTable.ts is one cohesive table renderer (row/cell/fragment painting,
   // border + cut-edge geometry, span handling, RTL bidi column mirror, resize
   // handles). Bumped modestly above the default rather than split, which would
-  // scatter the shared grid/column geometry across files.
+  // scatter the shared grid/column geometry across files. The grid-lookup
+  // placement (shared resolveCellGrid for painter/measurer/paginator) added a
+  // parameter + occupancy branch per row path, pushing it past 1040.
   {
     files: ['packages/core/src/layout-painter/renderTable.ts'],
     rules: {
-      'max-lines': ['error', { max: 1040, skipBlankLines: false, skipComments: false }],
+      'max-lines': ['error', { max: 1140, skipBlankLines: false, skipComments: false }],
     },
   },
 
