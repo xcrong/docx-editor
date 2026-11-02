@@ -20,6 +20,8 @@ import {
 import { serializeFootnotes, serializeEndnotes } from '../serializer/noteSerializer';
 import { serializeNumberingXml } from '../serializer/numberingSerializer';
 import { RELATIONSHIP_TYPES } from '../relsParser';
+import { ensureUniqueDrawingIds } from '../drawingIds';
+import { updateSettingsViewXml } from '../settingsParser';
 import { findMaxRId, readRelsOrStub, headerFooterFilename } from './parts';
 
 const HEADER_CONTENT_TYPE =
@@ -345,6 +347,9 @@ export function serializeEndnotesToZip(doc: Document, zip: JSZip, compressionLev
  */
 export function collectHeaderFooterUpdates(doc: Document): Map<string, string> {
   const updates = new Map<string, string>();
+  // Keep drawing IDs unique across body + headers/footers even when only a
+  // header/footer is serialized (idempotent when serializeDocument ran first).
+  ensureUniqueDrawingIds(doc);
   const rels = doc.package.relationships;
   if (!rels) return updates;
 
@@ -381,4 +386,29 @@ export function serializeHeadersFootersToZip(
   for (const [filename, xml] of collectHeaderFooterUpdates(doc)) {
     zip.file(filename, xml, { compression: 'DEFLATE', compressionOptions });
   }
+}
+
+/**
+ * Write the in-model `w:view` back into `word/settings.xml`, preserving
+ * every other byte. The repack pass otherwise copies `settings.xml`
+ * verbatim, so this is a no-op when the file already carries the same view —
+ * it only matters when the model view was set programmatically or the
+ * original part lacked the element.
+ */
+export async function syncSettingsViewToZip(
+  doc: Document,
+  zip: JSZip,
+  compressionLevel: number
+): Promise<void> {
+  const view = doc.package.settings?.view?.trim();
+  if (!view) return;
+  const file = zip.file('word/settings.xml');
+  if (!file) return;
+  const xml = await file.async('text');
+  const updated = updateSettingsViewXml(xml, view);
+  if (updated === xml) return;
+  zip.file('word/settings.xml', updated, {
+    compression: 'DEFLATE',
+    compressionOptions: { level: compressionLevel },
+  });
 }

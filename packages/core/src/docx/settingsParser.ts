@@ -35,6 +35,12 @@ export interface DocumentSettings {
    * right margin).
    */
   themeFontLang?: { eastAsia?: string; bidi?: string };
+  /**
+   * `w:view` (§17.15.1.89) — the view mode Word restores on open
+   * (`none` | `print` | `outline` | `web` | ...). Stored verbatim and
+   * written back on export; never affects layout.
+   */
+  view?: string;
 }
 
 /** OOXML default per §17.6.13 when `w:defaultTabStop` is absent. */
@@ -69,9 +75,66 @@ export function parseSettings(xml: string | null): DocumentSettings {
         }
       : undefined;
 
+  const viewEl = root ? findChild(root, 'w', 'view') : null;
+  const rawView = viewEl ? getAttribute(viewEl, 'w', 'val') : undefined;
+  const view = rawView?.trim() ? rawView.trim() : undefined;
+
   return {
     defaultTabStop: valid ? raw : DEFAULT_TAB_STOP_TWIPS,
     ...(defaultTableStyle ? { defaultTableStyle } : {}),
     ...(themeFontLang ? { themeFontLang } : {}),
+    ...(view ? { view } : {}),
   };
+}
+
+/**
+ * Patch a `word/settings.xml` string so its `w:view` matches `view`,
+ * preserving every other byte of the file.
+ *
+ * - If a view element exists (any prefix/case — `w:view`, `W:VIEW`, ...),
+ *   every occurrence is replaced by a single canonical `<w:view/>`.
+ * - Otherwise `<w:view w:val="..."/>` is inserted right after the opening
+ *   `<w:settings ...>` tag; a self-closing `<w:settings .../>` root is
+ *   expanded first so the result stays well-formed.
+ * - Returns the input unchanged when there is no `<w:settings>` root or
+ *   `view` is empty (caller should skip writing in that case).
+ */
+const VIEW_ELEMENT_RE = /<\w+:view\b(?:[^>"']|"[^"]*"|'[^']*')*(?:\/>|>.*?<\/\w+:view\s*>)/is;
+const VIEW_ELEMENT_RE_GLOBAL =
+  /<\w+:view\b(?:[^>"']|"[^"]*"|'[^']*')*(?:\/>|>.*?<\/\w+:view\s*>)/gis;
+
+export function updateSettingsViewXml(xml: string, view: string): string {
+  const trimmed = view.trim();
+  if (!trimmed) return xml;
+  const escaped = trimmed
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+  const canonical = `<w:view w:val="${escaped}"/>`;
+  if (VIEW_ELEMENT_RE.test(xml)) {
+    // Replace the first occurrence, drop any further duplicates
+    // (CT_Settings allows at most one w:view).
+    let done = false;
+    return xml.replace(VIEW_ELEMENT_RE_GLOBAL, () => {
+      if (!done) {
+        done = true;
+        return canonical;
+      }
+      return '';
+    });
+  }
+  const selfClosing = xml.match(/<((?:\w+:)?settings)\b[^>]*\/>/i);
+  if (selfClosing && selfClosing.index !== undefined) {
+    // Preserve the root's original tag-name case so the synthesized close
+    // tag matches (XML is case-sensitive).
+    const tagName = selfClosing[1];
+    const open = selfClosing[0].replace(/\/>\s*$/, '>');
+    const at = selfClosing.index;
+    return `${xml.slice(0, at)}${open}${canonical}</${tagName}>${xml.slice(at + selfClosing[0].length)}`;
+  }
+  const openMatch = xml.match(/<w:settings\b[^>]*>/i);
+  if (!openMatch || openMatch.index === undefined) return xml;
+  const insertAt = openMatch.index + openMatch[0].length;
+  return `${xml.slice(0, insertAt)}${canonical}${xml.slice(insertAt)}`;
 }

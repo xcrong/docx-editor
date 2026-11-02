@@ -44,7 +44,7 @@ export function getContentTypeForExtension(extension: string, mimeType: string):
  * Collect all images with data-URL src from the document content.
  * These are newly inserted images that need to be added to the ZIP.
  */
-function collectNewImages(blocks: BlockContent[]): Image[] {
+export function collectNewImages(blocks: BlockContent[]): Image[] {
   const images: Image[] = [];
 
   const collectFromRun = (run: { content: { type: string; image?: Image }[] }): void => {
@@ -186,6 +186,17 @@ export async function processNewImages(
     const relEntries: string[] = [];
 
     for (const image of images) {
+      // Already-registered images (parsed from the file: their rId resolves
+      // in this part's rels) keep their relationship — including non-standard
+      // IDs like `img2073076884`. Only truly new insertions (rId empty or
+      // unregistered) get fresh media + rIds. This also stops every save from
+      // duplicating all media files.
+      //
+      // Invariant: reusing an existing rId with *different* image bytes is
+      // not supported — the bytes behind a registered rel are left untouched.
+      // Byte replacement must mint a new relationship instead.
+      if (image.rId && hasRelId(relsXml, image.rId)) continue;
+
       const { data, extension } = decodeDataUrl(image.src!);
 
       maxImageNum++;
@@ -217,6 +228,12 @@ export async function processNewImages(
   }
 
   await registerImageExtensions(zip, extensionsAdded, compressionLevel);
+}
+
+/** True when a rels XML already contains a relationship with this exact Id. */
+export function hasRelId(relsXml: string, rId: string): boolean {
+  const escaped = rId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`Id="${escaped}"`).test(relsXml);
 }
 
 /** Normalize a rels Target to its `media/<file>` form for comparison. */
@@ -307,7 +324,7 @@ export async function processNewWatermarkImages(
     const relsXml = await readRelsOrStub(zip, relsPath);
 
     // Keep the existing relId when it already resolves in this header's rels.
-    if (wm.relId && new RegExp(`Id="${wm.relId}"`).test(relsXml)) continue;
+    if (wm.relId && hasRelId(relsXml, wm.relId)) continue;
 
     const mediaFilename = resolveMediaFilename(wm);
     if (!mediaFilename) continue;

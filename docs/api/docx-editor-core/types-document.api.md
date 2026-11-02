@@ -189,6 +189,7 @@ export interface DocumentSettings {
         eastAsia?: string;
         bidi?: string;
     };
+    view?: string;
 }
 
 // @public
