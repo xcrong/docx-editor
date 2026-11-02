@@ -719,6 +719,128 @@ async function generateTrackedChangesRoundtripDocx(): Promise<void> {
 }
 
 /**
+ * Highlight round-trip fixture (change ooxml-roundtrip-fidelity, Highlight fix).
+ *
+ * - run 1: predefined highlight `<w:highlight w:val="yellow"/>`
+ * - run 2: custom highlight `<w:shd w:val="clear" w:fill="FFEB3B"/>`
+ *   (`w:highlight` only accepts the §17.18.40 named palette, so custom
+ *   colors must use run shading)
+ * Used by e2e/tests/roundtrip-highlight-theme.spec.ts.
+ */
+export async function generateHighlightRoundtripDocx(): Promise<void> {
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:rPr><w:highlight w:val="yellow"/></w:rPr>
+        <w:t xml:space="preserve">Named highlight yellow </w:t>
+      </w:r>
+      <w:r>
+        <w:rPr><w:shd w:val="clear" w:color="auto" w:fill="FFEB3B"/></w:rPr>
+        <w:t>Custom highlight pale yellow</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:rPr><w:highlight w:val="green"/></w:rPr>
+        <w:t xml:space="preserve">Named highlight green </w:t>
+      </w:r>
+      <w:r>
+        <w:t>plain tail.</w:t>
+      </w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+  await createDocx(documentXml, 'highlight-roundtrip.docx');
+}
+
+/**
+ * Theme-color round-trip fixture (change ooxml-roundtrip-fidelity, Theme color fix).
+ *
+ * Body runs carry `w:themeColor` + tint/shade alongside the resolved `w:val`;
+ * the table header uses theme-colored text (`background1` = white) on a
+ * theme-filled cell (`accent1`) — the combination that used to corrupt on
+ * round-trip. Used by e2e/tests/roundtrip-highlight-theme.spec.ts.
+ */
+export async function generateThemeColorRoundtripDocx(): Promise<void> {
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:rPr><w:color w:val="000000" w:themeColor="dark1"/></w:rPr>
+        <w:t>Theme dark1 text.</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:rPr><w:color w:val="B4C6E7" w:themeColor="accent1" w:themeTint="66"/></w:rPr>
+        <w:t>Theme accent1 lighter 40%.</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:rPr><w:color w:val="2F5496" w:themeColor="accent1" w:themeShade="BF"/></w:rPr>
+        <w:t>Theme accent1 darker 25%.</w:t>
+      </w:r>
+    </w:p>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="9000" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid><w:gridCol w:w="4500"/><w:gridCol w:w="4500"/></w:tblGrid>
+      <w:tr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4500" w:type="dxa"/>
+            <w:shd w:val="clear" w:color="auto" w:fill="4472C4" w:themeFill="accent1"/>
+          </w:tcPr>
+          <w:p><w:r><w:rPr><w:color w:val="FFFFFF" w:themeColor="background1"/></w:rPr><w:t>Header A</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4500" w:type="dxa"/>
+            <w:shd w:val="clear" w:color="auto" w:fill="4472C4" w:themeFill="accent1"/>
+          </w:tcPr>
+          <w:p><w:r><w:rPr><w:color w:val="FFFFFF" w:themeColor="background1"/></w:rPr><w:t>Header B</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>Body A</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>Body B</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+  await createDocx(documentXml, 'theme-color-roundtrip.docx');
+}
+
+/**
  * Main function
  */
 async function main(): Promise<void> {
@@ -733,11 +855,15 @@ async function main(): Promise<void> {
   await generateEndnotesTrackedChangesDocx();
   await generateCommentsRoundtripDocx();
   await generateTrackedChangesRoundtripDocx();
+  await generateHighlightRoundtripDocx();
+  await generateThemeColorRoundtripDocx();
 
   console.log('\nAll fixtures generated successfully!');
 }
 
-main().catch((error) => {
-  console.error('Error generating fixtures:', error);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((error) => {
+    console.error('Error generating fixtures:', error);
+    process.exit(1);
+  });
+}

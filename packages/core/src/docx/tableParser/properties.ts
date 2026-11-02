@@ -148,10 +148,13 @@ export function parseShading(shdElement: XmlElement | null): ShadingProperties |
     shading.fill = { rgb: fillStr };
   }
 
-  // Theme fill
+  // Theme fill — merge with the resolved rgb above (Word always writes both);
+  // overwriting here would drop the w:fill fallback and corrupt the header
+  // shading on round-trip (theme-only fill has no concrete color).
   const themeFill = getAttribute(shdElement, 'w', 'themeFill');
   if (themeFill) {
-    shading.fill = { themeColor: themeFill as ColorValue['themeColor'] };
+    shading.fill = shading.fill || {};
+    shading.fill.themeColor = themeFill as ColorValue['themeColor'];
 
     const themeFillTint = getAttribute(shdElement, 'w', 'themeFillTint');
     if (themeFillTint && shading.fill) {

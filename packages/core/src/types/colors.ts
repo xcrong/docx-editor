@@ -5,7 +5,16 @@
  */
 
 /**
- * Theme color slots from theme1.xml
+ * Theme color slots from theme1.xml.
+ *
+ * Two spelling families exist on the wire and both are accepted here:
+ * - DrawingML-style canonical names (`dk1`, `lt1`, `hlink`, …)
+ * - Transitional `w:`-namespace names Word actually writes (`dark1`,
+ *   `light1`, `hyperlink`, `followedHyperlink`, `text1`, `background1`, …)
+ *
+ * Parsers store the spelling found in the file and the serializer echoes it
+ * back verbatim (byte fidelity); display resolution canonicalizes via the
+ * alias map in `utils/colorResolver.ts`, so never compare these with `===`.
  */
 export type ThemeColorSlot =
   | 'dk1'
@@ -20,6 +29,12 @@ export type ThemeColorSlot =
   | 'accent6'
   | 'hlink'
   | 'folHlink'
+  | 'dark1'
+  | 'light1'
+  | 'dark2'
+  | 'light2'
+  | 'hyperlink'
+  | 'followedHyperlink'
   | 'background1'
   | 'text1'
   | 'background2'

@@ -11,15 +11,15 @@
 
 ## Highlight fix
 
-- [ ] Map predefined highlight colors to `w:highlight w:val="name"`
-- [ ] Route custom colors to `w:shd w:val="clear" w:fill="RRGGBB"`
-- [ ] Test roundtrip: apply custom highlight → save → reopen in Word
+- [x] Map predefined highlight colors to `w:highlight w:val="name"`
+- [x] Route custom colors to `w:shd w:val="clear" w:fill="RRGGBB"`
+- [x] Test roundtrip: apply custom highlight → save → reopen in Word
 
 ## Theme color fix
 
-- [ ] Preserve `w:themeColor`, `w:themeTint`, `w:themeShade` in run properties through PM roundtrip
-- [ ] Write theme attributes back in serializer alongside resolved `w:val`
-- [ ] Test with theme-colored text in table headers
+- [x] Preserve `w:themeColor`, `w:themeTint`, `w:themeShade` in run properties through PM roundtrip
+- [x] Write theme attributes back in serializer alongside resolved `w:val`
+- [x] Test with theme-colored text in table headers
 
 ## Font family fix
 
@@ -49,9 +49,9 @@
 
 ## Testing
 
-- [ ] E2E test: custom highlight color roundtrip
-- [ ] E2E test: theme color roundtrip
+- [x] E2E test: custom highlight color roundtrip
+- [x] E2E test: theme color roundtrip
 - [ ] E2E test: East Asian font preservation
 - [ ] E2E test: footer with field codes roundtrip
 - [ ] E2E test: multiple images with duplicate IDs
-- [ ] Run `bun run typecheck`
+- [x] Run `bun run typecheck`
