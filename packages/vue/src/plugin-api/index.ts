@@ -16,6 +16,20 @@
 
 export { default as PluginHost } from './PluginHost.vue';
 export { createRenderedDomContext, RenderedDomContextImpl } from './RenderedDomContext';
+
+// Built-in editor plugins (mirrors `@xcrong/docx-editor-react/plugin-api`)
+export {
+  templatePlugin,
+  createPlugin as createTemplatePlugin,
+  createTemplatePlugin as createTemplateProseMirrorPlugin,
+  templatePluginKey,
+  getTemplateTags as getTemplatePluginTags,
+  setHoveredElement,
+  setSelectedElement,
+  TEMPLATE_DECORATION_STYLES,
+  type TemplateTag,
+  type TagType,
+} from '../plugins/template';
 export type {
   EditorPlugin,
   EditorPluginCore,
@@ -23,5 +37,7 @@ export type {
   PluginPanelProps,
   PositionCoordinates,
   RenderedDomContext,
+  SidebarItemRenderProps,
   VueEditorPlugin,
+  VueSidebarItem,
 } from './types';

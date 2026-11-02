@@ -16,6 +16,7 @@ import {
 } from '@xcrong/docx-editor-core/prosemirror/commands';
 import { loadFont } from '@xcrong/docx-editor-core/utils';
 import { DocxEditor, type DocxEditorRef } from '@xcrong/docx-editor-react';
+import { templatePlugin, templatePluginKey } from '@xcrong/docx-editor-react/plugin-api';
 import {
   AgentChatLog,
   type AgentMessage,
@@ -258,9 +259,14 @@ export function App() {
   // (so existing tests are unaffected); ?empty=1 boots from an empty document
   // instead, giving tests that build their own content a deterministic start
   // that doesn't race the demo fetch.
-  const { isE2E, e2eBootEmpty, e2eExternalContent } = useMemo(() => {
+  const { isE2E, e2eBootEmpty, e2eExternalContent, e2eTemplate } = useMemo(() => {
     if (typeof window === 'undefined')
-      return { isE2E: false, e2eBootEmpty: false, e2eExternalContent: false };
+      return {
+        isE2E: false,
+        e2eBootEmpty: false,
+        e2eExternalContent: false,
+        e2eTemplate: false,
+      };
     const params = new URLSearchParams(window.location.search);
     const env = import.meta.env;
     const e2e =
@@ -268,6 +274,9 @@ export function App() {
     return {
       isE2E: e2e,
       e2eBootEmpty: e2e && params.get('empty') === '1',
+      // Mounts <DocxEditor externalPlugins={templatePlugin.proseMirrorPlugins} />
+      // so parity smoke can verify built-in plugin detection on both adapters.
+      e2eTemplate: e2e && params.get('template') === '1',
       // Mounts <DocxEditor document={parsed} externalContent /> so e2e can
       // verify headers/styles render from `document` even when the body PM
       // is populated externally (e.g. ySyncPlugin).
@@ -298,6 +307,14 @@ export function App() {
       // Raw body EditorView — lets specs build precise PM states (e.g. a line
       // with mixed font sizes) without driving the toolbar UI.
       getView: () => editorRef.current?.getEditorRef()?.getView?.() ?? null,
+      // Template-plugin parity hook — number of docxtemplater tags detected
+      // by the built-in templatePlugin's PM state (mounted via
+      // externalPlugins when ?template=1). Mirrors the Vue demo hook.
+      getTemplateTagCount: () => {
+        const view = editorRef.current?.getEditorRef()?.getView?.();
+        if (!view) return null;
+        return templatePluginKey.getState(view.state)?.tags.length ?? 0;
+      },
       getPmStartForParaId: (paraId: string) => {
         const state = editorRef.current?.getEditorRef()?.getState?.();
         if (!state || !paraId) return null;
@@ -968,6 +985,7 @@ export function App() {
           document={documentBuffer ? undefined : currentDocument}
           documentBuffer={documentBuffer}
           externalContent={e2eExternalContent}
+          externalPlugins={e2eTemplate ? templatePlugin.proseMirrorPlugins : undefined}
           author={randomAuthor}
           colorMode={colorMode}
           onError={handleError}

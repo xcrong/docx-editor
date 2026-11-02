@@ -136,6 +136,9 @@ declare global {
       focusFirstTableCell: () => boolean;
       addRowBelow: () => boolean;
       deleteCurrentRow: () => boolean;
+      // Built-in template plugin parity (?template=1): number of
+      // docxtemplater tags in the PM plugin state (null = no view yet).
+      getTemplateTagCount: () => number | null;
     };
   }
 }

@@ -9,6 +9,7 @@
         ref="editorRef"
         :document-buffer="documentBuffer"
         :document="currentDocument"
+        :external-plugins="e2eTemplatePlugins"
         :show-toolbar="true"
         :show-help-menu="showHelpMenu"
         :document-name="fileName"
@@ -106,6 +107,7 @@
 <script setup lang="ts">
 import { computed, ref, onBeforeUnmount, onMounted } from 'vue';
 import { DocxEditor, type DocxEditorRef } from '@xcrong/docx-editor-vue';
+import { templatePlugin, templatePluginKey } from '@xcrong/docx-editor-vue/plugin-api';
 import { de as deLocale } from '@xcrong/docx-editor-i18n';
 import ExampleSwitcher from '../../shared/ExampleSwitcher.vue';
 import BrandLogo from '../../shared/BrandLogo.vue';
@@ -156,6 +158,11 @@ const documentBuffer = ref<ArrayBuffer | null>(null);
 const currentDocument = ref<Document | null>(null);
 const fileName = ref('sample.docx');
 const status = ref('');
+
+// Mirrors the React demo's `userStartedOwnDocRef` — if the user (or a
+// Playwright upload) picks a file before the boot sample.docx fetch
+// resolves, the late fetch must not clobber the chosen document.
+let userStartedOwnDoc = false;
 const colorMode = ref<'light' | 'dark'>('light');
 
 // E2E hook: ?customFonts=1 wires a custom-font registration against the
@@ -189,7 +196,17 @@ const showAgentPanel = computed(() => {
   return import.meta.env.VITE_DOCX_EDITOR_AGENT_PANEL === '1';
 });
 
-// E2E hook: `?hideHelpMenu=1` hides the Help menu (parity with the React prop).
+// E2E hook: `?template=1` mounts the built-in templatePlugin's PM plugins
+// via `externalPlugins` so parity smoke can verify built-in plugin
+// detection identically on both adapters (mirrors the React demo).
+const e2eTemplatePlugins = computed(() => {
+  if (typeof window === 'undefined') return undefined;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('e2e') !== '1' || params.get('template') !== '1') return undefined;
+  return templatePlugin.proseMirrorPlugins;
+});
+
+// E2E hook: ?hideHelpMenu=1 hides the Help menu (parity with the React prop).
 const showHelpMenu = computed(() => {
   if (typeof window === 'undefined') return true;
   return new URLSearchParams(window.location.search).get('hideHelpMenu') !== '1';
@@ -280,6 +297,14 @@ onMounted(async () => {
       // Raw body EditorView — lets specs build precise PM states (e.g. a line
       // with mixed font sizes) without driving the toolbar UI.
       getView: () => (editorRef.value?.getEditorRef() as any)?.getView?.() ?? null,
+      // Template-plugin parity hook — number of docxtemplater tags detected
+      // by the built-in templatePlugin's PM state (mounted via
+      // externalPlugins when ?template=1). Mirrors the React demo hook.
+      getTemplateTagCount: () => {
+        const view = (editorRef.value?.getEditorRef() as any)?.getView?.();
+        if (!view) return null;
+        return templatePluginKey.getState(view.state)?.tags.length ?? 0;
+      },
       getPmStartForParaId: (paraId: string) => {
         const state = (editorRef.value?.getEditorRef() as any)?.getState?.();
         if (!state || !paraId) return null;
@@ -607,9 +632,11 @@ onMounted(async () => {
   try {
     const res = await fetch(`${import.meta.env.BASE_URL}sample.docx`);
     const buffer = await res.arrayBuffer();
+    if (userStartedOwnDoc) return; // user already moved on
     documentBuffer.value = buffer;
     fileName.value = 'sample.docx';
   } catch {
+    if (userStartedOwnDoc) return;
     currentDocument.value = createEmptyDocument();
     fileName.value = 'Untitled.docx';
   }
@@ -624,6 +651,7 @@ function handleFileSelect(event: Event) {
   const file = input.files?.[0];
   if (!file) return;
 
+  userStartedOwnDoc = true;
   status.value = 'Loading...';
   file
     .arrayBuffer()
@@ -639,6 +667,7 @@ function handleFileSelect(event: Event) {
 }
 
 function handleNew() {
+  userStartedOwnDoc = true;
   documentBuffer.value = null;
   currentDocument.value = createEmptyDocument();
   fileName.value = 'Untitled.docx';

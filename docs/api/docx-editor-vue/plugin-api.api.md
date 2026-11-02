@@ -6,22 +6,43 @@
 
 import { Component } from 'vue';
 import { createRenderedDomContext } from '@xcrong/docx-editor-core/plugin-api/RenderedDomContext';
+import { createTemplatePlugin as createTemplateProseMirrorPlugin } from '@xcrong/docx-editor-core/prosemirror/template/prosemirror-plugin';
 import { EditorPluginCore } from '@xcrong/docx-editor-core/plugin-api';
 import { EditorView } from 'prosemirror-view';
+import { getTemplateTags as getTemplatePluginTags } from '@xcrong/docx-editor-core/prosemirror/template/prosemirror-plugin';
 import { PanelConfig } from '@xcrong/docx-editor-core/plugin-api';
 import { default as PluginHost } from './PluginHost.vue';
 import { PluginPanelProps } from '@xcrong/docx-editor-core/plugin-api';
 import { PositionCoordinates } from '@xcrong/docx-editor-core/plugin-api';
 import { RenderedDomContext } from '@xcrong/docx-editor-core/plugin-api';
 import { RenderedDomContextImpl } from '@xcrong/docx-editor-core/plugin-api/RenderedDomContext';
+import { setHoveredElement } from '@xcrong/docx-editor-core/prosemirror/template/prosemirror-plugin';
+import { setSelectedElement } from '@xcrong/docx-editor-core/prosemirror/template/prosemirror-plugin';
+import { SidebarItem } from '@xcrong/docx-editor-core/plugin-api';
+import { SidebarItemContext } from '@xcrong/docx-editor-core/plugin-api';
+import { TagType } from '@xcrong/docx-editor-core/prosemirror/template/prosemirror-plugin';
+import { TEMPLATE_DECORATION_STYLES } from '@xcrong/docx-editor-core/prosemirror/template/prosemirror-plugin';
+import { templatePluginKey } from '@xcrong/docx-editor-core/prosemirror/template/prosemirror-plugin';
+import { TemplateTag } from '@xcrong/docx-editor-core/prosemirror/template/prosemirror-plugin';
 import { VNode } from 'vue';
 
 export { createRenderedDomContext }
 
 // @public
+export function createTemplatePlugin(_options?: {
+    defaultCollapsed?: boolean;
+    panelPosition?: 'left' | 'right';
+    panelWidth?: number;
+}): VueEditorPlugin<TemplatePluginState>;
+
+export { createTemplateProseMirrorPlugin }
+
+// @public
 export type EditorPlugin<TState = any> = VueEditorPlugin<TState>;
 
 export { EditorPluginCore }
+
+export { getTemplatePluginTags }
 
 export { PanelConfig }
 
@@ -35,10 +56,39 @@ export { RenderedDomContext }
 
 export { RenderedDomContextImpl }
 
+export { setHoveredElement }
+
+export { setSelectedElement }
+
+// @public
+export interface SidebarItemRenderProps {
+    isExpanded: boolean;
+    measureRef: (el: HTMLElement | null) => void;
+    onToggleExpand: () => void;
+}
+
+export { TagType }
+
+export { TEMPLATE_DECORATION_STYLES }
+
+// @public
+export const templatePlugin: VueEditorPlugin<TemplatePluginState>;
+
+export { templatePluginKey }
+
+export { TemplateTag }
+
 // @public
 export interface VueEditorPlugin<TState = any> extends EditorPluginCore<TState> {
+    getSidebarItems?: (state: TState | undefined, context: SidebarItemContext) => VueSidebarItem[];
     Panel?: Component<PluginPanelProps<TState>>;
     renderOverlay?: (context: RenderedDomContext, state: TState, editorView: EditorView | null) => VNode | null;
+}
+
+// @public
+export interface VueSidebarItem extends SidebarItem {
+    estimatedHeight?: number;
+    render: (props: SidebarItemRenderProps) => VNode | null;
 }
 
 ```

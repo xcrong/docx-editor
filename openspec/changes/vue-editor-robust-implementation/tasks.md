@@ -36,7 +36,7 @@
 
 ## 6. Plugin host (built-in only)
 
-- [ ] 6.1 Confirm built-in plugins (templatePlugin) work via the Vue adapter using only core's plugin contract
+- [x] 6.1 Done — Vue `templatePlugin` ported in `feat/vue-parity` §6 (`packages/vue/src/plugins/template/`, exported from `plugin-api` mirroring React). Built only on core's plugin contract (PM factory/key/helpers); overlay/chip markup + CSS pixel-identical to React. Verified by `e2e/tests/parity/smoke/plugin-template.spec.ts` (both adapters detect 4 planted tags). Also fixed a demo-level race the smoke exposed: Vue demo `?template=1` mount + `userStartedOwnDoc` guard mirroring React
 - [x] 6.2 Add a runtime check that throws a descriptive error when a React-only plugin (one that imports React hooks) is mounted into Vue
 - [x] 6.3 `packages/vue/README.md#scope` documents third-party Vue plugins as out-of-scope-for-v1 with the cross-adapter plugin contract reasoning, alongside collab + SSR + the same "prefer React for 1.0 if you need this today" guidance
 
