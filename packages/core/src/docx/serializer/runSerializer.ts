@@ -58,6 +58,11 @@ const VALID_HIGHLIGHT_COLORS = new Set([
 
 /**
  * Serialize a color element (w:color)
+ *
+ * ECMA-376 CT_Color requires w:val. When a themed color carries no resolved
+ * rgb (e.g. a theme-only mark through the PM round-trip), emit w:val="auto"
+ * as the fallback so the element stays valid — Word resolves the theme
+ * attributes and only uses w:val for readers without theme support.
  */
 function serializeColorElement(color: ColorValue | undefined): string {
   if (!color) return '';
@@ -68,6 +73,8 @@ function serializeColorElement(color: ColorValue | undefined): string {
     attrs.push('w:val="auto"');
   } else if (color.rgb) {
     attrs.push(`w:val="${color.rgb}"`);
+  } else if (color.themeColor) {
+    attrs.push('w:val="auto"');
   }
 
   if (color.themeColor) {

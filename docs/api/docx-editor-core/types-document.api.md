@@ -1374,7 +1374,7 @@ export interface ThemeColorScheme {
 }
 
 // @public
-export type ThemeColorSlot = 'dk1' | 'lt1' | 'dk2' | 'lt2' | 'accent1' | 'accent2' | 'accent3' | 'accent4' | 'accent5' | 'accent6' | 'hlink' | 'folHlink' | 'background1' | 'text1' | 'background2' | 'text2';
+export type ThemeColorSlot = 'dk1' | 'lt1' | 'dk2' | 'lt2' | 'accent1' | 'accent2' | 'accent3' | 'accent4' | 'accent5' | 'accent6' | 'hlink' | 'folHlink' | 'dark1' | 'light1' | 'dark2' | 'light2' | 'hyperlink' | 'followedHyperlink' | 'background1' | 'text1' | 'background2' | 'text2';
 
 // @public
 export interface ThemeFont {

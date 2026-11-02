@@ -62,11 +62,14 @@ export function marksToTextFormatting(marks: readonly Mark[]): TextFormatting {
 
       case 'textColor': {
         const attrs = mark.attrs as TextColorAttrs;
+        // PM fills unset attrs with null (mark defaults); normalize to
+        // undefined so nulls never leak into the Document model — a null rgb
+        // would otherwise read as "valueless" downstream of formatting.color.
         formatting.color = {
-          rgb: attrs.rgb,
-          themeColor: attrs.themeColor,
-          themeTint: attrs.themeTint,
-          themeShade: attrs.themeShade,
+          rgb: attrs.rgb ?? undefined,
+          themeColor: attrs.themeColor ?? undefined,
+          themeTint: attrs.themeTint ?? undefined,
+          themeShade: attrs.themeShade ?? undefined,
         };
         break;
       }
