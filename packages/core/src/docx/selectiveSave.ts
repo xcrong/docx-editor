@@ -28,7 +28,8 @@ import {
   COMMENTS_EXTENSIBLE_CONTENT_TYPE,
 } from './rezip';
 import { RELATIONSHIP_TYPES } from './relsParser';
-import { headerFooterFilename } from './rezip/parts';
+import { collectParts, headerFooterFilename } from './rezip/parts';
+import { collectNewImages, hasRelId } from './rezip/images';
 
 /**
  * Check if document content has new images (data: URL without rId) or
@@ -114,6 +115,21 @@ export async function attemptSelectiveSave(
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(originalBuffer);
     const updates = new Map<string, string>();
+
+    // Images with data: URLs whose rId isn't registered in their part's
+    // rels need full-repack registration (media write + rel entry). The
+    // model-side guard above only catches empty rIds; editor pastes mint
+    // placeholder rIds (e.g. `rId_img_*`), so verify against the archive.
+    // Without this the patched XML would reference a dangling r:embed.
+    for (const { relsPath, blocks } of collectParts(doc)) {
+      const images = collectNewImages(blocks);
+      if (images.length === 0) continue;
+      const relsFile = zip.file(relsPath);
+      const partRelsXml = relsFile ? await relsFile.async('text') : '';
+      if (images.some((image) => !image.rId || !hasRelId(partRelsXml, image.rId))) {
+        return null;
+      }
+    }
 
     // Bail when the model references a header/footer part that the original
     // archive doesn't contain — e.g. applying a watermark created a new

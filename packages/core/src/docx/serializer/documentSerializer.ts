@@ -15,6 +15,7 @@ import type { Document, DocumentBody, BlockContent } from '../../types/document'
 
 import { serializeParagraph } from './paragraphSerializer';
 import { resetAutoIdCounter } from './runSerializer';
+import { ensureUniqueDrawingIds } from '../drawingIds';
 import { serializeTable } from './tableSerializer';
 import { serializeBlockSdt } from './sdtSerializer';
 import { serializeSectionProperties } from './sectionPropertiesSerializer';
@@ -161,6 +162,9 @@ export function serializeDocumentBody(body: DocumentBody): string {
  * @returns Complete XML string for document.xml
  */
 export function serializeDocument(doc: Document): string {
+  // Remap duplicate/invalid drawing IDs (template engines emit id="0"
+  // everywhere) before the pass so wp:docPr/pic:cNvPr stay unique.
+  ensureUniqueDrawingIds(doc);
   // Reset auto-incrementing image/shape ID counter for this serialization pass
   resetAutoIdCounter();
 

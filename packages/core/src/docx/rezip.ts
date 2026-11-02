@@ -56,6 +56,7 @@ import {
   serializeHeadersFootersToZip,
   serializeFootnotesToZip,
   serializeEndnotesToZip,
+  syncSettingsViewToZip,
 } from './rezip/packaging';
 import { createEmptyDocx } from './rezip/createEmpty';
 
@@ -146,6 +147,9 @@ export async function repackDocx(doc: Document, options: RepackOptions = {}): Pr
 
   // Serialize and update modified headers/footers
   serializeHeadersFootersToZip(exportDocument, newZip, compressionLevel);
+
+  // Write back w:view when the model carries one (otherwise passthrough).
+  await syncSettingsViewToZip(exportDocument, newZip, compressionLevel);
 
   await ensureHeaderFooterParts(exportDocument, newZip, compressionLevel);
 
@@ -240,6 +244,9 @@ export async function repackDocxFromRaw(
 
   // Serialize and update modified headers/footers
   serializeHeadersFootersToZip(exportDocument, newZip, compressionLevel);
+
+  // Write back w:view when the model carries one (otherwise passthrough).
+  await syncSettingsViewToZip(exportDocument, newZip, compressionLevel);
 
   await ensureHeaderFooterParts(exportDocument, newZip, compressionLevel);
 
