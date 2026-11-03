@@ -175,15 +175,22 @@ export function useTableResizeState(opts: UseTableResizeStateOptions): UseTableR
     if (isResizingColumnRef.current) {
       e.preventDefault();
       const delta = e.clientX - resizeStartXRef.current;
-      if (resizeHandleRef.current) {
-        const origLeft = parseFloat(resizeHandleRef.current.style.left);
-        resizeHandleRef.current.style.left = `${origLeft + delta}px`;
-        resizeStartXRef.current = e.clientX;
-        const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
+      // Advance the anchor on every move so the next delta stays
+      // incremental, but only move the visual handle when the widths
+      // actually accept the delta. Moving the handle on a clamped
+      // (min-width) move desyncs it from the model and the user can
+      // never drag back to the original position.
+      resizeStartXRef.current = e.clientX;
+      const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
+      if (resizeHandleRef.current && deltaTwips !== 0) {
         const newLeft = resizeOrigWidthsRef.current.left + deltaTwips;
         const newRight = resizeOrigWidthsRef.current.right - deltaTwips;
         if (newLeft >= MIN_CELL_WIDTH_TWIPS && newRight >= MIN_CELL_WIDTH_TWIPS) {
-          resizeOrigWidthsRef.current = { left: newLeft, right: newRight };
+          const origLeft = parseFloat(resizeHandleRef.current.style.left);
+          if (Number.isFinite(origLeft)) {
+            resizeHandleRef.current.style.left = `${origLeft + delta}px`;
+            resizeOrigWidthsRef.current = { left: newLeft, right: newRight };
+          }
         }
       }
       return true;
@@ -192,14 +199,16 @@ export function useTableResizeState(opts: UseTableResizeStateOptions): UseTableR
     if (isResizingRowRef.current) {
       e.preventDefault();
       const delta = e.clientY - resizeStartYRef.current;
-      if (resizeRowHandleRef.current) {
-        const origTop = parseFloat(resizeRowHandleRef.current.style.top);
-        resizeRowHandleRef.current.style.top = `${origTop + delta}px`;
-        resizeStartYRef.current = e.clientY;
-        const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
+      resizeStartYRef.current = e.clientY;
+      const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
+      if (resizeRowHandleRef.current && deltaTwips !== 0) {
         const newHeight = resizeRowOrigHeightRef.current + deltaTwips;
         if (newHeight >= MIN_ROW_HEIGHT_TWIPS) {
-          resizeRowOrigHeightRef.current = newHeight;
+          const origTop = parseFloat(resizeRowHandleRef.current.style.top);
+          if (Number.isFinite(origTop)) {
+            resizeRowHandleRef.current.style.top = `${origTop + delta}px`;
+            resizeRowOrigHeightRef.current = newHeight;
+          }
         }
       }
       return true;
@@ -208,14 +217,16 @@ export function useTableResizeState(opts: UseTableResizeStateOptions): UseTableR
     if (isResizingRightEdgeRef.current) {
       e.preventDefault();
       const delta = e.clientX - resizeRightEdgeStartXRef.current;
-      if (resizeRightEdgeHandleRef.current) {
-        const origLeft = parseFloat(resizeRightEdgeHandleRef.current.style.left);
-        resizeRightEdgeHandleRef.current.style.left = `${origLeft + delta}px`;
-        resizeRightEdgeStartXRef.current = e.clientX;
-        const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
+      resizeRightEdgeStartXRef.current = e.clientX;
+      const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
+      if (resizeRightEdgeHandleRef.current && deltaTwips !== 0) {
         const newWidth = resizeRightEdgeOrigWidthRef.current + deltaTwips;
         if (newWidth >= MIN_CELL_WIDTH_TWIPS) {
-          resizeRightEdgeOrigWidthRef.current = newWidth;
+          const origLeft = parseFloat(resizeRightEdgeHandleRef.current.style.left);
+          if (Number.isFinite(origLeft)) {
+            resizeRightEdgeHandleRef.current.style.left = `${origLeft + delta}px`;
+            resizeRightEdgeOrigWidthRef.current = newWidth;
+          }
         }
       }
       return true;

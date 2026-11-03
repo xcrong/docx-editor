@@ -90,6 +90,11 @@ export function readColumnWidthAt(
 /**
  * Bake a column-resize into the PM doc: update the table's `columnWidths`
  * attr and every cell at `colIdx` / `colIdx + 1` in every row.
+ *
+ * Cells spanning the dragged boundary (`colspan > 1`) keep a width equal to
+ * the sum of the columns they cover — the inverse resize preserves that
+ * total, so their stored width stays correct without an update. Writing a
+ * single side's width onto a spanning cell would diverge the grid.
  */
 export function commitColumnResize(
   view: EditorView,
@@ -118,7 +123,8 @@ export function commitColumnResize(
     let cellColIdx = 0;
     row.forEach((cell) => {
       const colspan = (cell.attrs.colspan as number) || 1;
-      if (cellColIdx === colIdx || cellColIdx === colIdx + 1) {
+      const spanEnd = cellColIdx + colspan;
+      if (colspan === 1 && (cellColIdx === colIdx || cellColIdx === colIdx + 1)) {
         const newWidth = cellColIdx === colIdx ? newLeft : newRight;
         tr.setNodeMarkup(tr.mapping.map(cellOffset), undefined, {
           ...cell.attrs,
@@ -126,6 +132,20 @@ export function commitColumnResize(
           widthType: 'dxa',
           colwidth: null,
         });
+      } else if (colspan > 1 && cellColIdx <= colIdx + 1 && spanEnd > colIdx) {
+        // Spanning cell covering the dragged boundary (or starting exactly
+        // on its right side): re-sum from the updated grid so the stored
+        // width matches the columns it covers.
+        let spanWidth = 0;
+        for (let c = cellColIdx; c < spanEnd; c++) spanWidth += widths[c] ?? 0;
+        if (spanWidth > 0) {
+          tr.setNodeMarkup(tr.mapping.map(cellOffset), undefined, {
+            ...cell.attrs,
+            width: spanWidth,
+            widthType: 'dxa',
+            colwidth: null,
+          });
+        }
       }
       cellOffset += cell.nodeSize;
       cellColIdx += colspan;
@@ -167,6 +187,8 @@ export function commitRowResize(
 /**
  * Bake a right-edge resize into the PM doc: grow only the last column.
  * Updates `columnWidths[colIdx]` and the cell at `colIdx` in every row.
+ * Spanning cells covering `colIdx` are re-summed from the updated grid
+ * (see `commitColumnResize`) instead of taking the single-column width.
  */
 export function commitRightEdgeResize(
   view: EditorView,
@@ -193,13 +215,25 @@ export function commitRightEdgeResize(
     let cellColIdx = 0;
     row.forEach((cell) => {
       const colspan = (cell.attrs.colspan as number) || 1;
-      if (cellColIdx === colIdx) {
+      const spanEnd = cellColIdx + colspan;
+      if (colspan === 1 && cellColIdx === colIdx) {
         tr.setNodeMarkup(tr.mapping.map(cellOffset), undefined, {
           ...cell.attrs,
           width: newWidth,
           widthType: 'dxa',
           colwidth: null,
         });
+      } else if (colspan > 1 && cellColIdx <= colIdx && spanEnd > colIdx) {
+        let spanWidth = 0;
+        for (let c = cellColIdx; c < spanEnd; c++) spanWidth += widths[c] ?? 0;
+        if (spanWidth > 0) {
+          tr.setNodeMarkup(tr.mapping.map(cellOffset), undefined, {
+            ...cell.attrs,
+            width: spanWidth,
+            widthType: 'dxa',
+            colwidth: null,
+          });
+        }
       }
       cellOffset += cell.nodeSize;
       cellColIdx += colspan;
