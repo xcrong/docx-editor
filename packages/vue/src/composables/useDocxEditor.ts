@@ -84,6 +84,9 @@ import {
   buildBlockLookup,
   enclosingSdtGroupIds,
   applySdtFocus,
+  type BlockLookup,
+  type FootnoteRenderItem,
+  type RenderPageOptions,
 } from '@xcrong/docx-editor-core/layout-painter';
 import type { Document } from '@xcrong/docx-editor-core/types/document';
 import type { LayoutSelectionGate } from '@xcrong/docx-editor-core/prosemirror';
@@ -360,6 +363,9 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
         firstPageFooterForRender,
         hasTitlePg,
         watermark,
+        headerDistancePx,
+        footerDistancePx,
+        pageBorders,
         footnotesByPage,
       } = computeLayout({
         state,
@@ -389,7 +395,13 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       // Step 6: Build block lookup and paint
       const blockLookup = buildBlockLookup(blocks, measures);
 
-      renderPages(newLayout.pages, container, {
+      const pageOptions: RenderPageOptions & {
+        pageGap?: number;
+        pageBackground?: string;
+        showShadow?: boolean;
+        blockLookup?: BlockLookup;
+        footnotesByPage?: Map<number, FootnoteRenderItem[]>;
+      } = {
         pageGap,
         showShadow: true,
         pageBackground: 'var(--doc-page-bg, #ffffff)',
@@ -399,10 +411,14 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
         footerContent: footerContentForRender,
         firstPageHeaderContent: firstPageHeaderForRender,
         firstPageFooterContent: firstPageFooterForRender,
-        titlePage: hasTitlePg,
+        titlePg: hasTitlePg,
+        headerDistance: headerDistancePx,
+        footerDistance: footerDistancePx,
+        pageBorders,
         watermark,
         footnotesByPage,
-      } as Parameters<typeof renderPages>[2]);
+      };
+      renderPages(newLayout.pages, container, pageOptions);
 
       // renderPages sets display:flex on the container — fix scrolling
       container.style.overflowY = 'auto';

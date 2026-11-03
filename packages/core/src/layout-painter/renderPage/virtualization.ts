@@ -246,8 +246,10 @@ export function renderPages(
         data.page = pages[i];
 
         if (data.rendered) {
-          // Surgically replace only the content area, preserving header/footer
-          repopulatePageContent(shell, prevDataMap, totalPages, options);
+          // Surgically replace only the content area, preserving header/footer.
+          // When the page count changes, PAGE/NUMPAGES fields in HF are stale,
+          // so refresh the header/footer DOM as well.
+          repopulatePageContent(shell, prevDataMap, totalPages, options, totalPagesChanged);
         }
         // If not rendered, it will be populated when it scrolls into view
       }
@@ -488,13 +490,16 @@ function populatePageShell(
 
 /**
  * Surgically replace only the content area of a rendered page shell.
- * Preserves header/footer elements to avoid blinking.
+ * Preserves header/footer elements to avoid blinking, unless
+ * `refreshHeaderFooter` is set (e.g. total page count changed, which
+ * invalidates PAGE/NUMPAGES fields painted in HF).
  */
 function repopulatePageContent(
   shell: HTMLElement,
   pageDataMap: Map<HTMLElement, { page: Page; index: number; rendered: boolean }>,
   totalPages: number,
-  options: FullPageOptions
+  options: FullPageOptions,
+  refreshHeaderFooter = false
 ): void {
   const data = pageDataMap.get(shell);
   if (!data) return;
@@ -511,6 +516,18 @@ function repopulatePageContent(
   if (newContentEl && oldContentEl) {
     // Replace only the content area — header/footer stay untouched
     shell.replaceChild(newContentEl, oldContentEl);
+    if (refreshHeaderFooter) {
+      const newHeaderEl = fullPageEl.querySelector(`.${PAGE_CLASS_NAMES.header}`);
+      const oldHeaderEl = shell.querySelector(`.${PAGE_CLASS_NAMES.header}`);
+      if (newHeaderEl && oldHeaderEl) {
+        shell.replaceChild(newHeaderEl, oldHeaderEl);
+      }
+      const newFooterEl = fullPageEl.querySelector(`.${PAGE_CLASS_NAMES.footer}`);
+      const oldFooterEl = shell.querySelector(`.${PAGE_CLASS_NAMES.footer}`);
+      if (newFooterEl && oldFooterEl) {
+        shell.replaceChild(newFooterEl, oldFooterEl);
+      }
+    }
   } else {
     // Fallback: full replace if structure doesn't match
     shell.innerHTML = '';

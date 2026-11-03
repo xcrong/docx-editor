@@ -25,6 +25,7 @@ import { renderTableFragment } from '../renderTable';
 import { renderImageFragment } from '../renderImage';
 import { renderTextBoxFragment } from '../renderTextBox';
 import { emuToPixels } from '../../utils/units';
+import { wrapsAroundText } from '../../docx/wrapTypes';
 import type { RenderContext, RenderPageOptions } from '../renderPage';
 
 /**
@@ -266,10 +267,17 @@ export function renderHeaderFooterContent(
       // Track the Y position where this paragraph starts
       const paragraphStartY = cursorY;
 
-      // Extract floating images and filter them from runs
+      // Extract floating images and filter them from runs. Gate on the same
+      // predicate the measurer uses (`position && (float || wrapsAroundText)`)
+      // so positioned inline/topAndBottom runs stay in-flow in both paths.
       const inlineRuns: typeof paragraphBlock.runs = [];
       for (const run of paragraphBlock.runs) {
-        if (run.kind === 'image' && 'position' in run && run.position) {
+        if (
+          run.kind === 'image' &&
+          'position' in run &&
+          run.position &&
+          (run.displayMode === 'float' || wrapsAroundText(run.wrapType))
+        ) {
           const imgRun = run as {
             kind: 'image';
             src: string;
@@ -393,7 +401,9 @@ export function renderHeaderFooterContent(
       }
     } else if (block.kind === 'image') {
       if (measure.kind !== 'image') continue;
-      // Block-level images stack in the HF flow like paragraphs/tables.
+      // Block-level images stack in the HF flow like paragraphs/tables, unless
+      // anchored (behind/inFront): those are positioned floats that do not
+      // advance the flow, mirroring floating text boxes and tables above.
       const syntheticFragment: ImageFragment = {
         kind: 'image',
         blockId: block.id,
@@ -414,7 +424,9 @@ export function renderHeaderFooterContent(
       fragEl.style.top = `${cursorY}px`;
       fragEl.style.left = '0';
       containerEl.appendChild(fragEl);
-      cursorY += measure.height;
+      if (!block.anchor?.isAnchored) {
+        cursorY += measure.height;
+      }
     } else if (block.kind === 'textBox') {
       if (measure.kind !== 'textBox') continue;
       // Text boxes stack in the HF flow. headerFooterLayout already reserves
