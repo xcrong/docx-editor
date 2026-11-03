@@ -268,7 +268,14 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
           const blockLookup = buildBlockLookup(newBlocks, newMeasures);
           painterRef.current.setBlockLookup(blockLookup);
 
-          const renderPagesKind = renderPages(newLayout.pages, pagesContainerRef.current, {
+          const pageOptions: RenderPageOptions & {
+            pageGap?: number;
+            pageBackground?: string;
+            showShadow?: boolean;
+            blockLookup?: BlockLookup;
+            footnotesByPage?: Map<number, FootnoteRenderItem[]>;
+            resolvedCommentIds?: Set<number>;
+          } = {
             pageGap,
             showShadow: true,
             pageBackground: 'var(--doc-page-bg, #ffffff)',
@@ -285,11 +292,12 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
             watermark,
             footnotesByPage,
             resolvedCommentIds,
-          } as RenderPageOptions & {
-            pageGap?: number;
-            blockLookup?: BlockLookup;
-            footnotesByPage?: Map<number, FootnoteRenderItem[]>;
-          });
+          };
+          const renderPagesKind = renderPages(
+            newLayout.pages,
+            pagesContainerRef.current,
+            pageOptions
+          );
 
           const vp = viewportLayoutRef.current;
           if (vp) {

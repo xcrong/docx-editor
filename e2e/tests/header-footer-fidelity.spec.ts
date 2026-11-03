@@ -20,6 +20,12 @@ test.describe('Header/footer fidelity (T13)', () => {
 
     await editor.loadDocxFile('fixtures/header-inline-image-dist.docx');
     await page.waitForSelector('[data-page-number="1"] .layout-page-header img');
+    await page.waitForFunction(() => {
+      const img = document.querySelector<HTMLImageElement>(
+        '[data-page-number="1"] .layout-page-header img'
+      );
+      return !!img && img.complete && img.naturalHeight > 10;
+    });
 
     const metrics = await page.evaluate(() => {
       const pageEl = document.querySelector<HTMLElement>('[data-page-number="1"]');
