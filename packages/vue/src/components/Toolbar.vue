@@ -356,14 +356,14 @@
       :title="t('lists.decreaseIndent')"
       :aria-label="t('lists.decreaseIndent')"
       :disabled="!canOutdent"
-      @mousedown.prevent="handleOutdent"
+      @mousedown.prevent="handleListIndent(-1)"
     >
       <MaterialSymbol name="format_indent_decrease" />
     </button>
     <button
       :title="t('lists.increaseIndent')"
       :aria-label="t('lists.increaseIndent')"
-      @mousedown.prevent="handleIndent"
+      @mousedown.prevent="handleListIndent(1)"
     >
       <MaterialSymbol name="format_indent_increase" />
     </button>
@@ -809,34 +809,18 @@ function execCommand(name: string, ...args: any[]) {
 }
 
 // Mirror React's useFormattingActions indent fallback: try the list-level
-// command first (multi-select aware in core ListExtension), then fall back
-// to plain paragraph indent. Previously called non-existent 'indent'/
-// 'outdent' commands so the buttons no-op'd.
-function handleIndent() {
+// command first (multi-select aware in core ListExtension), then plain indent.
+function handleListIndent(dir: 1 | -1) {
   const v = props.view;
   if (!v) return;
   const cmds = props.getCommands();
-  const incList = cmds['increaseListLevel']?.();
-  if (incList?.(v.state, (tr: any) => v.dispatch(tr), v)) {
+  const list = cmds[dir > 0 ? 'increaseListLevel' : 'decreaseListLevel']?.();
+  if (list?.(v.state, (tr: any) => v.dispatch(tr), v)) {
     if (!v.hasFocus()) v.focus();
     return;
   }
-  const inc = cmds['increaseIndent']?.();
-  inc?.(v.state, (tr: any) => v.dispatch(tr), v);
-  if (!v.hasFocus()) v.focus();
-}
-
-function handleOutdent() {
-  const v = props.view;
-  if (!v) return;
-  const cmds = props.getCommands();
-  const decList = cmds['decreaseListLevel']?.();
-  if (decList?.(v.state, (tr: any) => v.dispatch(tr), v)) {
-    if (!v.hasFocus()) v.focus();
-    return;
-  }
-  const dec = cmds['decreaseIndent']?.();
-  dec?.(v.state, (tr: any) => v.dispatch(tr), v);
+  const plain = cmds[dir > 0 ? 'increaseIndent' : 'decreaseIndent']?.();
+  plain?.(v.state, (tr: any) => v.dispatch(tr), v);
   if (!v.hasFocus()) v.focus();
 }
 
