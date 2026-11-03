@@ -138,76 +138,82 @@ const toggleNumberedList: Command = (state, dispatch) => {
 };
 
 const increaseListLevel: Command = (state, dispatch) => {
-  const { $from } = state.selection;
-  const paragraph = $from.parent;
+  const { $from, $to } = state.selection;
 
-  if (paragraph.type.name !== 'paragraph') return false;
-  if (!paragraph.attrs.numPr) return false;
+  // Collect every list paragraph in the selection so a multi-item
+  // selection indents all of them (Word parity). Previously only
+  // $from.parent was bumped, so toolbar Indent left the rest behind.
+  const targets: { pos: number; attrs: Record<string, unknown> }[] = [];
+  state.doc.nodesBetween($from.pos, $to.pos, (node, pos) => {
+    if (node.type.name !== 'paragraph' || !node.attrs.numPr) return;
+    const ilvl = (node.attrs.numPr as { ilvl?: number }).ilvl ?? 0;
+    if (ilvl < 8) targets.push({ pos, attrs: node.attrs as Record<string, unknown> });
+  });
 
-  const currentLevel = paragraph.attrs.numPr.ilvl || 0;
-  if (currentLevel >= 8) return false;
+  if (targets.length === 0) return false;
 
   if (!dispatch) return true;
 
-  const paragraphPos = $from.before($from.depth);
+  let tr = state.tr;
+  for (const { pos, attrs } of targets) {
+    const numPr = attrs.numPr as { ilvl?: number; numId?: number };
+    tr = tr.setNodeMarkup(pos, undefined, {
+      ...attrs,
+      numPr: { ...numPr, ilvl: (numPr.ilvl ?? 0) + 1 },
+      // Clear explicit indentation so layout engine computes from new level
+      indentLeft: null,
+      indentFirstLine: null,
+      hangingIndent: null,
+    });
+  }
 
-  dispatch(
-    state.tr
-      .setNodeMarkup(paragraphPos, undefined, {
-        ...paragraph.attrs,
-        numPr: { ...paragraph.attrs.numPr, ilvl: currentLevel + 1 },
-        // Clear explicit indentation so layout engine computes from new level
-        indentLeft: null,
-        indentFirstLine: null,
-        hangingIndent: null,
-      })
-      .scrollIntoView()
-  );
+  dispatch(tr.scrollIntoView());
 
   return true;
 };
 
 const decreaseListLevel: Command = (state, dispatch) => {
-  const { $from } = state.selection;
-  const paragraph = $from.parent;
+  const { $from, $to } = state.selection;
 
-  if (paragraph.type.name !== 'paragraph') return false;
-  if (!paragraph.attrs.numPr) return false;
+  // Same multi-paragraph handling as increaseListLevel: outdent every
+  // list item in the selection; level-0 items leave the list.
+  const targets: { pos: number; attrs: Record<string, unknown> }[] = [];
+  state.doc.nodesBetween($from.pos, $to.pos, (node, pos) => {
+    if (node.type.name !== 'paragraph' || !node.attrs.numPr) return;
+    targets.push({ pos, attrs: node.attrs as Record<string, unknown> });
+  });
 
-  const currentLevel = paragraph.attrs.numPr.ilvl || 0;
+  if (targets.length === 0) return false;
 
   if (!dispatch) return true;
 
-  const paragraphPos = $from.before($from.depth);
-
-  if (currentLevel <= 0) {
-    dispatch(
-      state.tr
-        .setNodeMarkup(paragraphPos, undefined, {
-          ...paragraph.attrs,
-          numPr: null,
-          listIsBullet: null,
-          listNumFmt: null,
-          listMarker: null,
-          indentLeft: null,
-          indentFirstLine: null,
-          hangingIndent: null,
-        })
-        .scrollIntoView()
-    );
-  } else {
-    dispatch(
-      state.tr
-        .setNodeMarkup(paragraphPos, undefined, {
-          ...paragraph.attrs,
-          numPr: { ...paragraph.attrs.numPr, ilvl: currentLevel - 1 },
-          indentLeft: null,
-          indentFirstLine: null,
-          hangingIndent: null,
-        })
-        .scrollIntoView()
-    );
+  let tr = state.tr;
+  for (const { pos, attrs } of targets) {
+    const numPr = attrs.numPr as { ilvl?: number; numId?: number };
+    const currentLevel = numPr.ilvl ?? 0;
+    if (currentLevel <= 0) {
+      tr = tr.setNodeMarkup(pos, undefined, {
+        ...attrs,
+        numPr: null,
+        listIsBullet: null,
+        listNumFmt: null,
+        listMarker: null,
+        indentLeft: null,
+        indentFirstLine: null,
+        hangingIndent: null,
+      });
+    } else {
+      tr = tr.setNodeMarkup(pos, undefined, {
+        ...attrs,
+        numPr: { ...numPr, ilvl: currentLevel - 1 },
+        indentLeft: null,
+        indentFirstLine: null,
+        hangingIndent: null,
+      });
+    }
   }
+
+  dispatch(tr.scrollIntoView());
 
   return true;
 };

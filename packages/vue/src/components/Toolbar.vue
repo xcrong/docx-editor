@@ -356,14 +356,14 @@
       :title="t('lists.decreaseIndent')"
       :aria-label="t('lists.decreaseIndent')"
       :disabled="!canOutdent"
-      @mousedown.prevent="execCommand('outdent')"
+      @mousedown.prevent="handleListIndent(-1)"
     >
       <MaterialSymbol name="format_indent_decrease" />
     </button>
     <button
       :title="t('lists.increaseIndent')"
       :aria-label="t('lists.increaseIndent')"
-      @mousedown.prevent="execCommand('indent')"
+      @mousedown.prevent="handleListIndent(1)"
     >
       <MaterialSymbol name="format_indent_increase" />
     </button>
@@ -806,6 +806,22 @@ function execCommand(name: string, ...args: any[]) {
   // a selection-syncing transaction that clears stored marks.
   if (!v.hasFocus()) v.focus();
   openDropdown.value = null;
+}
+
+// Mirror React's useFormattingActions indent fallback: try the list-level
+// command first (multi-select aware in core ListExtension), then plain indent.
+function handleListIndent(dir: 1 | -1) {
+  const v = props.view;
+  if (!v) return;
+  const cmds = props.getCommands();
+  const list = cmds[dir > 0 ? 'increaseListLevel' : 'decreaseListLevel']?.();
+  if (list?.(v.state, (tr: any) => v.dispatch(tr), v)) {
+    if (!v.hasFocus()) v.focus();
+    return;
+  }
+  const plain = cmds[dir > 0 ? 'increaseIndent' : 'decreaseIndent']?.();
+  plain?.(v.state, (tr: any) => v.dispatch(tr), v);
+  if (!v.hasFocus()) v.focus();
 }
 
 function setFont(fontName: string) {
