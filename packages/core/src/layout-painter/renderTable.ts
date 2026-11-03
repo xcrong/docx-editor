@@ -827,27 +827,6 @@ export function renderTableFragment(
   const bidi = block.bidi === true;
   const tableWidth = measure.columnWidths.reduce((w, cw) => w + (cw ?? 0), 0);
 
-  // Add column resize handles at each column boundary
-  let handleX = 0;
-  for (let col = 0; col < measure.columnWidths.length - 1; col++) {
-    handleX += measure.columnWidths[col] ?? 0;
-    const handle = doc.createElement('div');
-    handle.className = TABLE_CLASS_NAMES.resizeHandle;
-    handle.style.position = 'absolute';
-    handle.style.left = `${(bidi ? tableWidth - handleX : handleX) - 3}px`;
-    handle.style.top = '0';
-    handle.style.width = '6px';
-    handle.style.height = '100%';
-    handle.style.cursor = 'col-resize';
-    handle.style.zIndex = '10';
-    handle.dataset.columnIndex = String(col);
-    handle.dataset.tableBlockId = String(fragment.blockId);
-    if (fragment.pmStart !== undefined) {
-      handle.dataset.tablePmStart = String(fragment.pmStart);
-    }
-    tableEl.appendChild(handle);
-  }
-
   const rowYPositions = buildRowYPositions(measure.rows);
 
   // Resolve cell grid placement once (column index + x per cell).
@@ -1055,6 +1034,31 @@ export function renderTableFragment(
   if (fragment.bottomClip !== undefined)
     drawCutEdge(fragment.toRow - 1, 'bottom', visibleHeight, false);
   else if (fragment.continuesOnNext) drawCutEdge(fragment.toRow - 1, 'bottom', visibleHeight, true);
+
+  // Column resize handles at each inter-column boundary. Appended after the
+  // row/cell boxes (absolutely-positioned siblings with auto z-index that
+  // would otherwise capture the mousedown) but BEFORE the row/edge resize
+  // handles: all handles share zIndex 10, so DOM order wins hit-testing and
+  // the row/edge handles keep their 6px crossing points.
+  let handleX = 0;
+  for (let col = 0; col < measure.columnWidths.length - 1; col++) {
+    handleX += measure.columnWidths[col] ?? 0;
+    const handle = doc.createElement('div');
+    handle.className = TABLE_CLASS_NAMES.resizeHandle;
+    handle.style.position = 'absolute';
+    handle.style.left = `${(bidi ? tableWidth - handleX : handleX) - 3}px`;
+    handle.style.top = '0';
+    handle.style.width = '6px';
+    handle.style.height = '100%';
+    handle.style.cursor = 'col-resize';
+    handle.style.zIndex = '10';
+    handle.dataset.columnIndex = String(col);
+    handle.dataset.tableBlockId = String(fragment.blockId);
+    if (fragment.pmStart !== undefined) {
+      handle.dataset.tablePmStart = String(fragment.pmStart);
+    }
+    tableEl.appendChild(handle);
+  }
 
   // Row resize handles at row boundaries that fall inside the visible window.
   for (let rowIdx = fragment.fromRow; rowIdx < fragment.toRow - 1; rowIdx++) {

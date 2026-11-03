@@ -12,7 +12,7 @@
 import type { Node as PMNode, Schema } from 'prosemirror-model';
 import { type Command, type EditorState, type Transaction, TextSelection } from 'prosemirror-state';
 import { getTableContext } from '../context';
-import { buildCellAttrsFromTemplate } from './helpers';
+import { buildCellAttrsFromTemplate, buildParagraphAttrsFromTemplate } from './helpers';
 import { makeRevisionInfo as makeSuggestionInfo } from '../../../../plugins/revisionIds';
 import {
   getDocumentStyleResolver,
@@ -36,32 +36,58 @@ import type {
 } from '../../../../../types/content/trackedChange';
 
 /**
- * Build a tracked-row-insertion row + cells. Caller decides where to insert.
+ * Build a tracked-row-insertion row + cells. Caller decides where to insert
+ * and whether the new row belongs to the header band (`isHeader`) — see the
+ * header-band rule documented on `resolveInsertedRowIsHeader`.
  */
 function buildSuggestingRow(
   schema: Schema,
   templateRow: PMNode,
-  info: import('../../../../../types/content/trackedChange').RevisionInfo
+  info: import('../../../../../types/content/trackedChange').RevisionInfo,
+  isHeader: boolean
 ): PMNode {
   const cells: PMNode[] = [];
   templateRow.forEach((cell) => {
-    const paragraph = schema.nodes.paragraph.create();
+    // Inherit the reference cell's paragraph formatting (alignment, spacing,
+    // default run font) so the new empty cell matches the table's style.
+    // Content itself is NOT copied — the cell starts empty.
+    const paragraph = schema.nodes.paragraph.create(buildParagraphAttrsFromTemplate(cell));
     const baseAttrs = buildCellAttrsFromTemplate(cell);
     const cellWithMarker = { ...baseAttrs, cellMarker: { kind: 'ins' as const, info } };
-    cells.push(schema.nodes.tableCell.create(cellWithMarker, paragraph));
+    const cellType =
+      cell.type.name === 'tableHeader' && schema.nodes.tableHeader
+        ? schema.nodes.tableHeader
+        : schema.nodes.tableCell;
+    cells.push(cellType.create(cellWithMarker, paragraph));
   });
   return schema.nodes.tableRow.create(
     {
       height: templateRow.attrs.height ?? 360,
       heightRule: templateRow.attrs.heightRule ?? 'atLeast',
-      // Carry header status from the template row so inserting under a
-      // header keeps the new row a header (and inserting under a body
-      // keeps it a body row).
-      isHeader: templateRow.attrs.isHeader ?? false,
+      isHeader,
       trIns: info,
     },
     cells
   );
+}
+
+/**
+ * Decide the new row's header status. The header band is the leading run of
+ * `isHeader` rows (repeated on every page); blindly copying the reference
+ * row's flag would extend it when adding below its last row — Word makes
+ * that new row body instead. Adding above always stays inside the reference
+ * row's band, so it inherits directly.
+ */
+function resolveInsertedRowIsHeader(
+  table: PMNode,
+  rowIndex: number,
+  direction: 'above' | 'below'
+): boolean {
+  const refIsHeader = (table.child(rowIndex).attrs.isHeader as boolean | undefined) ?? false;
+  if (!refIsHeader) return false;
+  if (direction === 'above') return true;
+  const next = rowIndex + 1 < table.childCount ? table.child(rowIndex + 1) : null;
+  return (next?.attrs.isHeader as boolean | undefined) ?? false;
 }
 
 /**
@@ -330,20 +356,28 @@ export function makeAddRowAbove(schema: Schema): Command {
       const tr = state.tr;
       const rowNode = context.table.child(context.rowIndex);
       const info = makeSuggestionInfo(state);
+      const isHeader = resolveInsertedRowIsHeader(context.table, context.rowIndex, 'above');
       let newRow: PMNode;
       if (info) {
-        newRow = buildSuggestingRow(schema, rowNode, info);
+        newRow = buildSuggestingRow(schema, rowNode, info, isHeader);
       } else {
         const cells: PMNode[] = [];
         rowNode.forEach((cell) => {
-          const paragraph = schema.nodes.paragraph.create();
+          // Match the reference cell's paragraph formatting (alignment,
+          // spacing, default run font); the new cell itself stays empty.
+          const paragraph = schema.nodes.paragraph.create(buildParagraphAttrsFromTemplate(cell));
           const cellAttrs = buildCellAttrsFromTemplate(cell);
-          cells.push(schema.nodes.tableCell.create(cellAttrs, paragraph));
+          const cellType =
+            cell.type.name === 'tableHeader' && schema.nodes.tableHeader
+              ? schema.nodes.tableHeader
+              : schema.nodes.tableCell;
+          cells.push(cellType.create(cellAttrs, paragraph));
         });
         newRow = schema.nodes.tableRow.create(
           {
             height: rowNode.attrs.height ?? 360,
             heightRule: rowNode.attrs.heightRule ?? 'atLeast',
+            isHeader,
           },
           cells
         );
@@ -376,20 +410,28 @@ export function makeAddRowBelow(schema: Schema): Command {
       const tr = state.tr;
       const rowNode = context.table.child(context.rowIndex);
       const info = makeSuggestionInfo(state);
+      const isHeader = resolveInsertedRowIsHeader(context.table, context.rowIndex, 'below');
       let newRow: PMNode;
       if (info) {
-        newRow = buildSuggestingRow(schema, rowNode, info);
+        newRow = buildSuggestingRow(schema, rowNode, info, isHeader);
       } else {
         const cells: PMNode[] = [];
         rowNode.forEach((cell) => {
-          const paragraph = schema.nodes.paragraph.create();
+          // Match the reference cell's paragraph formatting (alignment,
+          // spacing, default run font); the new cell itself stays empty.
+          const paragraph = schema.nodes.paragraph.create(buildParagraphAttrsFromTemplate(cell));
           const cellAttrs = buildCellAttrsFromTemplate(cell);
-          cells.push(schema.nodes.tableCell.create(cellAttrs, paragraph));
+          const cellType =
+            cell.type.name === 'tableHeader' && schema.nodes.tableHeader
+              ? schema.nodes.tableHeader
+              : schema.nodes.tableCell;
+          cells.push(cellType.create(cellAttrs, paragraph));
         });
         newRow = schema.nodes.tableRow.create(
           {
             height: rowNode.attrs.height ?? 360,
             heightRule: rowNode.attrs.heightRule ?? 'atLeast',
+            isHeader,
           },
           cells
         );

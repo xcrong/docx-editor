@@ -127,4 +127,38 @@ describe('commits', () => {
     commitColumnResize(view, { pmStart: 99999, colIdx: 0, newLeft: 1, newRight: 1 });
     expect(view.state).toBe(before);
   });
+
+  test('commitColumnResize keeps a colspan=2 cell consistent with the grid', () => {
+    // Row 0 merges columns 0-1 (width 6000); row 1 has three plain cells.
+    const spanCell = schema.nodes.tableCell.create(
+      { width: 6000, widthType: 'dxa', colspan: 2 },
+      schema.nodes.paragraph.create(null, schema.text('span'))
+    );
+    const plain = (t: string, w: number) =>
+      schema.nodes.tableCell.create(
+        { width: w, widthType: 'dxa' },
+        schema.nodes.paragraph.create(null, schema.text(t))
+      );
+    const table = schema.nodes.table.create({ columnWidths: [3000, 3000, 3000] }, [
+      schema.nodes.tableRow.create(null, [spanCell, plain('c', 3000)]),
+      schema.nodes.tableRow.create(null, [plain('a', 3000), plain('b', 3000), plain('d', 3000)]),
+    ]);
+    const doc = schema.nodes.doc.create(null, [table]);
+    const view = {
+      state: EditorState.create({ schema, doc }),
+      dispatch(tr: Transaction) {
+        view.state = view.state.apply(tr);
+      },
+    } as unknown as EditorView & { state: EditorState };
+
+    // Drag the boundary interior to the span: grid total must be preserved
+    // and the spanning cell re-summed, not set to a single side's width.
+    commitColumnResize(view, { pmStart: INSIDE_TABLE, colIdx: 0, newLeft: 2000, newRight: 4000 });
+    const updated = view.state.doc.firstChild!;
+    expect(updated.attrs.columnWidths).toEqual([2000, 4000, 3000]);
+    expect(updated.child(0).child(0).attrs.width).toBe(6000);
+    expect(updated.child(0).child(0).attrs.colspan).toBe(2);
+    expect(updated.child(1).child(0).attrs.width).toBe(2000);
+    expect(updated.child(1).child(1).attrs.width).toBe(4000);
+  });
 });

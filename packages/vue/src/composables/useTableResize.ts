@@ -152,14 +152,21 @@ export function useTableResize(): UseTableResizeReturn {
     if (col.active && col.handle) {
       e.preventDefault();
       const delta = e.clientX - col.startX;
-      const origLeft = parseFloat(col.handle.style.left);
-      col.handle.style.left = `${origLeft + delta}px`;
+      // Keep the anchor incremental but only move the visual handle when
+      // the widths accept the delta — otherwise the handle desyncs from
+      // the model and the user can never drag back to the original spot.
       col.startX = e.clientX;
       const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
-      const newLeft = col.origWidths.left + deltaTwips;
-      const newRight = col.origWidths.right - deltaTwips;
-      if (newLeft >= MIN_CELL_WIDTH_TWIPS && newRight >= MIN_CELL_WIDTH_TWIPS) {
-        col.origWidths = { left: newLeft, right: newRight };
+      if (deltaTwips !== 0) {
+        const newLeft = col.origWidths.left + deltaTwips;
+        const newRight = col.origWidths.right - deltaTwips;
+        if (newLeft >= MIN_CELL_WIDTH_TWIPS && newRight >= MIN_CELL_WIDTH_TWIPS) {
+          const origLeft = parseFloat(col.handle.style.left);
+          if (Number.isFinite(origLeft)) {
+            col.handle.style.left = `${origLeft + delta}px`;
+            col.origWidths = { left: newLeft, right: newRight };
+          }
+        }
       }
       return;
     }
@@ -167,13 +174,17 @@ export function useTableResize(): UseTableResizeReturn {
     if (row.active && row.handle) {
       e.preventDefault();
       const delta = e.clientY - row.startY;
-      const origTop = parseFloat(row.handle.style.top);
-      row.handle.style.top = `${origTop + delta}px`;
       row.startY = e.clientY;
       const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
-      const newHeight = row.origHeight + deltaTwips;
-      if (newHeight >= MIN_ROW_HEIGHT_TWIPS) {
-        row.origHeight = newHeight;
+      if (deltaTwips !== 0) {
+        const newHeight = row.origHeight + deltaTwips;
+        if (newHeight >= MIN_ROW_HEIGHT_TWIPS) {
+          const origTop = parseFloat(row.handle.style.top);
+          if (Number.isFinite(origTop)) {
+            row.handle.style.top = `${origTop + delta}px`;
+            row.origHeight = newHeight;
+          }
+        }
       }
       return;
     }
@@ -181,13 +192,17 @@ export function useTableResize(): UseTableResizeReturn {
     if (edge.active && edge.handle) {
       e.preventDefault();
       const delta = e.clientX - edge.startX;
-      const origLeft = parseFloat(edge.handle.style.left);
-      edge.handle.style.left = `${origLeft + delta}px`;
       edge.startX = e.clientX;
       const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
-      const newWidth = edge.origWidth + deltaTwips;
-      if (newWidth >= MIN_CELL_WIDTH_TWIPS) {
-        edge.origWidth = newWidth;
+      if (deltaTwips !== 0) {
+        const newWidth = edge.origWidth + deltaTwips;
+        if (newWidth >= MIN_CELL_WIDTH_TWIPS) {
+          const origLeft = parseFloat(edge.handle.style.left);
+          if (Number.isFinite(origLeft)) {
+            edge.handle.style.left = `${origLeft + delta}px`;
+            edge.origWidth = newWidth;
+          }
+        }
       }
     }
   }

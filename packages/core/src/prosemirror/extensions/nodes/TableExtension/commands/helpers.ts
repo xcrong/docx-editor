@@ -39,6 +39,59 @@ export function buildCellAttrsFromTemplate(
 }
 
 /**
+ * Clone the text formatting of a template cell's first paragraph so a newly
+ * inserted row matches the reference row's style (alignment, spacing, default
+ * run font). Identity and tracking attrs (paraId, list numbering, bookmarks,
+ * revisions) are intentionally NOT copied — the new cell starts empty and
+ * unlisted.
+ *
+ * Deliberately excluded by design (not oversights):
+ * - `numPr` / `numPrFromStyle` + derived list attrs (`listNumFmt`,
+ *   `listIsBullet`, `listMarker*`) — a new empty row must not join the
+ *   reference cell's numbering sequence.
+ * - `tabs`, paragraph `borders` / `shading`, `pageBreakBefore`,
+ *   `outlineLevel` — outside the row-inheritance scope; cell-level
+ *   borders/shading already come through `buildCellAttrsFromTemplate`.
+ */
+export function buildParagraphAttrsFromTemplate(
+  templateCell: PMNode | null
+): Record<string, unknown> | undefined {
+  if (!templateCell) return undefined;
+  let firstPara: PMNode | undefined;
+  templateCell.forEach((child) => {
+    if (firstPara === undefined && child.type.name === 'paragraph') firstPara = child;
+  });
+  if (firstPara === undefined) return undefined;
+  const a = firstPara.attrs;
+  const out: Record<string, unknown> = {};
+  if (a.alignment != null) out.alignment = a.alignment;
+  if (a.spaceBefore != null) out.spaceBefore = a.spaceBefore;
+  if (a.spaceAfter != null) out.spaceAfter = a.spaceAfter;
+  if (a.lineSpacing != null) out.lineSpacing = a.lineSpacing;
+  if (a.lineSpacingRule != null) out.lineSpacingRule = a.lineSpacingRule;
+  if (a.spacingExplicit != null) out.spacingExplicit = a.spacingExplicit;
+  if (a.indentLeft != null) out.indentLeft = a.indentLeft;
+  if (a.indentRight != null) out.indentRight = a.indentRight;
+  if (a.indentFirstLine != null) out.indentFirstLine = a.indentFirstLine;
+  if (a.hangingIndent) out.hangingIndent = a.hangingIndent;
+  if (a.styleId != null) out.styleId = a.styleId;
+  if (a.defaultTextFormatting != null) {
+    // Deep clone: the formatting holds nested objects (color, shading,
+    // underline) that must not be shared with the template cell — PM attrs
+    // are treated as immutable and an in-place edit would corrupt the row.
+    out.defaultTextFormatting = JSON.parse(JSON.stringify(a.defaultTextFormatting)) as Record<
+      string,
+      unknown
+    >;
+  }
+  if (a.keepNext != null) out.keepNext = a.keepNext;
+  if (a.keepLines != null) out.keepLines = a.keepLines;
+  if (a.contextualSpacing != null) out.contextualSpacing = a.contextualSpacing;
+  if (a.bidi != null) out.bidi = a.bidi;
+  return out;
+}
+
+/**
  * Walk up from the selection to find the enclosing node matching `typeName`.
  * Returns the node's `before` position and the node itself, or null.
  */
