@@ -121,3 +121,52 @@ describe('calculateHeaderFooterVisualBounds — floating text box', () => {
     expect(bounds([para(18), tb(400, 'float')]).visualBottom).toBe(418);
   });
 });
+
+describe('calculateHeaderFooterVisualBounds — anchored image block', () => {
+  const para = (h: number): { block: ParagraphBlock; measure: Measure } => ({
+    block: { kind: 'paragraph', id: 'p', runs: [] },
+    measure: { kind: 'paragraph', lines: [], totalHeight: h },
+  });
+  const img = (h: number, anchored: boolean): { block: ImageBlock; measure: Measure } => ({
+    block: {
+      kind: 'image',
+      id: 'img',
+      src: 'logo.png',
+      width: 100,
+      height: h,
+      anchor: anchored ? { isAnchored: true } : undefined,
+    },
+    measure: { kind: 'image', width: 100, height: h },
+  });
+  const metrics = {
+    section: 'header' as const,
+    pageSize: { w: 744, h: 1123 },
+    margins: { top: 102, right: 72, bottom: 72, left: 72, header: 48, footer: 48 },
+  };
+  const bounds = (items: Array<{ block: FlowBlock; measure: Measure }>) => {
+    const blocks = items.map((i) => i.block);
+    const measures = items.map((i) => i.measure);
+    const total = measures.reduce(
+      (s, m) =>
+        s +
+        (m.kind === 'paragraph'
+          ? m.totalHeight
+          : m.kind === 'image'
+            ? m.height
+            : m.kind === 'textBox'
+              ? m.height
+              : 0),
+      0
+    );
+    return calculateHeaderFooterVisualBounds(blocks, measures, total, metrics);
+  };
+
+  test('anchored image does not advance the cursor', () => {
+    // anchored(100) + para(18): visualBottom = 100 (float extent), not 118.
+    expect(bounds([img(100, true), para(18)]).visualBottom).toBe(100);
+  });
+
+  test('inline image still advances (stacked extent)', () => {
+    expect(bounds([img(100, false), para(18)]).visualBottom).toBe(118);
+  });
+});

@@ -24,6 +24,7 @@ import type { HeaderFooter, StyleDefinitions, Theme } from '../types/document';
 import type { HeaderFooterContent } from '../layout-painter/renderPage';
 import { headerFooterToProseDoc } from '../prosemirror/conversion/toProseDoc';
 import { emuToPixels } from '../utils/units';
+import { wrapsAroundText } from '../docx/wrapTypes';
 import { toFlowBlocks } from './toFlowBlocks';
 import type { MeasureBlocksFn } from './footnoteLayout';
 
@@ -276,6 +277,10 @@ export function calculateHeaderFooterVisualBounds(
 
       for (const run of block.runs) {
         if (run.kind !== 'image' || !run.position) continue;
+        // Mirror the painter/measurer float predicate: positioned inline or
+        // topAndBottom runs stay in-flow and must not extend the visual bounds
+        // as floats.
+        if (run.displayMode !== 'float' && !wrapsAroundText(run.wrapType)) continue;
         const runTop = resolveHeaderFooterVisualTop(run, paragraphStartY, flowHeight, metrics);
         visualTop = Math.min(visualTop, runTop);
         visualBottom = Math.max(visualBottom, runTop + run.height);
@@ -291,7 +296,13 @@ export function calculateHeaderFooterVisualBounds(
       const blockBottomY = cursorY + measure.height;
       visualTop = Math.min(visualTop, cursorY);
       visualBottom = Math.max(visualBottom, blockBottomY);
-      cursorY = blockBottomY;
+      // Anchored (behind/inFront) images are positioned floats: they extend the
+      // visual bounds but do NOT advance the cursor, mirroring floating text
+      // boxes below. Otherwise the band outgrows the in-flow content and a tall
+      // anchored image inflates visualBottom past flowHeight.
+      if (!block.anchor?.isAnchored) {
+        cursorY = blockBottomY;
+      }
     } else if (block.kind === 'textBox' && measure.kind === 'textBox') {
       const blockBottomY = cursorY + measure.height;
       visualTop = Math.min(visualTop, cursorY);
