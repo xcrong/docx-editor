@@ -111,8 +111,12 @@ export function extractCellFloatingImages(
         }
       }
 
-      // Clamp within cell bounds
-      x = Math.max(0, Math.min(x, contentWidth - imgRun.width));
+      // Clamp within cell bounds (content area). Multiple images in the same
+      // cell keep their own anchor offsets; clamping only prevents escape.
+      // Y is clamped to >= 0 so a negative paragraph-relative offset cannot
+      // place the image above the cell content.
+      x = Math.max(0, Math.min(x, Math.max(0, contentWidth - imgRun.width)));
+      y = Math.max(0, y);
 
       result.push({
         src: imgRun.src,
@@ -127,7 +131,9 @@ export function extractCellFloatingImages(
         distBottom,
         distLeft,
         distRight,
-        wrapText: imageWrapTextFromCssFloat(imgRun.cssFloat),
+        // Prefer the OOXML wrapText carried on the run; fall back to the
+        // cssFloat-derived direction for runs that predate the plumbing.
+        wrapText: imgRun.wrapText ?? imageWrapTextFromCssFloat(imgRun.cssFloat),
         wrapType: imgRun.wrapType,
         pmStart: imgRun.pmStart,
         pmEnd: imgRun.pmEnd,

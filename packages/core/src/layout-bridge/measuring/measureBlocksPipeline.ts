@@ -25,14 +25,17 @@ import {
   type TableBlock,
   type TextBoxBlock,
 } from '../../layout-engine';
-import { isTextWrappingFloatingImageRun } from '../../layout-painter/floatingImageFlow';
+import {
+  imageWrapTextFromCssFloat,
+  isTextWrappingFloatingImageRun,
+} from '../../layout-painter/floatingImageFlow';
 import {
   resolveAnchoredObjectVerticalTop,
   type PageGeometry,
 } from '../../layout-painter/anchoredObjectPosition';
 import { emuToPixels } from '../../utils/units';
 import { clampFloatingWrapMargins } from './measureParagraph';
-import type { FloatingImageZone } from './floatingZones';
+import { rectsToFloatingZones, type FloatingImageZone } from './floatingZones';
 import { measureTableBlock } from '../measureTable';
 
 /**
@@ -229,41 +232,77 @@ function extractFloatingZones(
 }
 
 /**
- * Resolve left/right exclusion margins for an OOXML-positioned anchored
- * object (image or text box). Shared between image-in-paragraph and
+ * Resolve the content-area X and side for an OOXML-positioned anchored
+ * object (image or text box). Mirrors the painter's horizontal anchor
+ * resolution for the paragraph/column-relative case (band base 0, size
+ * contentWidth); page/margin-relative bands need page geometry for exact X,
+ * which this pre-pagination pass doesn't have — the side heuristic still
+ * yields the correct wrap side for the common cases.
+ */
+function resolveAnchoredX(
+  position: ImageRunPosition | undefined,
+  cssFloat: 'left' | 'right' | 'none' | undefined,
+  width: number,
+  contentWidth: number
+): { x: number; side: 'left' | 'right' } {
+  const h = position?.horizontal;
+  if (h?.align === 'left') return { x: 0, side: 'left' };
+  if (h?.align === 'right') return { x: Math.max(0, contentWidth - width), side: 'right' };
+  if (h?.align === 'center') return { x: Math.max(0, (contentWidth - width) / 2), side: 'left' };
+  if (h?.posOffset !== undefined) {
+    const x = emuToPixels(h.posOffset);
+    return { x, side: x > contentWidth / 2 ? 'right' : 'left' };
+  }
+  if (cssFloat === 'right') return { x: Math.max(0, contentWidth - width), side: 'right' };
+  return { x: 0, side: 'left' };
+}
+
+/**
+ * Resolve left/right exclusion margins (plus centered split segments) for an
+ * OOXML-positioned anchored object (image or text box) via the shared
+ * `rectsToFloatingZones` helper — the same function the page-level and
+ * cell-level painter paths use. `wrapText` is the OOXML direction
+ * (bothSides/left/right/largest); when absent it falls back to the
+ * cssFloat-derived direction. Shared between image-in-paragraph and
  * top-level textbox extraction since both use the same
- * `ImageRunPosition` shape and `cssFloat` fallback.
+ * `ImageRunPosition` shape and `cssFloat` fallback. Tight/through with a
+ * rectangular wrapPolygon (the common serializer output) are equivalent to
+ * square here.
  */
 function computeAnchoredMargins(
   position: ImageRunPosition | undefined,
   cssFloat: 'left' | 'right' | 'none' | undefined,
   width: number,
+  height: number,
   distLeft: number,
   distRight: number,
+  distTop: number,
+  distBottom: number,
+  topY: number,
+  wrapText: ImageRun['wrapText'],
+  wrapType: string | undefined,
   contentWidth: number
-): { leftMargin: number; rightMargin: number } {
-  let leftMargin = 0;
-  let rightMargin = 0;
-
-  const h = position?.horizontal;
-  if (h?.align === 'left') {
-    leftMargin = width + distRight;
-  } else if (h?.align === 'right') {
-    rightMargin = width + distLeft;
-  } else if (h?.posOffset !== undefined) {
-    const x = emuToPixels(h.posOffset);
-    if (x < contentWidth / 2) {
-      leftMargin = x + width + distRight;
-    } else {
-      rightMargin = contentWidth - x + distLeft;
-    }
-  } else if (cssFloat === 'left') {
-    leftMargin = width + distRight;
-  } else if (cssFloat === 'right') {
-    rightMargin = width + distLeft;
-  }
-
-  return clampFloatingWrapMargins(leftMargin, rightMargin, contentWidth);
+): FloatingImageZone {
+  const { x, side } = resolveAnchoredX(position, cssFloat, width, contentWidth);
+  const [zone] = rectsToFloatingZones(
+    [
+      {
+        side,
+        x,
+        y: topY,
+        width,
+        height,
+        distTop,
+        distBottom,
+        distLeft,
+        distRight,
+        wrapText: wrapText ?? imageWrapTextFromCssFloat(cssFloat),
+        wrapType,
+      },
+    ],
+    contentWidth
+  );
+  return zone;
 }
 
 /**
@@ -300,23 +339,27 @@ function extractImageZonesFromParagraph(
     } else if (v?.posOffset !== undefined) {
       topY = emuToPixels(v.posOffset);
     }
-    const bottomY = topY + imgRun.height;
 
-    const { leftMargin, rightMargin } = computeAnchoredMargins(
+    const zone = computeAnchoredMargins(
       imgRun.position,
       imgRun.cssFloat,
       imgRun.width,
+      imgRun.height,
       distLeft,
       distRight,
+      distTop,
+      distBottom,
+      topY,
+      imgRun.wrapText,
+      imgRun.wrapType,
       contentWidth
     );
 
-    if (leftMargin > 0 || rightMargin > 0) {
+    // Centered both-sides floats emit split segments with zero side margins —
+    // they still obstruct the line and must produce a zone.
+    if (zone.leftMargin > 0 || zone.rightMargin > 0 || zone.segments?.length) {
       out.push({
-        leftMargin,
-        rightMargin,
-        topY: topY - distTop,
-        bottomY: bottomY + distBottom,
+        ...zone,
         anchorBlockIndex: blockIndex,
         isMarginRelative: isPositionMarginRelative(imgRun.position),
       });
@@ -445,24 +488,26 @@ function extractFloatingTextBoxZone(
   if (tbBlock.position?.vertical?.posOffset !== undefined) {
     topY = emuToPixels(tbBlock.position.vertical.posOffset);
   }
-  const bottomY = topY + tbHeight;
 
-  const { leftMargin, rightMargin } = computeAnchoredMargins(
+  const zone = computeAnchoredMargins(
     tbBlock.position,
     tbBlock.cssFloat,
     tbWidth,
+    tbHeight,
     distLeft,
     distRight,
+    distTop,
+    distBottom,
+    topY,
+    tbBlock.wrapText,
+    tbBlock.wrapType,
     contentWidth
   );
 
-  if (leftMargin <= 0 && rightMargin <= 0) return;
+  if (zone.leftMargin <= 0 && zone.rightMargin <= 0 && !zone.segments?.length) return;
 
   out.push({
-    leftMargin,
-    rightMargin,
-    topY: topY - distTop,
-    bottomY: bottomY + distBottom,
+    ...zone,
     anchorBlockIndex: blockIndex,
     isMarginRelative: isPositionMarginRelative(tbBlock.position),
   });

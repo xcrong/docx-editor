@@ -435,7 +435,11 @@ function extractFloatingImagesFromParagraph(
       distRight,
       pmStart: imgRun.pmStart,
       pmEnd: imgRun.pmEnd,
-      wrapText: imageWrapTextFromCssFloat(imgRun.cssFloat),
+      // Prefer the OOXML wrapText carried on the run (bothSides/left/right/
+      // largest); fall back to the cssFloat-derived direction for runs that
+      // predate the plumbing. Tight/through with a rectangular wrapPolygon
+      // (the common serializer output) are equivalent to square here.
+      wrapText: imgRun.wrapText ?? imageWrapTextFromCssFloat(imgRun.cssFloat),
       wrapType: imgRun.wrapType,
       cropTop: imgRun.cropTop,
       cropRight: imgRun.cropRight,

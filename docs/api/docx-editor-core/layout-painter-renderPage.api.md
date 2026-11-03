@@ -95,6 +95,8 @@ export interface FloatingImagePaintRecord {
     transform?: string;
     // (undocumented)
     width: number;
+    wrapText?: string;
+    wrapType?: string;
     // (undocumented)
     x: number;
     // (undocumented)

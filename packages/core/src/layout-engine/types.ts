@@ -177,6 +177,8 @@ export type ImageRun = {
   position?: ImageRunPosition;
   /** Wrap type from DOCX (inline, square, tight, through, topAndBottom, etc.) */
   wrapType?: string;
+  /** OOXML wrapText direction (which side(s) text flows on) */
+  wrapText?: WrapTextDirection;
   /** Display mode for CSS rendering */
   displayMode?: 'inline' | 'block' | 'float';
   /** CSS float direction */
