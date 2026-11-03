@@ -356,14 +356,14 @@
       :title="t('lists.decreaseIndent')"
       :aria-label="t('lists.decreaseIndent')"
       :disabled="!canOutdent"
-      @mousedown.prevent="execCommand('outdent')"
+      @mousedown.prevent="handleOutdent"
     >
       <MaterialSymbol name="format_indent_decrease" />
     </button>
     <button
       :title="t('lists.increaseIndent')"
       :aria-label="t('lists.increaseIndent')"
-      @mousedown.prevent="execCommand('indent')"
+      @mousedown.prevent="handleIndent"
     >
       <MaterialSymbol name="format_indent_increase" />
     </button>
@@ -806,6 +806,38 @@ function execCommand(name: string, ...args: any[]) {
   // a selection-syncing transaction that clears stored marks.
   if (!v.hasFocus()) v.focus();
   openDropdown.value = null;
+}
+
+// Mirror React's useFormattingActions indent fallback: try the list-level
+// command first (multi-select aware in core ListExtension), then fall back
+// to plain paragraph indent. Previously called non-existent 'indent'/
+// 'outdent' commands so the buttons no-op'd.
+function handleIndent() {
+  const v = props.view;
+  if (!v) return;
+  const cmds = props.getCommands();
+  const incList = cmds['increaseListLevel']?.();
+  if (incList?.(v.state, (tr: any) => v.dispatch(tr), v)) {
+    if (!v.hasFocus()) v.focus();
+    return;
+  }
+  const inc = cmds['increaseIndent']?.();
+  inc?.(v.state, (tr: any) => v.dispatch(tr), v);
+  if (!v.hasFocus()) v.focus();
+}
+
+function handleOutdent() {
+  const v = props.view;
+  if (!v) return;
+  const cmds = props.getCommands();
+  const decList = cmds['decreaseListLevel']?.();
+  if (decList?.(v.state, (tr: any) => v.dispatch(tr), v)) {
+    if (!v.hasFocus()) v.focus();
+    return;
+  }
+  const dec = cmds['decreaseIndent']?.();
+  dec?.(v.state, (tr: any) => v.dispatch(tr), v);
+  if (!v.hasFocus()) v.focus();
 }
 
 function setFont(fontName: string) {
