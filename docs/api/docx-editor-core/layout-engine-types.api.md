@@ -192,6 +192,7 @@ export type ImageRun = {
     transform?: string;
     position?: ImageRunPosition;
     wrapType?: string;
+    wrapText?: WrapTextDirection;
     displayMode?: 'inline' | 'block' | 'float';
     cssFloat?: 'left' | 'right' | 'none';
     distTop?: number;

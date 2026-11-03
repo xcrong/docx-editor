@@ -14,6 +14,10 @@ export interface FloatingImagePaintRecord {
   y: number;
   pmStart?: number;
   pmEnd?: number;
+  /** OOXML wrap type (square/tight/through/behind/inFront/...) for test hooks. */
+  wrapType?: string;
+  /** OOXML wrapText direction for test hooks. */
+  wrapText?: string;
   /** wp:srcRect crop fractions in [0, 1]. */
   cropTop?: number;
   cropRight?: number;
@@ -71,6 +75,10 @@ export function renderFloatingImagesLayer(
     container.style.left = `${floatImg.x}px`;
     if (floatImg.pmStart !== undefined) container.dataset.pmStart = String(floatImg.pmStart);
     if (floatImg.pmEnd !== undefined) container.dataset.pmEnd = String(floatImg.pmEnd);
+    // Test hooks: let directed e2e distinguish square/tight/through/behind
+    // without parsing positions. Visual rendering is unchanged.
+    if (floatImg.wrapType) container.dataset.wrapType = floatImg.wrapType;
+    if (floatImg.wrapText) container.dataset.wrapText = floatImg.wrapText;
 
     const img = doc.createElement('img');
     img.src = floatImg.src;

@@ -400,6 +400,7 @@ export function paragraphToRuns(
         alt: attrs.alt as string | undefined,
         transform: attrs.transform as string | undefined,
         wrapType: attrs.wrapType as string | undefined,
+        wrapText: attrs.wrapText as ImageRun['wrapText'],
         displayMode: attrs.displayMode as 'inline' | 'block' | 'float' | undefined,
         cssFloat: attrs.cssFloat as 'left' | 'right' | 'none' | undefined,
         distTop: attrs.distTop as number | undefined,

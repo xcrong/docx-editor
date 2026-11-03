@@ -23,6 +23,7 @@ import { renderFloatingImagesLayer } from './floatingImageLayer';
 import { floatingImageIsBehindDoc, floatingImageWrapsText } from './floatingImageFlow';
 import { renderParagraphFragment } from './renderParagraph';
 import { measureParagraph, type FloatingImageZone } from '../layout-bridge/measuring';
+import { rectsToFloatingZones } from '../layout-bridge/measuring/floatingZones';
 import { resolveCellGrid } from '../layout-bridge/tableWidthUtils';
 import { extractCellFloatingImages } from './renderTableCellFloating';
 import {
@@ -93,34 +94,29 @@ function renderCellContent(
   // Extract floating images from cell paragraphs
   const cellFloatingImages = extractCellFloatingImages(cell, cellMeasure, contentWidth);
 
-  // Build floating zones for measurement and render floating layer
+  // Build floating zones for measurement and render floating layer. Shares
+  // rectsToFloatingZones with the page-level path so side/segments/clamp
+  // stay identical (largest, centered both-sides split, near-full-width
+  // clamp). Tight/through with a rectangular wrapPolygon (the common
+  // serializer output) are equivalent to square here.
   let floatingZones: FloatingImageZone[] | undefined;
   if (cellFloatingImages.length > 0) {
-    floatingZones = cellFloatingImages.filter(floatingImageWrapsText).map((img) => {
-      const rectRight = img.x + img.width + img.distRight;
-      const rectTop = img.y - img.distTop;
-      const rectBottom = img.y + img.height + img.distBottom;
-
-      let leftMargin = 0;
-      let rightMargin = 0;
-      // Use wrapText to determine which side text flows on (same as rectsToFloatingZones in renderPage.ts)
-      const wt = img.wrapText ?? 'bothSides';
-      if (wt === 'right') {
-        // Text flows on RIGHT only -> image blocks the left side
-        leftMargin = rectRight;
-      } else if (wt === 'left') {
-        // Text flows on LEFT only -> image blocks the right side
-        rightMargin = contentWidth - (img.x - img.distLeft);
-      } else {
-        // bothSides / largest: use image position to determine which side it blocks
-        if (img.side === 'left') {
-          leftMargin = rectRight;
-        } else {
-          rightMargin = contentWidth - (img.x - img.distLeft);
-        }
-      }
-      return { leftMargin, rightMargin, topY: rectTop, bottomY: rectBottom };
-    });
+    floatingZones = rectsToFloatingZones(
+      cellFloatingImages.filter(floatingImageWrapsText).map((img) => ({
+        side: img.side,
+        x: img.x,
+        y: img.y,
+        width: img.width,
+        height: img.height,
+        distTop: img.distTop,
+        distBottom: img.distBottom,
+        distLeft: img.distLeft,
+        distRight: img.distRight,
+        wrapText: img.wrapText,
+        wrapType: img.wrapType,
+      })),
+      contentWidth
+    );
 
     const behindFloatingImages = cellFloatingImages.filter(floatingImageIsBehindDoc);
     if (behindFloatingImages.length > 0) {
