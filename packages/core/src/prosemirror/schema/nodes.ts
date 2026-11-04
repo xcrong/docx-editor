@@ -281,6 +281,8 @@ export interface ImageAttrs {
   wrapText?: string;
   /** Hyperlink URL for clickable image */
   hlinkHref?: string;
+  /** Original `a:hlinkClick` relationship ID, preserved for round-trip save. */
+  hlinkRId?: string;
   /**
    * `wp:srcRect` crop fractions in [0, 1]. Each side is the fraction of the
    * source image that should be hidden. Renders as CSS `clip-path: inset(...)`.

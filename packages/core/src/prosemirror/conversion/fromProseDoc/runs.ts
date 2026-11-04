@@ -28,6 +28,7 @@ import type {
   MathEquation,
 } from '../../../types/document';
 import type { ImageAttrs } from '../../schema/nodes';
+import { sanitizeHref } from '../../../utils/sanitizeHref';
 import { marksToTextFormatting } from './marks';
 
 /**
@@ -306,9 +307,21 @@ export function createImageRun(node: PMNode): Run {
     };
   }
 
-  // Round-trip image hyperlink
+  // Round-trip image hyperlink (sanitize at the trust boundary so pasted/edited hrefs can't smuggle javascript:)
+  // Only carry well-formed rIds; a cross-part paste would otherwise leave
+  // a dangling r:id that validators flag. The rezip pass rebinds.
+  const validHlinkRId =
+    attrs.hlinkRId && /^rId\d+$/.test(attrs.hlinkRId) ? attrs.hlinkRId : undefined;
   if (attrs.hlinkHref) {
-    image.hlinkHref = attrs.hlinkHref;
+    const href = sanitizeHref(attrs.hlinkHref);
+    if (href) {
+      image.hlinkHref = href;
+      if (validHlinkRId) image.hlinkRId = validHlinkRId;
+    } else if (validHlinkRId) {
+      image.hlinkRId = validHlinkRId;
+    }
+  } else if (validHlinkRId) {
+    image.hlinkRId = validHlinkRId;
   }
 
   // Round-trip wp:srcRect crop fractions

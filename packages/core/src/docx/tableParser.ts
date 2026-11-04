@@ -559,7 +559,7 @@ function parseCellContent(
   numbering: NumberingMap | null,
   rels: RelationshipMap | null,
   media: Map<string, MediaFile> | null,
-  options?: { inHeaderFooter?: boolean }
+  options?: { inHeaderFooter?: boolean; tableDepth?: number }
 ): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = [];
 
@@ -583,6 +583,14 @@ function parseCellContent(
 
     const localName = child.name.split(':').pop();
 
+    // Per-cell element-count guard: truncate absurd cells instead of OOMing.
+    // Note: `w:sdt` directly in `w:tc` is intentionally not parsed here (same
+    // as other rare cell content below) — pre-existing behavior, not a guard gap.
+    if (content.length >= MAX_CELL_BLOCKS) {
+      console.warn(`[parseCellContent] truncated at ${MAX_CELL_BLOCKS} blocks`);
+      break;
+    }
+
     if (localName === 'p') {
       // Parse paragraph
       const para = parseParagraph(child, styles, theme, numbering, rels, media, options);
@@ -593,8 +601,18 @@ function parseCellContent(
       content.push(para);
       markers.onBlockPushed(para);
     } else if (localName === 'tbl') {
-      // Parse nested table (recursive)
-      const table = parseTable(child, styles, theme, numbering, rels, media, options);
+      // Parse nested table (recursive, depth-guarded against malicious nesting)
+      const tableDepth = options?.tableDepth ?? 0;
+      if (tableDepth >= MAX_TABLE_NESTING_DEPTH) {
+        console.warn(
+          `[parseCellContent] dropped nested w:tbl beyond depth ${MAX_TABLE_NESTING_DEPTH}`
+        );
+        continue;
+      }
+      const table = parseTable(child, styles, theme, numbering, rels, media, {
+        ...options,
+        tableDepth: tableDepth + 1,
+      });
       content.push(table);
       markers.onBlockPushed(table);
     }
@@ -640,7 +658,7 @@ export function parseTableCell(
   numbering: NumberingMap | null,
   rels: RelationshipMap | null,
   media: Map<string, MediaFile> | null,
-  options?: { inHeaderFooter?: boolean }
+  options?: { inHeaderFooter?: boolean; tableDepth?: number }
 ): TableCell {
   const cell: TableCell = {
     type: 'tableCell',
@@ -684,7 +702,7 @@ export function parseTableRow(
   numbering: NumberingMap | null,
   rels: RelationshipMap | null,
   media: Map<string, MediaFile> | null,
-  options?: { inHeaderFooter?: boolean }
+  options?: { inHeaderFooter?: boolean; tableDepth?: number }
 ): TableRow {
   const row: TableRow = {
     type: 'tableRow',
@@ -700,15 +718,33 @@ export function parseTableRow(
   row.propertyChanges = parseTableRowPropertyChanges(trPrElement, formatting);
   row.structuralChange = parseTableRowStructuralChange(trPrElement);
 
-  // Parse cells
+  // Parse cells (capped: truncate absurd rows instead of OOMing)
   const cells = findChildren(trElement, 'w', 'tc');
   for (const cellElement of cells) {
+    if (row.cells.length >= MAX_TABLE_CELLS_PER_ROW) {
+      console.warn(
+        `[parseTableRow] truncated at ${MAX_TABLE_CELLS_PER_ROW} cells (file may be malicious)`
+      );
+      break;
+    }
     const cell = parseTableCell(cellElement, styles, theme, numbering, rels, media, options);
     row.cells.push(cell);
   }
 
   return row;
 }
+
+/**
+ * Parse-time element-count guards (see blockContentParser): truncate absurd
+ * tables instead of OOMing. Generous for real documents.
+ */
+export const MAX_TABLE_ROWS = 2000;
+export const MAX_TABLE_CELLS_PER_ROW = 200;
+export const MAX_TABLE_GRID_COLS = 200;
+/** Max nested-table depth (`w:tbl` in `w:tc`); deeper tables are dropped, not crashed on. */
+export const MAX_TABLE_NESTING_DEPTH = 16;
+/** Max blocks parsed per table cell; beyond this the cell is truncated, not OOMed. */
+export const MAX_CELL_BLOCKS = 2000;
 
 // ============================================================================
 // TABLE GRID PARSING
@@ -727,6 +763,7 @@ export function parseTableGrid(tblGridElement: XmlElement | null): number[] | un
 
   const gridCols = findChildren(tblGridElement, 'w', 'gridCol');
   for (const col of gridCols) {
+    if (widths.length >= MAX_TABLE_GRID_COLS) break;
     const width = parseNumericAttribute(col, 'w', 'w') ?? 0;
     widths.push(width);
   }
@@ -793,7 +830,7 @@ export function parseTable(
   numbering: NumberingMap | null,
   rels: RelationshipMap | null,
   media: Map<string, MediaFile> | null,
-  options?: { inHeaderFooter?: boolean }
+  options?: { inHeaderFooter?: boolean; tableDepth?: number }
 ): Table {
   const table: Table = {
     type: 'table',
@@ -814,9 +851,13 @@ export function parseTable(
     table.columnWidths = columnWidths;
   }
 
-  // Parse rows
+  // Parse rows (capped: truncate absurd tables instead of OOMing)
   const rows = findChildren(tblElement, 'w', 'tr');
   for (const rowElement of rows) {
+    if (table.rows.length >= MAX_TABLE_ROWS) {
+      console.warn(`[parseTable] truncated at ${MAX_TABLE_ROWS} rows (file may be malicious)`);
+      break;
+    }
     const row = parseTableRow(rowElement, styles, theme, numbering, rels, media, options);
     table.rows.push(row);
   }

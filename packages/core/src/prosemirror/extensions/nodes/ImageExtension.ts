@@ -209,6 +209,7 @@ export const ImageExtension = createNodeExtension({
       borderStyle: { default: null },
       wrapText: { default: null },
       hlinkHref: { default: null },
+      hlinkRId: { default: null },
       cropTop: { default: null },
       cropRight: { default: null },
       cropBottom: { default: null },
@@ -242,6 +243,8 @@ export const ImageExtension = createNodeExtension({
               : undefined,
             borderColor: element.dataset.borderColor || undefined,
             borderStyle: element.dataset.borderStyle || undefined,
+            hlinkHref: element.dataset.hlinkHref || undefined,
+            hlinkRId: element.dataset.hlinkRid || undefined,
           };
         },
       },
@@ -263,6 +266,8 @@ export const ImageExtension = createNodeExtension({
       if (attrs.borderWidth) domAttrs['data-border-width'] = String(attrs.borderWidth);
       if (attrs.borderColor) domAttrs['data-border-color'] = attrs.borderColor;
       if (attrs.borderStyle) domAttrs['data-border-style'] = attrs.borderStyle;
+      if (attrs.hlinkHref) domAttrs['data-hlink-href'] = attrs.hlinkHref;
+      if (attrs.hlinkRId) domAttrs['data-hlink-rid'] = attrs.hlinkRId;
 
       const styles: string[] = [];
 

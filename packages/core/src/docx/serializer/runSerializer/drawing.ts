@@ -239,6 +239,14 @@ export function serializeDrawingContent(content: DrawingContent): string {
   const effectExtentEl = `<wp:effectExtent l="${intAttr(effL)}" t="${intAttr(effT)}" r="${intAttr(effR)}" b="${intAttr(effB)}"/>`;
   const docPrId = getUniqueId(image.id);
   const docPrName = image.title || image.filename || `Picture ${docPrId}`;
+  // Round-trip `a:hlinkClick`: the relationship itself lives in the part's
+  // rels file. The rezip hyperlink pass registers editor-created hrefs and
+  // rebinds edited ones before serialization, so by emit time `hlinkRId`
+  // holds the correct rId. A bare hlinkHref without an rId at this point
+  // means registration was skipped — drop it rather than emitting dangling XML.
+  const docPrBase = `id="${docPrId}" name="${escapeXml(docPrName)}"${image.alt ? ` descr="${escapeXml(image.alt)}"` : ''}`;
+  const hlinkClickEl = image.hlinkRId ? `<a:hlinkClick r:id="${escapeXml(image.hlinkRId)}"/>` : '';
+  const docPr = `<wp:docPr ${docPrBase}${image.decorative ? ' hidden="1"' : ''}${hlinkClickEl ? `>${hlinkClickEl}</wp:docPr>` : '/>'}`;
 
   const graphic = serializePicGraphic(image, docPrId);
 
@@ -249,7 +257,7 @@ export function serializeDrawingContent(content: DrawingContent): string {
       `<wp:inline distT="${intAttr(distT)}" distB="${intAttr(distB)}" distL="${intAttr(distL)}" distR="${intAttr(distR)}">`,
       `<wp:extent cx="${intAttr(cx)}" cy="${intAttr(cy)}"/>`,
       effectExtentEl,
-      `<wp:docPr id="${docPrId}" name="${escapeXml(docPrName)}"${image.alt ? ` descr="${escapeXml(image.alt)}"` : ''}${image.decorative ? ' hidden="1"' : ''}/>`,
+      docPr,
       '<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr>',
       graphic,
       '</wp:inline>',
@@ -272,7 +280,7 @@ export function serializeDrawingContent(content: DrawingContent): string {
     `<wp:extent cx="${intAttr(cx)}" cy="${intAttr(cy)}"/>`,
     effectExtentEl,
     wrap,
-    `<wp:docPr id="${docPrId}" name="${escapeXml(docPrName)}"${image.alt ? ` descr="${escapeXml(image.alt)}"` : ''}/>`,
+    docPr,
     '<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr>',
     graphic,
     '</wp:anchor>',

@@ -341,9 +341,14 @@ function findLastReachableRun(content: ParagraphContent[]): Run | undefined {
   return undefined;
 }
 
-// ============================================================================
-// BLOCK CONTENT PARSING
-// ============================================================================
+/**
+ * Parse-time crash guards (CLAUDE.md security: resource limits). A DOCX is
+ * fully attacker-controlled; deeply nested or hugely repeated structures
+ * (nested SDTs/tables, 100k-row tables) must degrade gracefully instead of
+ * stack-overflowing or OOMing the tab. Caps are generous for real documents.
+ */
+export const MAX_BLOCK_CONTENT_ITEMS = 20000;
+export const MAX_SDT_NESTING_DEPTH = 32;
 
 /**
  * Parse block-level content from a container element (w:body, w:hdr, w:ftr, or
@@ -372,7 +377,7 @@ export function parseBlockContent(
   numbering: NumberingMap | null,
   rels: RelationshipMap | null,
   media: Map<string, MediaFile> | null,
-  options?: { inHeaderFooter?: boolean }
+  options?: { inHeaderFooter?: boolean; sdtDepth?: number; tableDepth?: number }
 ): BlockContent[] {
   const content: BlockContent[] = [];
   const children = getChildElements(parent);
@@ -380,8 +385,16 @@ export function parseBlockContent(
   // elements (e.g. `</w:p><w:bookmarkEnd/><w:p>`). They have no slot in the
   // block content model, so ride them on the adjacent block by position.
   const markers = new BlockMarkerCollector();
+  const sdtDepth = options?.sdtDepth ?? 0;
 
   for (const child of children) {
+    // Element-count guard: truncate absurd containers instead of crashing.
+    if (content.length >= MAX_BLOCK_CONTENT_ITEMS) {
+      console.warn(
+        `[parseBlockContent] truncated at ${MAX_BLOCK_CONTENT_ITEMS} blocks (file may be malicious)`
+      );
+      break;
+    }
     const name = child.name ?? '';
 
     // Block-level bookmark marker (w:bookmarkStart / w:bookmarkEnd) sitting
@@ -413,7 +426,18 @@ export function parseBlockContent(
     // Structured Document Tag (w:sdt) — preserve as a BlockSdt wrapper so the
     // content control, its properties, and identity survive the round trip.
     else if (name === 'w:sdt' || name.endsWith(':sdt')) {
-      const sdt = parseBlockSdt(child, styles, theme, numbering, rels, media, options);
+      // Recursion-depth guard: flatten absurdly nested SDTs instead of
+      // stack-overflowing. The content is preserved as far as the cap allows.
+      if (sdtDepth >= MAX_SDT_NESTING_DEPTH) {
+        console.warn(
+          `[parseBlockContent] dropped nested w:sdt beyond depth ${MAX_SDT_NESTING_DEPTH}`
+        );
+        continue;
+      }
+      const sdt = parseBlockSdt(child, styles, theme, numbering, rels, media, {
+        ...options,
+        sdtDepth: sdtDepth + 1,
+      });
       content.push(sdt);
       markers.onBlockPushed(sdt);
     }
@@ -451,7 +475,7 @@ function parseBlockSdt(
   numbering: NumberingMap | null,
   rels: RelationshipMap | null,
   media: Map<string, MediaFile> | null,
-  options?: { inHeaderFooter?: boolean }
+  options?: { inHeaderFooter?: boolean; sdtDepth?: number; tableDepth?: number }
 ): BlockSdt {
   const sdtPr = findChild(sdt, 'w', 'sdtPr');
   const sdtEndPr = findChild(sdt, 'w', 'sdtEndPr');

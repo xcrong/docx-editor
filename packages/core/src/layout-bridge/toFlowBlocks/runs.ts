@@ -413,6 +413,7 @@ export function paragraphToRuns(
         cropBottom: attrs.cropBottom as number | undefined,
         cropLeft: attrs.cropLeft as number | undefined,
         opacity: attrs.opacity as number | undefined,
+        hlinkHref: attrs.hlinkHref as string | undefined,
         isInsertion: changeFmt.isInsertion,
         isDeletion: changeFmt.isDeletion,
         changeAuthor: changeFmt.changeAuthor,

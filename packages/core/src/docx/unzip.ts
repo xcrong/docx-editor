@@ -65,6 +65,33 @@ export function assertDecompressionBudget(
 }
 
 /**
+ * Throw on unsafe ZIP entry paths (`..` segments or leading `/`).
+ * Part paths are attacker-controlled; reject before resolving (CLAUDE.md security).
+ * Exported for unit testing — JSZip normalizes `..` on generate, so the
+ * end-to-end path can only be exercised with hand-crafted archives.
+ */
+export function assertSafeEntryPath(path: string): void {
+  // Decode %XX before testing so `..%2Fevil` can't slip past the separator
+  // check. A malformed encoding keeps the raw string (fail closed on the
+  // raw form too).
+  let probe = path;
+  try {
+    probe = decodeURIComponent(path);
+  } catch {
+    // Keep raw path on malformed encoding.
+  }
+  if (
+    probe.startsWith('/') ||
+    probe.startsWith('\\') ||
+    /(^|[/\\])\.\.([/\\]|$)/.test(probe) ||
+    /(^|[/\\])\.\.([/\\]|$)/.test(path) ||
+    /%2e%2e/i.test(path)
+  ) {
+    throw new Error(`DOCX rejected: unsafe entry path "${path}"`);
+  }
+}
+
+/**
  * JSZip records the declared uncompressed size on each entry before it is
  * inflated. Reading it lets us reject a giant entry without ever decompressing
  * it. The field is internal/undocumented, so we access it defensively.
@@ -203,6 +230,10 @@ export async function unzipDocx(buffer: ArrayBuffer): Promise<RawDocxContent> {
   for (const [path, file] of Object.entries(zip.files)) {
     // Skip directories
     if (file.dir) continue;
+
+    // Path traversal guard: part paths are attacker-controlled. Reject `..`
+    // segments and absolute paths before resolving them (CLAUDE.md security).
+    assertSafeEntryPath(path);
 
     const lowerPath = path.toLowerCase();
 

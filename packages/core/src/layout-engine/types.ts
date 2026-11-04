@@ -195,6 +195,8 @@ export type ImageRun = {
   cropLeft?: number;
   /** a:alphaModFix → CSS opacity in [0, 1]. */
   opacity?: number;
+  /** Sanitized hyperlink URL for clickable images (`a:hlinkClick`). */
+  hlinkHref?: string;
   /** Whether this picture is itself a tracked insertion (`<w:ins>`). */
   isInsertion?: boolean;
   /** Whether this picture is itself a tracked deletion (`<w:del>`). */

@@ -23,6 +23,7 @@ import { assertExhaustiveFlowBlock } from '../../layout-engine/types';
 import { renderParagraphFragment } from '../renderParagraph';
 import { renderTableFragment } from '../renderTable';
 import { renderImageFragment } from '../renderImage';
+import { sanitizeHref } from '../../utils/sanitizeHref';
 import { renderTextBoxFragment } from '../renderTextBox';
 import { emuToPixels } from '../../utils/units';
 import { wrapsAroundText } from '../../docx/wrapTypes';
@@ -163,7 +164,7 @@ export function resolveHeaderFooterFloatLeft(
 }
 
 function applyHeaderFooterFloatHorizontalPosition(
-  img: HTMLImageElement,
+  img: HTMLElement,
   floatImg: {
     width: number;
     position: {
@@ -234,6 +235,7 @@ export function renderHeaderFooterContent(
     width: number;
     height: number;
     alt?: string;
+    hlinkHref?: string;
     paragraphY: number; // Y position of the containing paragraph
     position: {
       horizontal?: {
@@ -284,6 +286,7 @@ export function renderHeaderFooterContent(
             width: number;
             height: number;
             alt?: string;
+            hlinkHref?: string;
             position: {
               horizontal?: {
                 relativeTo?: string;
@@ -304,6 +307,7 @@ export function renderHeaderFooterContent(
             width: imgRun.width,
             height: imgRun.height,
             alt: imgRun.alt,
+            hlinkHref: imgRun.hlinkHref,
             paragraphY: paragraphStartY, // Store where this paragraph starts
             position: imgRun.position,
           });
@@ -510,7 +514,23 @@ export function renderHeaderFooterContent(
     applyHeaderFooterFloatHorizontalPosition(img, floatImg, layout);
     img.style.top = `${resolveHeaderFooterFloatTop(floatImg, layout)}px`;
 
-    containerEl.appendChild(img);
+    const safeHlink = sanitizeHref(floatImg.hlinkHref);
+    if (safeHlink) {
+      const link = doc.createElement('a');
+      link.href = safeHlink;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.style.position = 'absolute';
+      link.style.display = 'block';
+      applyHeaderFooterFloatHorizontalPosition(link, floatImg, layout);
+      link.style.top = `${resolveHeaderFooterFloatTop(floatImg, layout)}px`;
+      link.appendChild(img);
+      img.style.position = 'static';
+      img.style.top = '';
+      containerEl.appendChild(link);
+    } else {
+      containerEl.appendChild(img);
+    }
   }
 
   return containerEl;
