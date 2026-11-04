@@ -46,9 +46,25 @@ export const tableSpec: NodeSpec = {
       tag: 'table',
       getAttrs(dom): TableAttrs {
         const element = dom as HTMLTableElement;
+        // Centered pasted tables (Google Docs uses auto margins) keep their
+        // justification; cell-level borders/fills are handled per-cell.
+        let justification = element.dataset.justification as
+          | TableAttrs['justification']
+          | undefined;
+        if (!justification) {
+          const ml = element.style.marginLeft;
+          const mr = element.style.marginRight;
+          if (ml === 'auto' && mr === 'auto') justification = 'center';
+          else if (ml === 'auto') justification = 'right';
+          else {
+            const align = (element.getAttribute('align') || '').toLowerCase();
+            if (align === 'center') justification = 'center';
+            else if (align === 'right') justification = 'right';
+          }
+        }
         return {
           styleId: element.dataset.styleId || undefined,
-          justification: element.dataset.justification as TableAttrs['justification'] | undefined,
+          justification: justification || undefined,
           bidi: element.dataset.bidi === 'true' || element.dir === 'rtl' || undefined,
         };
       },

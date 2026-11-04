@@ -11,7 +11,14 @@ export const SuperscriptExtension = createMarkExtension({
   schemaMarkName: 'superscript',
   markSpec: {
     excludes: 'subscript',
-    parseDOM: [{ tag: 'sup' }],
+    parseDOM: [
+      { tag: 'sup' },
+      // Google Docs sends superscript as inline vertical-align, not <sup>.
+      {
+        style: 'vertical-align',
+        getAttrs: (value) => ((value as string).trim().toLowerCase() === 'super' ? null : false),
+      },
+    ],
     toDOM() {
       return ['sup', 0];
     },

@@ -193,6 +193,25 @@ function cssLineHeightToSpacing(
 }
 
 /**
+ * Map a pasted list kind (from PasteStyleInlinerExtension's data-paste-list)
+ * to the schema's numbered-format attr. Bullets use listIsBullet instead.
+ */
+function pasteListKindToNumFmt(kind: string): NumberFormat {
+  switch (kind) {
+    case 'lowerRoman':
+      return 'lowerRoman';
+    case 'upperRoman':
+      return 'upperRoman';
+    case 'lowerLetter':
+      return 'lowerLetter';
+    case 'upperLetter':
+      return 'upperLetter';
+    default:
+      return 'decimal';
+  }
+}
+
+/**
  * Extract paragraph-level attributes from a pasted HTML <p> element's inline styles.
  * Used by parseDOM to preserve formatting from external apps (Google Docs, Word Online, etc.).
  */
@@ -344,9 +363,27 @@ const paragraphNodeSpec: NodeSpec = {
         // (covers paste from Google Docs, Word Online, and other external apps)
         const styleAttrs = extractParagraphAttrsFromStyle(element);
 
+        // Pasted lists: PasteStyleInlinerExtension flattens <ul>/<ol>/<li> into
+        // <p data-paste-list="bullet|decimal|…" data-paste-level="0-8"> since
+        // lists are paragraph numPr attrs in our schema, not nodes.
+        const listAttrs: Partial<ParagraphAttrs> = {};
+        const pasteList = element.dataset.pasteList;
+        if (pasteList) {
+          const rawLevel = parseInt(element.dataset.pasteLevel || '0', 10);
+          const ilvl = Math.max(0, Math.min(8, isNaN(rawLevel) ? 0 : rawLevel));
+          if (pasteList === 'bullet') {
+            listAttrs.numPr = { numId: 1, ilvl };
+            listAttrs.listIsBullet = true;
+          } else {
+            listAttrs.numPr = { numId: 2, ilvl };
+            listAttrs.listNumFmt = pasteListKindToNumFmt(pasteList);
+          }
+        }
+
         // Merge: data-attributes take precedence over CSS-extracted values
         return {
           ...styleAttrs,
+          ...listAttrs,
           ...attrs,
           // For alignment, prefer data-attribute if present, otherwise use CSS
           alignment: attrs.alignment || styleAttrs.alignment || undefined,

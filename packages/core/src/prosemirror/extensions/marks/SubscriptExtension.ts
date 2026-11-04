@@ -11,7 +11,14 @@ export const SubscriptExtension = createMarkExtension({
   schemaMarkName: 'subscript',
   markSpec: {
     excludes: 'superscript',
-    parseDOM: [{ tag: 'sub' }],
+    parseDOM: [
+      { tag: 'sub' },
+      // Google Docs sends subscript as inline vertical-align, not <sub>.
+      {
+        style: 'vertical-align',
+        getAttrs: (value) => ((value as string).trim().toLowerCase() === 'sub' ? null : false),
+      },
+    ],
     toDOM() {
       return ['sub', 0];
     },
