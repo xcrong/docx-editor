@@ -13,7 +13,7 @@
 
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { DOMParser as PMDOMParser } from 'prosemirror-model';
+import { DOMParser as PMDOMParser, type Node as ProseMirrorNode } from 'prosemirror-model';
 import { schema } from '../../schema/index';
 import { transformPastedHTML } from './PasteStyleInlinerExtension';
 
@@ -68,7 +68,7 @@ describe('paste-google-docs', () => {
       `<table><tr><td style="background-color: rgb(255, 255, 0); padding: 5pt;"><p><span>C</span></p></td></tr></table>`
     );
     let cell: any = null;
-    let cellTextMarks: string[] = [];
+    const cellTextMarks: string[] = [];
     slice.content.forEach((node) => {
       node.descendants((n) => {
         if (n.type.name === 'tableCell') cell = n;
@@ -94,7 +94,7 @@ describe('paste-google-docs', () => {
       `<ul><li aria-level="1"><p role="presentation"><span>one</span></p></li>` +
         `<li aria-level="2"><p role="presentation"><span>nested</span></p></li></ul>`
     );
-    const paras: any[] = [];
+    const paras: ProseMirrorNode[] = [];
     slice.content.forEach((n) => paras.push(n));
     expect(paras.length).toBe(2);
     expect(paras[0].type.name).toBe('paragraph');
@@ -107,7 +107,7 @@ describe('paste-google-docs', () => {
 
   test('ol/li flattens to numbered paragraphs', () => {
     const { slice } = parseTransformed(`<ol><li>first</li><li>second</li></ol>`);
-    const paras: any[] = [];
+    const paras: ProseMirrorNode[] = [];
     slice.content.forEach((n) => paras.push(n));
     expect(paras.length).toBe(2);
     expect(paras[0].attrs.numPr).toEqual({ numId: 2, ilvl: 0 });
@@ -178,7 +178,7 @@ describe('paste-google-docs', () => {
 
   test('empty li becomes an empty list paragraph', () => {
     const { slice } = parseTransformed(`<ul><li></li></ul>`);
-    const paras: any[] = [];
+    const paras: ProseMirrorNode[] = [];
     slice.content.forEach((n) => paras.push(n));
     expect(paras.length).toBe(1);
     expect(paras[0].type.name).toBe('paragraph');
@@ -192,7 +192,7 @@ describe('paste-google-docs', () => {
         `<ul><li aria-level="3"><p role="presentation"><span>c</span></p></li></ul>` +
         `</li></ul></li></ul>`
     );
-    const paras: any[] = [];
+    const paras: ProseMirrorNode[] = [];
     slice.content.forEach((n) => paras.push(n));
     expect(paras.map((p) => p.textContent)).toEqual(['a', 'b', 'c']);
     expect(paras.map((p) => p.attrs.numPr?.ilvl)).toEqual([0, 1, 2]);
@@ -208,7 +208,7 @@ describe('paste-google-docs', () => {
 
   test('ol type=a maps to lowerLetter numbering', () => {
     const { slice } = parseTransformed(`<ol type="a"><li>first</li></ol>`);
-    const paras: any[] = [];
+    const paras: ProseMirrorNode[] = [];
     slice.content.forEach((n) => paras.push(n));
     expect(paras[0].attrs.numPr).toEqual({ numId: 2, ilvl: 0 });
     expect(paras[0].attrs.listNumFmt).toBe('lowerLetter');
