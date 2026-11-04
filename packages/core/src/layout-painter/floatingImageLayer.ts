@@ -1,4 +1,5 @@
 import { applyImageVisualAttrs, hasImageVisualAttrs } from './renderImage';
+import { sanitizeHref } from '../utils/sanitizeHref';
 
 /**
  * Minimum fields the floating-image painter needs. Page-level and cell-level
@@ -25,6 +26,8 @@ export interface FloatingImagePaintRecord {
   cropLeft?: number;
   /** a:alphaModFix -> CSS opacity. */
   opacity?: number;
+  /** Sanitized hyperlink URL (`a:hlinkClick`) — wraps the float in an anchor. */
+  hlinkHref?: string;
 }
 
 export interface FloatingImagesLayerOptions {
@@ -99,7 +102,21 @@ export function renderFloatingImagesLayer(
     }
     if (hasImageVisualAttrs(floatImg)) applyImageVisualAttrs(img, floatImg);
 
-    container.appendChild(img);
+    // Re-sanitize: floats arrive via PM attrs that may bypass the parse boundary.
+    const safeHlink = sanitizeHref(floatImg.hlinkHref);
+    if (safeHlink) {
+      const link = doc.createElement('a');
+      // Clicks navigate to the sanitized URL in a new tab; assignment alone
+      // never executes script, but only allowlisted schemes reach here.
+      link.href = safeHlink;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.style.display = 'block';
+      link.appendChild(img);
+      container.appendChild(link);
+    } else {
+      container.appendChild(img);
+    }
     layer.appendChild(container);
   }
 

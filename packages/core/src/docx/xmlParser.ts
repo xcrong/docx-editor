@@ -81,6 +81,14 @@ function escapeStrayAmpersands(xml: string): string {
  * @returns Parsed element tree
  */
 export function parseXml(xml: string): XmlElement {
+  // XXE / billion-laughs guard: OOXML never legitimately contains ENTITY
+  // declarations. xml-js already ignores doctypes, but reject explicitly.
+  // Note: parseXmlDocument catches this per-part (warn + null) so a malicious
+  // part is dropped gracefully; callers must handle a null document part
+  // (e.g. missing document.xml surfaces as an explicit error downstream).
+  if (/<!ENTITY/i.test(xml)) {
+    throw new Error('XML rejected: ENTITY declarations are not allowed');
+  }
   const sanitized = escapeStrayAmpersands(xml);
 
   try {

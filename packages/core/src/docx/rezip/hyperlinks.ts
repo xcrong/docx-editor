@@ -14,9 +14,10 @@
  */
 
 import type JSZip from 'jszip';
-import type { BlockContent, Hyperlink } from '../../types/content';
+import type { BlockContent, Hyperlink, Image, ParagraphContent } from '../../types/content';
 import { RELATIONSHIP_TYPES } from '../relsParser';
 import { escapeXml } from '../serializer/xmlUtils';
+import { sanitizeHref } from '../../utils/sanitizeHref';
 import { findMaxRId, readRelsOrStub, type Part } from './parts';
 
 /**
@@ -45,6 +46,83 @@ function collectExternalHyperlinks(blocks: BlockContent[]): Hyperlink[] {
   }
 
   return hyperlinks;
+}
+
+/**
+ * Collect images carrying an `a:hlinkClick` hyperlink (href and/or rId) from
+ * block content, including drawings nested in text-hyperlink children and
+ * tracked-change wrappers. Mirrors the traversal of collectExternalHyperlinks
+ * so image links get the same rel registration as text links.
+ */
+function collectImageHyperlinks(blocks: BlockContent[]): Image[] {
+  const images: Image[] = [];
+
+  const collectFromRun = (run: { content?: unknown }): void => {
+    const contents = (run as { content?: unknown }).content;
+    const list = Array.isArray(contents) ? contents : [contents];
+    for (const c of list) {
+      if ((c as { type?: string }).type === 'drawing') {
+        const image = (c as { image: Image }).image;
+        if (image.hlinkHref || image.hlinkRId) images.push(image);
+      } else if ((c as { type?: string }).type === 'shape') {
+        // Drawings nested in shape/textbox text bodies (text links share this
+        // gap for Hyperlink blocks — pre-existing; images are covered here so
+        // their hrefs are never silently dropped on save).
+        const textBody = (
+          c as { shape?: { textBody?: { content?: { content?: ParagraphContent[] }[] } } }
+        ).shape?.textBody;
+        for (const para of textBody?.content ?? []) {
+          if (para?.content) collectFromItems(para.content);
+        }
+      }
+    }
+  };
+
+  const collectFromItems = (items: ParagraphContent[]): void => {
+    for (const item of items) {
+      if (item.type === 'run') {
+        collectFromRun(item);
+      } else if (item.type === 'hyperlink') {
+        for (const child of item.children) {
+          if (child.type === 'run') collectFromRun(child);
+        }
+      } else if (item.type === 'insertion' || item.type === 'deletion') {
+        for (const child of item.content) {
+          if (child.type === 'run') collectFromRun(child);
+          else if (child.type === 'hyperlink') {
+            for (const grandchild of child.children) {
+              if (grandchild.type === 'run') collectFromRun(grandchild);
+            }
+          }
+        }
+      } else if (item.type === 'inlineSdt') {
+        for (const child of item.content) {
+          if (child.type === 'run') collectFromRun(child as never);
+          else if (child.type === 'hyperlink') {
+            for (const grandchild of child.children) {
+              if (grandchild.type === 'run') collectFromRun(grandchild);
+            }
+          }
+        }
+      }
+    }
+  };
+
+  for (const block of blocks) {
+    if (block.type === 'paragraph') {
+      collectFromItems(block.content);
+    } else if (block.type === 'table') {
+      for (const row of block.rows) {
+        for (const cell of row.cells) {
+          images.push(...collectImageHyperlinks(cell.content));
+        }
+      }
+    } else if (block.type === 'blockSdt') {
+      images.push(...collectImageHyperlinks(block.content));
+    }
+  }
+
+  return images;
 }
 
 function escapeRegExp(value: string): string {
@@ -119,7 +197,8 @@ export async function processNewHyperlinks(
 ): Promise<void> {
   for (const { relsPath, blocks } of parts) {
     const hyperlinks = collectExternalHyperlinks(blocks);
-    if (hyperlinks.length === 0) continue;
+    const images = collectImageHyperlinks(blocks);
+    if (hyperlinks.length === 0 && images.length === 0) continue;
 
     const relsXml = await readRelsOrStub(zip, relsPath);
     let maxId = findMaxRId(relsXml);
@@ -170,6 +249,47 @@ export async function processNewHyperlinks(
       );
 
       hyperlink.rId = newRId;
+    }
+
+    // Image hyperlinks (`a:hlinkClick`): same rel registration as text links.
+    // Hrefs are re-sanitized so a bypassed model value can't persist a
+    // javascript: target into the rels file.
+    for (const image of images) {
+      const href = sanitizeHref(image.hlinkHref);
+      if (!href) {
+        image.hlinkHref = undefined;
+        // Keep a resolving rId (original rel still targets the old URL);
+        // drop a stale one.
+        if (image.hlinkRId && !relationshipElementForId(relsXml, image.hlinkRId)) {
+          image.hlinkRId = undefined;
+        }
+        continue;
+      }
+      image.hlinkHref = href;
+      const currentRelationship = image.hlinkRId
+        ? relationshipElementForId(relsXml, image.hlinkRId)
+        : undefined;
+      if (relationshipTargetsHref(currentRelationship, href)) continue;
+      // Preserve a matching internal-target relationship (never silently
+      // rewrite an internal link into an external URL), mirroring text links.
+      if (
+        currentRelationship &&
+        !relationshipIsExternalHyperlink(currentRelationship) &&
+        relationshipTargetMatches(currentRelationship, href)
+      ) {
+        continue;
+      }
+      const existingRId = findExistingHyperlinkRelationshipId(relsXml, href);
+      if (existingRId) {
+        image.hlinkRId = existingRId;
+        continue;
+      }
+      maxId++;
+      const newRId = `rId${maxId}`;
+      relEntries.push(
+        `<Relationship Id="${newRId}" Type="${RELATIONSHIP_TYPES.hyperlink}" Target="${escapeXml(href)}" TargetMode="External"/>`
+      );
+      image.hlinkRId = newRId;
     }
 
     if (relEntries.length === 0) continue;

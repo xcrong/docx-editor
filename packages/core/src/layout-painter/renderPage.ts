@@ -138,6 +138,8 @@ interface PageFloatingImage {
   cropLeft?: number;
   /** a:alphaModFix → opacity. */
   opacity?: number;
+  /** Sanitized image hyperlink (`a:hlinkClick`). */
+  hlinkHref?: string;
 }
 
 /**
@@ -446,6 +448,7 @@ function extractFloatingImagesFromParagraph(
       cropBottom: imgRun.cropBottom,
       cropLeft: imgRun.cropLeft,
       opacity: imgRun.opacity,
+      hlinkHref: imgRun.hlinkHref,
     });
   }
 

@@ -387,6 +387,7 @@ function convertImage(image: Image): PMNode {
     borderStyle: borderStyle,
     wrapText: wrapText,
     hlinkHref: image.hlinkHref,
+    hlinkRId: image.hlinkRId,
     cropTop: image.crop?.top,
     cropRight: image.crop?.right,
     cropBottom: image.crop?.bottom,

@@ -9,6 +9,7 @@
 
 import type { ImageFragment, ImageBlock, ImageMeasure } from '../layout-engine/types';
 import type { RenderContext } from './renderPage';
+import { sanitizeHref } from '../utils/sanitizeHref';
 
 /**
  * CSS class names for image elements
@@ -189,10 +190,12 @@ export function renderImageFragment(
   // Prevent dragging
   imgEl.draggable = false;
 
-  // Wrap in hyperlink if image has a link
-  if (block.hlinkHref) {
+  // Wrap in hyperlink if image has a link (re-sanitize: the href may have
+  // arrived via PM attrs that bypassed the parse boundary)
+  const safeHlink = sanitizeHref(block.hlinkHref);
+  if (safeHlink) {
     const linkEl = doc.createElement('a');
-    linkEl.href = block.hlinkHref;
+    linkEl.href = safeHlink;
     linkEl.target = '_blank';
     linkEl.rel = 'noopener noreferrer';
     linkEl.style.display = 'block';

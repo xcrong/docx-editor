@@ -110,7 +110,13 @@ function parseExtent(extent: XmlElement | null): ImageSize {
   const cx = parseNumericAttribute(extent, null, 'cx') ?? 0;
   const cy = parseNumericAttribute(extent, null, 'cy') ?? 0;
 
-  return { width: cx, height: cy };
+  // Allocation guard: a file-supplied extent feeds straight into layout
+  // allocation. Clamp absurd values (≈50in) instead of laying out gigapixel boxes.
+  const MAX_EXTENT_EMU = 45720000;
+  return {
+    width: Math.max(0, Math.min(cx, MAX_EXTENT_EMU)),
+    height: Math.max(0, Math.min(cy, MAX_EXTENT_EMU)),
+  };
 }
 
 /**
@@ -536,7 +542,10 @@ function parseInline(
   // Resolve image hyperlink (a:hlinkClick)
   if (props.hlinkRId && rels) {
     const href = sanitizeHref(resolveTarget(rels, props.hlinkRId));
-    if (href) image.hlinkHref = href;
+    if (href) {
+      image.hlinkHref = href;
+      image.hlinkRId = props.hlinkRId;
+    }
   }
 
   return image;
@@ -643,7 +652,10 @@ function parseAnchor(
   // Resolve image hyperlink (a:hlinkClick)
   if (props.hlinkRId && rels) {
     const href = sanitizeHref(resolveTarget(rels, props.hlinkRId));
-    if (href) image.hlinkHref = href;
+    if (href) {
+      image.hlinkHref = href;
+      image.hlinkRId = props.hlinkRId;
+    }
   }
 
   return image;

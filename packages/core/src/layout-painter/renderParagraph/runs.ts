@@ -19,6 +19,7 @@ import type {
 import type { RenderContext } from '../renderPage';
 import { isFloatingImageRun } from '../floatingImageFlow';
 import { applyImageVisualAttrs, hasImageVisualAttrs } from '../renderImage';
+import { sanitizeHref } from '../../utils/sanitizeHref';
 import { resolveFontFamily } from '../../utils/fontResolver';
 import {
   PARAGRAPH_CLASS_NAMES,
@@ -305,13 +306,19 @@ export function renderTextRun(
   applyPmPositions(span, run.pmStart, run.pmEnd);
   applyInlineSdtWidgetAttrs(span, run);
 
-  // Handle hyperlinks
+  // Handle hyperlinks (re-sanitize: TextRun hrefs arrive via PM attrs that
+  // may bypass the hyperlinkParser boundary)
   if (run.hyperlink) {
+    const safeHref = sanitizeHref(run.hyperlink.href);
+    if (!safeHref) {
+      span.textContent = run.text;
+      return span;
+    }
     const anchor = doc.createElement('a');
-    anchor.href = run.hyperlink.href;
+    anchor.href = safeHref;
     // Internal bookmark links (starting with #) should scroll within the document
     // External links should open in a new tab
-    if (!run.hyperlink.href.startsWith('#')) {
+    if (!safeHref.startsWith('#')) {
       anchor.target = '_blank';
       anchor.rel = 'noopener noreferrer';
     }
@@ -591,6 +598,46 @@ function renderBlockImage(run: ImageRun, doc: Document): HTMLElement {
 }
 
 /**
+ * Wrap a rendered image in a hyperlink anchor when the run carries `hlinkHref`
+ * (`a:hlinkClick`). The href is already sanitized at the parse/save boundary;
+ * re-validate here so a bypassed PM attr still can't emit `javascript:`.
+ * Returns the original element when there is no (valid) link.
+ */
+function wrapImageRunInLink(el: HTMLElement, run: ImageRun, doc: Document): HTMLElement {
+  const safeHlink = sanitizeHref(run.hlinkHref);
+  if (!safeHlink) return el;
+  // Block images: keep the outer flow container untouched (pm mapping lives
+  // there) and link only the inner <img>, mirroring renderImageFragment.
+  if (el.classList.contains('layout-block-image')) {
+    const img = el.querySelector('img');
+    if (!img) return el;
+    const link = doc.createElement('a');
+    link.href = safeHlink;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.style.display = 'inline-block';
+    img.replaceWith(link);
+    link.appendChild(img);
+    return el;
+  }
+  // Inline images (img or rotated wrapper span): wrap the whole element so
+  // rotation/bbox layout is preserved. Copy (not move) pm markers to the link:
+  // image hit-testing reads `data-pm-start` off the inner `<img>` directly
+  // (findImageElement direct-hit path) while span-only resolvers match the
+  // inner span — removing either copy breaks click-to-select.
+  const link = doc.createElement('a');
+  link.href = safeHlink;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.style.display = 'inline-block';
+  link.style.lineHeight = '0';
+  if (el.dataset.pmStart !== undefined) link.dataset.pmStart = el.dataset.pmStart;
+  if (el.dataset.pmEnd !== undefined) link.dataset.pmEnd = el.dataset.pmEnd;
+  link.appendChild(el);
+  return link;
+}
+
+/**
  * Render an image run based on its display mode
  * Note: Floating images (square/tight/through) are handled separately at paragraph level,
  * not through this function. If they reach here, render as block.
@@ -608,7 +655,7 @@ export function renderImageRun(run: ImageRun, doc: Document): HTMLElement {
     el = renderInlineImageRun(run, doc);
   }
   applyImageRevisionStyle(el, run);
-  return el;
+  return wrapImageRunInLink(el, run, doc);
 }
 
 /**

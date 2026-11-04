@@ -88,6 +88,7 @@ export interface ImageAttrs {
     effectExtentTop?: number;
     height?: number;
     hlinkHref?: string;
+    hlinkRId?: string;
     layoutInCell?: boolean;
     opacity?: number;
     position?: ImagePositionAttrs;

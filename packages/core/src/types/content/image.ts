@@ -158,6 +158,8 @@ export interface Image {
   allowOverlap?: boolean;
   /** Hyperlink URL for clickable image */
   hlinkHref?: string;
+  /** Original relationship ID for the image hyperlink (`a:hlinkClick r:id`). Preserved for round-trip. */
+  hlinkRId?: string;
   /** Image outline/border */
   outline?: ShapeOutline;
   /** Image effects */
