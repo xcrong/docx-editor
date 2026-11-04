@@ -84,6 +84,7 @@ export interface FloatingImagePaintRecord {
     cropTop?: number;
     // (undocumented)
     height: number;
+    hlinkHref?: string;
     opacity?: number;
     // (undocumented)
     pmEnd?: number;

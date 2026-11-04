@@ -237,6 +237,7 @@ interface Image_2 {
     };
     filename?: string;
     hlinkHref?: string;
+    hlinkRId?: string;
     id?: string;
     layoutInCell?: boolean;
     mimeType?: string;

@@ -204,6 +204,7 @@ export type ImageRun = {
     cropBottom?: number;
     cropLeft?: number;
     opacity?: number;
+    hlinkHref?: string;
     isInsertion?: boolean;
     isDeletion?: boolean;
     changeAuthor?: string;
