@@ -137,6 +137,11 @@ export function parseCellAttrsFromDOM(element: HTMLTableCellElement): TableCellA
   const style = element.style;
   const borders = extractCellBordersFromCSS(style);
   const margins = extractCellMarginsFromCSS(style);
+  // dataset.bgcolor is set by our own toDOM round-trip and by the paste
+  // transformer (normalized hex); validate the shape so arbitrary pasted
+  // data-* values can't smuggle non-hex strings into the attr.
+  const rawBg = element.dataset.bgcolor;
+  const datasetBg = rawBg && /^[0-9A-Fa-f]{6}$/.test(rawBg) ? rawBg.toUpperCase() : undefined;
   return {
     colspan: element.colSpan || 1,
     rowspan: element.rowSpan || 1,
@@ -144,8 +149,7 @@ export function parseCellAttrsFromDOM(element: HTMLTableCellElement): TableCellA
       (element.dataset.valign as TableCellAttrs['verticalAlign']) ||
       mapCssVerticalAlign(style.verticalAlign) ||
       undefined,
-    backgroundColor:
-      element.dataset.bgcolor || parseCssColorToHex(style.backgroundColor) || undefined,
+    backgroundColor: datasetBg || parseCssColorToHex(style.backgroundColor) || undefined,
     borders: borders || undefined,
     margins: margins || undefined,
   };
