@@ -361,6 +361,12 @@ export function renderTextRun(
 const LEADER_FILL_COUNT = 1000;
 
 /**
+ * Gap in pixels kept between a tab leader and the text on either side,
+ * so dots/dashes never touch adjacent glyphs.
+ */
+const TAB_LEADER_GAP_PX = 2;
+
+/**
  * Render a tab run with calculated width
  */
 export function renderTabRun(
@@ -389,12 +395,18 @@ export function renderTabRun(
 
     const inner = doc.createElement('span');
     inner.style.position = 'absolute';
-    inner.style.left = '0';
-    inner.style.right = '0';
+    // Keep the leader clear of the adjacent text: Word leaves a small gap
+    // between the end of the title, the leader run, and the page number
+    // instead of letting dots touch the glyphs on either side.
+    inner.style.left = `${TAB_LEADER_GAP_PX}px`;
+    inner.style.right = `${TAB_LEADER_GAP_PX}px`;
     inner.style.top = '0';
     inner.style.bottom = '0';
     inner.style.overflow = 'hidden';
     inner.style.whiteSpace = 'nowrap';
+    // A heavy leader draws a thick rule; the other leaders use the regular
+    // run weight so their glyphs match the surrounding text.
+    if (leader === 'heavy') inner.style.fontWeight = '700';
     inner.textContent = leaderChar.repeat(LEADER_FILL_COUNT);
     span.appendChild(inner);
   } else {
