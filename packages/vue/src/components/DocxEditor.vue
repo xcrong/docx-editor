@@ -50,7 +50,7 @@
         :theme="documentTheme"
         :font-families="fontFamilies"
         :document-fonts="documentFonts"
-        :document-styles="documentStyles"
+        :document-styles="styleDefinitions?.styles"
         :style-definitions="styleDefinitions"
         @insert-link="showHyperlink = true"
         @apply-style="handleApplyStyle"
@@ -662,21 +662,11 @@ const documentTheme = computed(() => {
   return getDocument()?.package?.theme ?? props.theme ?? null;
 });
 
-// Paragraph styles from the loaded document — feeds the toolbar style picker so
-// it shows the document's real style names/order (matches React's Toolbar
-// `documentStyles={document?.package.styles?.styles}`).
-const documentStyles = computed(() => {
-  void stateTick.value;
-  return getDocument()?.package?.styles?.styles ?? undefined;
-});
-
-// Full style definitions (including docDefaults) for the toolbar's effective
-// font/size fallback when the cursor carries no explicit run marks.
+// Style definitions (docDefaults included) for the picker + font fallback.
 const styleDefinitions = computed(() => {
   void stateTick.value;
   return getDocument()?.package?.styles ?? undefined;
 });
-
 // HF caret overlay rect from the persistent HF view; shared with React via core's `computeHfCaretRectFromView`.
 const hfCaretRect = ref<{ top: number; left: number; height: number } | null>(null);
 // HF drag-selection rects — drawn when the user selects a range inside the
@@ -1074,12 +1064,8 @@ const {
   clearOverlay,
   setPmSelection,
   resolvePos,
-  openHyperlinkDialog: () => {
-    showHyperlink.value = true;
-  },
-  startAddComment: () => {
-    handleStartAddComment();
-  },
+  openHyperlinkDialog: () => void (showHyperlink.value = true),
+  startAddComment: handleStartAddComment,
 });
 
 const { handleMenuAction, handleMenuTableInsert } = useMenuActions({

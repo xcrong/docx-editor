@@ -41,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue';
 import { useTranslation } from '../i18n';
 import { useDocxPortalClass } from '../composables/usePortalClass';
 import MaterialSymbol from './ui/MaterialSymbol.vue';

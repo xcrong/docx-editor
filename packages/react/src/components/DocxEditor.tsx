@@ -22,6 +22,7 @@ import { useFileIO } from './DocxEditor/hooks/useFileIO';
 import { usePageSetupControls } from './DocxEditor/hooks/usePageSetupControls';
 import { useWatermarkControls } from './DocxEditor/hooks/useWatermarkControls';
 import { useHyperlinkActions } from './DocxEditor/hooks/useHyperlinkActions';
+import { useMenuActionCallbacks } from './DocxEditor/hooks/useMenuActionCallbacks';
 import { useFindReplaceBridge } from './DocxEditor/hooks/useFindReplaceBridge';
 import { useFormattingActions } from './DocxEditor/hooks/useFormattingActions';
 import { useImageActions } from './DocxEditor/hooks/useImageActions';
@@ -83,8 +84,6 @@ import {
   createStyleResolver,
   type TableContextInfo,
   type PMContentControl,
-  getSelectedText,
-  getHyperlinkAttrs,
 } from '@xcrong/docx-editor-core/prosemirror';
 import type { ContentControlFilter, ContentControlValue } from '@xcrong/docx-editor-core/agent';
 import {
@@ -1207,37 +1206,15 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
     scrollContainerRef,
     editorContentRef,
     i18n,
-    onAddComment: useCallback(
-      ({ from, to, yPos }: { from: number; to: number; yPos: number | null }) => {
-        setCommentSelectionRange({ from, to });
-        setAddCommentYPosition(yPos);
-        setShowCommentsSidebar(true);
-        setIsAddingComment(true);
-        setFloatingCommentBtn(null);
-      },
-      []
-    ),
-    onInsertLink: useCallback(() => {
-      const view = getActiveEditorView();
-      if (!view) return;
-      const selectedText = getSelectedText(view.state);
-      const existing = getHyperlinkAttrs(view.state);
-      if (existing) {
-        hyperlinkDialog.openEdit({
-          url: existing.href,
-          displayText: selectedText,
-          tooltip: existing.tooltip,
-        });
-      } else {
-        hyperlinkDialog.openInsert(selectedText);
-      }
-    }, [getActiveEditorView, hyperlinkDialog]),
-    onEditLink: useCallback(
-      (href: string, displayText: string) => {
-        hyperlinkDialog.openEdit({ url: href, displayText });
-      },
-      [hyperlinkDialog]
-    ),
+    ...useMenuActionCallbacks({
+      getActiveEditorView,
+      hyperlinkDialog,
+      setCommentSelectionRange,
+      setAddCommentYPosition,
+      setShowCommentsSidebar,
+      setIsAddingComment,
+      setFloatingCommentBtn,
+    }),
     zoom: state.zoom,
   });
 
