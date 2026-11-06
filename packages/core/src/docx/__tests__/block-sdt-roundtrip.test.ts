@@ -125,7 +125,7 @@ describe('block SDT parsing', () => {
     expect(properties.sdtType).toBe('richText');
   });
 
-  test('present-but-unmodeled type marker maps honestly (not richText)', () => {
+  test('a modeled type marker projects its canonical name', () => {
     const doc = body(`
       <w:sdt>
         <w:sdtPr><w:tag w:val="biblio"/><w:bibliography/></w:sdtPr>
@@ -133,6 +133,26 @@ describe('block SDT parsing', () => {
       </w:sdt>
     `);
     expect(firstBlockSdt(doc).properties.sdtType).toBe('bibliography');
+  });
+
+  test('a present-but-unmodeled type marker maps to unknown, not richText', () => {
+    const doc = body(`
+      <w:sdt>
+        <w:sdtPr><w:tag w:val="future"/><w:futureControl/></w:sdtPr>
+        <w:sdtContent><w:p><w:r><w:t>x</w:t></w:r></w:p></w:sdtContent>
+      </w:sdt>
+    `);
+    expect(firstBlockSdt(doc).properties.sdtType).toBe('unknown');
+  });
+
+  test('extension metadata (w15:repeatingSection) does not mark the type unknown', () => {
+    const doc = body(`
+      <w:sdt>
+        <w:sdtPr><w:tag w:val="repeat"/><w15:repeatingSection/></w:sdtPr>
+        <w:sdtContent><w:p><w:r><w:t>x</w:t></w:r></w:p></w:sdtContent>
+      </w:sdt>
+    `);
+    expect(firstBlockSdt(doc).properties.sdtType).toBe('richText');
   });
 });
 
@@ -160,7 +180,7 @@ describe('block SDT serialization round-trip', () => {
       <w:sdt>
         <w:sdtPr>
           <w:alias w:val="bound"/>
-          <w:dataBinding w:xpath="/ns0:root/ns0:f" w:storeItemID="{GUID}"/>
+          <w:dataBinding w:xpath="/ns0:root/ns0:f" w:storeItemID="{GUID}" w:prefixMappings="xmlns:ns0='urn:x'"/>
           <w:text/>
         </w:sdtPr>
         <w:sdtContent><w:p><w:r><w:t>v</w:t></w:r></w:p></w:sdtContent>
@@ -169,6 +189,7 @@ describe('block SDT serialization round-trip', () => {
     expect(out).toContain('w:dataBinding');
     expect(out).toContain('w:xpath="/ns0:root/ns0:f"');
     expect(out).toContain('w:storeItemID="{GUID}"');
+    expect(out).toContain(`w:prefixMappings="xmlns:ns0='urn:x'"`);
   });
 
   test('preserves sdtPr child ordering and emits exactly one of each managed element', () => {
@@ -216,6 +237,53 @@ describe('block SDT serialization round-trip', () => {
       </w:sdt>
     `);
     expect(out).toContain('w:sdtEndPr');
+  });
+
+  test('a BlockSdt without captured raw synthesizes a sequence-valid sdtPr', () => {
+    const doc = body(`
+      <w:sdt>
+        <w:sdtPr><w:tag w:val="stale"/></w:sdtPr>
+        <w:sdtContent><w:p><w:r><w:t>x</w:t></w:r></w:p></w:sdtContent>
+      </w:sdt>
+    `);
+    // Simulate a control built in code (PM attrs / programmatic construction):
+    // modeled properties only, no verbatim `w:sdtPr` capture.
+    const sdt = firstBlockSdt(doc);
+    sdt.properties = {
+      sdtType: 'plainText',
+      alias: 'A & B',
+      tag: 't1',
+      id: 7,
+      lock: 'sdtContentLocked',
+    };
+
+    const out = serializeDocumentBody(doc);
+    expect(out).toContain('<w:alias w:val="A &amp; B"/>');
+    expect(out).toContain('<w:tag w:val="t1"/>');
+    expect(out).toContain('<w:id w:val="7"/>');
+    expect(out).toContain('<w:lock w:val="sdtContentLocked"/>');
+    expect(out).toContain('<w:text/>');
+    // CT_SdtPr is a sequence: alias → tag → id → lock → type marker.
+    expect(out.indexOf('<w:alias')).toBeLessThan(out.indexOf('<w:tag'));
+    expect(out.indexOf('<w:tag')).toBeLessThan(out.indexOf('<w:id'));
+    expect(out.indexOf('<w:id')).toBeLessThan(out.indexOf('<w:lock'));
+    expect(out.indexOf('<w:lock')).toBeLessThan(out.indexOf('<w:text/>'));
+    // Synthesis runs only because no raw was captured — no duplicate managed
+    // element may appear.
+    expect((out.match(/<w:lock /g) ?? []).length).toBe(1);
+    expect((out.match(/<w:tag /g) ?? []).length).toBe(1);
+
+    // A runtime-cast invalid lock (crafted PM attr / pasted HTML) must be
+    // dropped by the shared synthesizer, never interpolated as markup.
+    // Reflect bypasses the compile-time `ST_Lock` union to simulate that input.
+    Reflect.set(sdt.properties, 'lock', 'sdtLocked"/><w:evil/>');
+    const injected = serializeDocumentBody(doc);
+    expect(injected).not.toContain('w:evil');
+    expect(injected).not.toContain('<w:lock');
+
+    // Inherited Object.prototype keys must not pass the whitelist either.
+    Reflect.set(sdt.properties, 'lock', 'constructor');
+    expect(serializeDocumentBody(doc)).not.toContain('<w:lock');
   });
 
   test('an unmodeled type marker is not replaced by w:richText', () => {

@@ -9,7 +9,14 @@
  */
 
 import type { SdtProperties, SdtType } from '../types/document';
-import { findChild, getAttribute, getLocalName, elementToXml, type XmlElement } from './xmlParser';
+import {
+  findChild,
+  getAttribute,
+  getLocalName,
+  getNamespacePrefix,
+  elementToXml,
+  type XmlElement,
+} from './xmlParser';
 
 /** Map of `w:sdtPr` type-marker element local-names to the modeled {@link SdtType}. */
 const TYPE_MARKER_TO_SDT_TYPE: Record<string, SdtType> = {
@@ -30,21 +37,51 @@ const TYPE_MARKER_TO_SDT_TYPE: Record<string, SdtType> = {
 };
 
 /**
+ * `w:sdtPr` children that are NOT the control-type marker. `CT_SdtPr` is an
+ * `xsd:sequence`: these precede the type-marker `xsd:choice`. Used to tell a
+ * typeless `w:sdtPr` (→ `richText`, the spec default) apart from one carrying
+ * a marker the editor does not model (→ `unknown`).
+ */
+const NON_TYPE_MARKER_NAMES: Record<string, true> = {
+  rPr: true,
+  alias: true,
+  tag: true,
+  id: true,
+  lock: true,
+  placeholder: true,
+  temporary: true,
+  showingPlcHdr: true,
+  dataBinding: true,
+  label: true,
+  tabIndex: true,
+};
+
+/**
  * Determine the control type from a `w:sdtPr` element.
  *
  * A `w:sdtPr` with no recognized type marker is `richText` (the spec
- * default). A marker that exists but is not modeled maps to `unknown`.
+ * default). A marker that exists but is not modeled maps to `unknown`, never
+ * `richText`, so the projection stays honest about what the editor knows.
  */
 export function parseSdtControlType(sdtPr: XmlElement | null | undefined): SdtType {
   if (!sdtPr || !sdtPr.elements) return 'richText';
 
+  let sawUnmodeledMarker = false;
   for (const el of sdtPr.elements) {
     if (el.type !== 'element' || !el.name) continue;
     const local = getLocalName(el.name);
     const mapped = TYPE_MARKER_TO_SDT_TYPE[local];
     if (mapped) return mapped;
+
+    // Base `CT_SdtPr` children are in the `w` namespace. Anything else is an
+    // extension: `w14:checkbox` is mapped above, while other extension
+    // children (e.g. `w15:repeatingSection`) are metadata, not a type marker.
+    // Any other `w:` child occupies the type-marker choice and is unmodeled.
+    if (getNamespacePrefix(el.name) === 'w' && !NON_TYPE_MARKER_NAMES[local]) {
+      sawUnmodeledMarker = true;
+    }
   }
-  return 'richText';
+  return sawUnmodeledMarker ? 'unknown' : 'richText';
 }
 
 function parseListItems(el: XmlElement): { displayText: string; value: string }[] {

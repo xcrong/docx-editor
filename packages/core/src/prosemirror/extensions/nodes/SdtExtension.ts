@@ -2,7 +2,7 @@
  * SDT Extension — inline content control node (Structured Document Tag)
  *
  * Represents OOXML inline SDTs as an inline node wrapping text content.
- * Supports: richText, plainText, date, dropdown, comboBox, checkbox.
+ * Supports: richText, plainText, date, dropDownList, comboBox, checkbox.
  */
 
 import { createNodeExtension } from '../create';
@@ -15,7 +15,7 @@ export const SdtExtension = createNodeExtension({
     group: 'inline',
     content: 'inline*',
     attrs: {
-      /** SDT type: richText, plainText, date, dropdown, comboBox, checkbox, etc. */
+      /** SDT type: richText, plainText, date, dropDownList, comboBox, checkbox, etc. */
       sdtType: { default: 'richText' },
       /** Unique numeric id (`w:id`). Stored as number|null. */
       id: { default: null },
@@ -25,7 +25,7 @@ export const SdtExtension = createNodeExtension({
       tag: { default: null },
       /** Lock setting */
       lock: { default: null },
-      /** Placeholder text */
+      /** Placeholder building-block name (`w:placeholder/w:docPart/@w:val`) */
       placeholder: { default: null },
       /** Whether showing placeholder */
       showingPlaceholder: { default: false },
