@@ -5,9 +5,19 @@
 ```ts
 
 import { EditorState } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
 
 // @public
 export function extractTrackedChanges(state: EditorState | null): TrackedChangesResult;
+
+// @public
+export function findViewOwningRevision(hfViews: HfViewsByRid | null | undefined, revisionId: number): EditorView | null;
+
+// @public
+export type HfViewsByRid = ReadonlyMap<string, EditorView>;
+
+// @public
+export function mergeTrackedChangesWithHf(body: TrackedChangesResult, hfResults: ReadonlyArray<TrackedChangesResult>): TrackedChangesResult;
 
 // @public
 export interface TrackedChangesResult {

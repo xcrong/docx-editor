@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  findHyperlinkRangeAt,
   setHyperlink,
   removeHyperlink,
   insertHyperlink,
+  setHyperlinkText,
+  removeHyperlinkRange,
 } from '@xcrong/docx-editor-core/prosemirror/commands';
 import type { EditorView } from 'prosemirror-view';
 import type { HyperlinkData, useHyperlinkDialog } from '../../dialogs/HyperlinkDialog';
@@ -91,18 +92,7 @@ export function useHyperlinkActions({
       const view = getActiveEditorView();
       if (!view) return;
 
-      const hit = findHyperlinkRangeAt(view.state);
-      if (hit) {
-        const hlType = view.state.schema.marks.hyperlink;
-        const { $from } = view.state.selection;
-        const newMark = hlType.create({ href, tooltip: hit.mark.attrs.tooltip });
-        const textNode = view.state.schema.text(displayText, [
-          ...$from.marks().filter((m) => m.type !== hlType),
-          newMark,
-        ]);
-        const tr = view.state.tr.replaceWith(hit.start, hit.end, textNode);
-        view.dispatch(tr.scrollIntoView());
-      }
+      setHyperlinkText(view.state, view.dispatch, displayText, href);
 
       setHyperlinkPopupData(null);
       focusActiveEditor();
@@ -114,11 +104,7 @@ export function useHyperlinkActions({
     const view = getActiveEditorView();
     if (!view) return;
 
-    const hit = findHyperlinkRangeAt(view.state, hyperlinkPopupData?.href);
-    if (!hit) return;
-
-    const hlType = view.state.schema.marks.hyperlink;
-    view.dispatch(view.state.tr.removeMark(hit.start, hit.end, hlType).scrollIntoView());
+    if (!removeHyperlinkRange(view.state, view.dispatch, hyperlinkPopupData?.href)) return;
 
     setHyperlinkPopupData(null);
     focusActiveEditor();

@@ -228,6 +228,17 @@ export function isInTable(state: EditorState): boolean;
 // @public
 export function isMarkActive(state: EditorState, markType: MarkType, attrs?: Record<string, unknown>): boolean;
 
+// @public
+export type LinkDialogTarget = {
+    mode: 'insert';
+    displayText: string;
+} | {
+    mode: 'edit';
+    href: string;
+    displayText: string;
+    tooltip?: string;
+};
+
 // @public (undocumented)
 export function mergeCells(state: EditorState, dispatch?: (tr: Transaction) => void): boolean;
 
@@ -249,6 +260,9 @@ export function removeCommentMark(commentId: number): Command;
 // @public (undocumented)
 export const removeHyperlink: Command;
 
+// @public
+export function removeHyperlinkRange(state: EditorState, dispatch: (tr: Transaction) => void, fallbackHref?: string): boolean;
+
 // @public (undocumented)
 export const removeList: Command;
 
@@ -266,6 +280,9 @@ export interface ResolvedStyleAttrs {
     // (undocumented)
     runFormatting?: TextFormatting;
 }
+
+// @public
+export function resolveLinkDialogTarget(state: EditorState): LinkDialogTarget;
 
 // @public (undocumented)
 export function selectColumn(state: EditorState, dispatch?: (tr: Transaction) => void): boolean;
@@ -325,6 +342,9 @@ export function setHighlight(color: string): Command;
 
 // @public (undocumented)
 export function setHyperlink(href: string, tooltip?: string): Command;
+
+// @public
+export function setHyperlinkText(state: EditorState, dispatch: (tr: Transaction) => void, displayText: string, href: string): boolean;
 
 // @public
 export function setImageWrapType(pos: number, target: ImageLayoutTarget, opts?: SetImageWrapTypeOptions): Command;

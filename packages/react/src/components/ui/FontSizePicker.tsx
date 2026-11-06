@@ -16,6 +16,7 @@ import { MaterialSymbol } from './MaterialSymbol';
 import { cn } from '../../lib/utils';
 import { useFixedDropdown } from '../../hooks/useFixedDropdown';
 import { useTranslation } from '../../i18n';
+import { nextFontSize, prevFontSize } from '@xcrong/docx-editor-core/utils/fontSize';
 
 // ============================================================================
 // TYPES
@@ -53,26 +54,14 @@ export { halfPointsToPoints, pointsToHalfPoints } from '@xcrong/docx-editor-core
  * Find the next size in the preset list (going up)
  */
 function getNextSize(currentSize: number, sizes: number[], maxSize: number): number {
-  for (const size of sizes) {
-    if (size > currentSize) {
-      return size;
-    }
-  }
-  // If current size is beyond preset list, increment by 1
-  return Math.min(currentSize + 1, maxSize);
+  return nextFontSize(sizes, currentSize, maxSize);
 }
 
 /**
  * Find the previous size in the preset list (going down)
  */
 function getPrevSize(currentSize: number, sizes: number[], minSize: number): number {
-  for (let i = sizes.length - 1; i >= 0; i--) {
-    if (sizes[i] < currentSize) {
-      return sizes[i];
-    }
-  }
-  // If current size is below preset list, decrement by 1
-  return Math.max(currentSize - 1, minSize);
+  return prevFontSize(sizes, currentSize, minSize);
 }
 
 // ============================================================================

@@ -8,6 +8,7 @@ import { computed, type ComputedRef, type Ref } from 'vue';
 import type { Document } from '@xcrong/docx-editor-core/types/document';
 import { SIDEBAR_DOCUMENT_SHIFT } from '@xcrong/docx-editor-core/utils/sidebarConstants';
 import { twipsToPixels } from '@xcrong/docx-editor-core/utils/units';
+import { computeSidebarLayoutWidths } from '@xcrong/docx-editor-core/utils/sidebarLayout';
 
 export interface UseSidebarLayoutOptions {
   showSidebar: Ref<boolean>;
@@ -58,28 +59,26 @@ export function useSidebarLayout(opts: UseSidebarLayoutOptions): UseSidebarLayou
 
   const minLayoutWidth = computed(() => {
     void opts.stateTick.value;
-    const showOutlineButton = opts.showOutlineButton();
-    const showRuler = opts.showRuler();
-    const outlineLeftAllowance =
-      (opts.showOutline.value
-        ? OUTLINE_RESERVED_SPACE
-        : showOutlineButton
-          ? OUTLINE_BUTTON_RESERVED_SPACE
-          : 20) + (showRuler && (opts.showOutline.value || showOutlineButton) ? RULER_WIDTH : 0);
-    const doc = opts.getDocument();
-    const docBody = doc?.package?.document;
-    const sectionPageWidths = [
-      docBody?.finalSectionProperties?.pageWidth,
-      ...(docBody?.sections?.map((s) => s.properties?.pageWidth) ?? []),
-    ].filter((w): w is number => typeof w === 'number' && w > 0);
-    const maxPageWidthPx = sectionPageWidths.length
-      ? Math.round(Math.max(...sectionPageWidths) / 15)
-      : DEFAULT_PAGE_WIDTH;
-    return (
-      2 * outlineLeftAllowance +
-      maxPageWidthPx +
-      (sidebarShifted.value ? SIDEBAR_DOCUMENT_SHIFT * 2 : 0)
-    );
+    const docBody = opts.getDocument()?.package?.document;
+    // Width math lives in core; only the min-width crosses over —
+    // `pageWidthPx` below stays Vue-specific (current section × zoom).
+    return computeSidebarLayoutWidths({
+      showOutline: opts.showOutline.value,
+      showOutlineButton: opts.showOutlineButton(),
+      showRuler: opts.showRuler(),
+      sidebarShifted: sidebarShifted.value,
+      sectionPageWidthsTwips: [
+        docBody?.finalSectionProperties?.pageWidth,
+        ...(docBody?.sections?.map((s) => s.properties?.pageWidth) ?? []),
+      ],
+      spaces: {
+        outlinePanel: OUTLINE_RESERVED_SPACE,
+        outlineButton: OUTLINE_BUTTON_RESERVED_SPACE,
+        outlineFallback: 20,
+        rulerWidth: RULER_WIDTH,
+        defaultPageWidth: DEFAULT_PAGE_WIDTH,
+      },
+    }).minLayoutWidth;
   });
 
   // When the comments sidebar opens, shift the pages container (NOT the

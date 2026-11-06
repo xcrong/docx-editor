@@ -23,6 +23,10 @@ import {
   commitColumnResize,
   commitRowResize,
   commitRightEdgeResize,
+  stepColumnResize,
+  stepRowResize,
+  stepRightEdgeResize,
+  pxDeltaToTwips,
   TWIPS_PER_PIXEL,
   MIN_CELL_WIDTH_TWIPS,
   MIN_ROW_HEIGHT_TWIPS,
@@ -156,15 +160,14 @@ export function useTableResize(): UseTableResizeReturn {
       // the widths accept the delta — otherwise the handle desyncs from
       // the model and the user can never drag back to the original spot.
       col.startX = e.clientX;
-      const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
+      const deltaTwips = pxDeltaToTwips(delta);
       if (deltaTwips !== 0) {
-        const newLeft = col.origWidths.left + deltaTwips;
-        const newRight = col.origWidths.right - deltaTwips;
-        if (newLeft >= MIN_CELL_WIDTH_TWIPS && newRight >= MIN_CELL_WIDTH_TWIPS) {
+        const stepped = stepColumnResize(col.origWidths, deltaTwips, MIN_CELL_WIDTH_TWIPS);
+        if (stepped) {
           const origLeft = parseFloat(col.handle.style.left);
           if (Number.isFinite(origLeft)) {
             col.handle.style.left = `${origLeft + delta}px`;
-            col.origWidths = { left: newLeft, right: newRight };
+            col.origWidths = stepped;
           }
         }
       }
@@ -175,14 +178,14 @@ export function useTableResize(): UseTableResizeReturn {
       e.preventDefault();
       const delta = e.clientY - row.startY;
       row.startY = e.clientY;
-      const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
+      const deltaTwips = pxDeltaToTwips(delta);
       if (deltaTwips !== 0) {
-        const newHeight = row.origHeight + deltaTwips;
-        if (newHeight >= MIN_ROW_HEIGHT_TWIPS) {
+        const stepped = stepRowResize(row.origHeight, deltaTwips, MIN_ROW_HEIGHT_TWIPS);
+        if (stepped !== null) {
           const origTop = parseFloat(row.handle.style.top);
           if (Number.isFinite(origTop)) {
             row.handle.style.top = `${origTop + delta}px`;
-            row.origHeight = newHeight;
+            row.origHeight = stepped;
           }
         }
       }
@@ -193,14 +196,14 @@ export function useTableResize(): UseTableResizeReturn {
       e.preventDefault();
       const delta = e.clientX - edge.startX;
       edge.startX = e.clientX;
-      const deltaTwips = Math.round(delta * TWIPS_PER_PIXEL);
+      const deltaTwips = pxDeltaToTwips(delta);
       if (deltaTwips !== 0) {
-        const newWidth = edge.origWidth + deltaTwips;
-        if (newWidth >= MIN_CELL_WIDTH_TWIPS) {
+        const stepped = stepRightEdgeResize(edge.origWidth, deltaTwips, MIN_CELL_WIDTH_TWIPS);
+        if (stepped !== null) {
           const origLeft = parseFloat(edge.handle.style.left);
           if (Number.isFinite(origLeft)) {
             edge.handle.style.left = `${origLeft + delta}px`;
-            edge.origWidth = newWidth;
+            edge.origWidth = stepped;
           }
         }
       }

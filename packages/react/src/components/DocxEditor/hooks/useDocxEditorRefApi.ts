@@ -3,7 +3,7 @@ import type { Document } from '@xcrong/docx-editor-core/types/document';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import { DocumentAgent } from '@xcrong/docx-editor-core/agent';
 import {
-  createStyleResolver,
+  getSharedStyleResolver,
   findContentControlsInPM,
   findContentControlPos,
   setContentControlContentTr,
@@ -64,7 +64,6 @@ export function useDocxEditorRefApi({
   setShowCommentsSidebar,
   contentChangeSubscribersRef,
   selectionChangeSubscribersRef,
-  getCachedStyleResolver,
   commentIdAllocator,
 }: {
   ref: React.ForwardedRef<DocxEditorRef>;
@@ -84,9 +83,6 @@ export function useDocxEditorRefApi({
   setShowCommentsSidebar: React.Dispatch<React.SetStateAction<boolean>>;
   contentChangeSubscribersRef: React.RefObject<Set<(doc: Document) => void>>;
   selectionChangeSubscribersRef: React.RefObject<Set<(state: SelectionState | null) => void>>;
-  getCachedStyleResolver: (
-    styles: Parameters<typeof createStyleResolver>[0]
-  ) => ReturnType<typeof createStyleResolver>;
   commentIdAllocator: CommentIdAllocator;
 }) {
   useImperativeHandle(
@@ -154,7 +150,7 @@ export function useDocxEditorRefApi({
         if (!view) return false;
         const currentDoc = historyStateRef.current;
         const styleResolver = currentDoc?.package?.styles
-          ? getCachedStyleResolver(currentDoc.package.styles)
+          ? getSharedStyleResolver(currentDoc.package.styles)
           : null;
         const numbering = currentDoc?.package?.numbering
           ? getCachedNumberingMap(currentDoc.package.numbering)

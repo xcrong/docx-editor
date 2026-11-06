@@ -4,7 +4,8 @@ import {
   getTableContext,
   type SelectionState,
   type TableContextInfo,
-  createStyleResolver,
+  type EffectiveFontRequest,
+  resolveEffectiveFont,
 } from '@xcrong/docx-editor-core/prosemirror';
 import { resolveColorToHex } from '@xcrong/docx-editor-core/utils';
 import type { EditorView } from 'prosemirror-view';
@@ -60,7 +61,6 @@ export function useSelectionTracker({
   borderSpecRef,
   theme,
   historyStateRef,
-  getCachedStyleResolver,
   setFloatingCommentBtn,
   applySelectionDelta,
   recomputeFloatingCommentBtn,
@@ -72,9 +72,6 @@ export function useSelectionTracker({
   borderSpecRef: React.RefObject<BorderSpec>;
   theme: Theme | null | undefined;
   historyStateRef: React.RefObject<{ package: { styles?: unknown } } | null>;
-  getCachedStyleResolver: (
-    styles: Parameters<typeof createStyleResolver>[0]
-  ) => ReturnType<typeof createStyleResolver>;
   setFloatingCommentBtn: React.Dispatch<React.SetStateAction<{ top: number; left: number } | null>>;
   applySelectionDelta: (delta: SelectionStateDelta) => void;
   recomputeFloatingCommentBtn: () => void;
@@ -141,27 +138,18 @@ export function useSelectionTracker({
       const { textFormatting, paragraphFormatting } = selectionState;
 
       // Font/size fall back to the paragraph style's resolved values when no
-      // explicit run-level mark is present. The resolver cascades
-      // docDefaults -> Normal -> paragraph style, so even unstyled text
-      // (no styleId) resolves instead of falling through to Arial/11.
-      let fontFamily = textFormatting.fontFamily?.ascii || textFormatting.fontFamily?.hAnsi;
-      let fontSize = textFormatting.fontSize;
-      if (!fontFamily || !fontSize) {
-        const currentDoc = historyStateRef.current;
-        if (currentDoc?.package.styles) {
-          const resolver = getCachedStyleResolver(
-            currentDoc.package.styles as Parameters<typeof createStyleResolver>[0]
-          );
-          const resolved = resolver.resolveParagraphStyle(selectionState.styleId ?? undefined);
-          if (!fontFamily && resolved.runFormatting?.fontFamily) {
-            fontFamily =
-              resolved.runFormatting.fontFamily.ascii || resolved.runFormatting.fontFamily.hAnsi;
-          }
-          if (!fontSize && resolved.runFormatting?.fontSize) {
-            fontSize = resolved.runFormatting.fontSize;
-          }
-        }
-      }
+      // explicit run-level mark is present (shared kernel in core).
+      const currentDoc = historyStateRef.current;
+      const effectiveFont = resolveEffectiveFont({
+        directFamily: textFormatting.fontFamily,
+        directSizeHalfPoints: textFormatting.fontSize,
+        styleId: selectionState.styleId,
+        styleDefinitions: (currentDoc?.package.styles ??
+          null) as EffectiveFontRequest['styleDefinitions'],
+      });
+      // Kernel uses `null` for unresolvable; the formatting state uses optional.
+      const fontFamily = effectiveFont.family ?? undefined;
+      const fontSize = effectiveFont.sizeHalfPoints ?? undefined;
 
       const textColorHex = resolveColorToHex(textFormatting.color, theme ?? undefined);
       const textColor = textColorHex ? `#${textColorHex}` : undefined;
@@ -227,7 +215,6 @@ export function useSelectionTracker({
       borderSpecRef,
       theme,
       historyStateRef,
-      getCachedStyleResolver,
       setFloatingCommentBtn,
       applySelectionDelta,
       recomputeFloatingCommentBtn,

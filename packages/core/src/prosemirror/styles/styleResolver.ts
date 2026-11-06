@@ -367,10 +367,67 @@ export class StyleResolver {
     return mergeTextFormatting(target, source);
   }
 }
-
 /**
  * Create a style resolver from document's style definitions
  */
 export function createStyleResolver(styleDefinitions: StyleDefinitions | undefined): StyleResolver {
   return new StyleResolver(styleDefinitions);
+}
+
+/**
+ * Shared style resolvers keyed by definitions-object identity (WeakMap, so
+ * entries die with their document). Replaces the per-component single-entry
+ * caches both adapters carried — same resolver for the same document, no
+ * rebuild on every selection change, no cross-document thrash.
+ */
+const sharedResolvers = new WeakMap<StyleDefinitions, StyleResolver>();
+
+export function getSharedStyleResolver(styleDefinitions: StyleDefinitions): StyleResolver {
+  let resolver = sharedResolvers.get(styleDefinitions);
+  if (!resolver) {
+    resolver = createStyleResolver(styleDefinitions);
+    sharedResolvers.set(styleDefinitions, resolver);
+  }
+  return resolver;
+}
+
+/** Input for {@link resolveEffectiveFont} — plain values, no PM types. */
+export interface EffectiveFontRequest {
+  /** Explicit run-level family (wins when present). */
+  directFamily?: TextFormatting['fontFamily'] | null;
+  /** Explicit run-level size in half-points (wins when present). */
+  directSizeHalfPoints?: number | null;
+  /** Paragraph style id for the cascade fallback. */
+  styleId?: string | null;
+  /** Style definitions for the cascade fallback. */
+  styleDefinitions?: StyleDefinitions | null;
+}
+
+/** Resolved effective font: `null` members mean "unresolvable here". */
+export interface EffectiveFont {
+  family: string | null;
+  sizeHalfPoints: number | null;
+}
+
+/**
+ * Effective font for toolbar display: explicit run marks win, otherwise the
+ * style cascade (docDefaults → Normal → paragraph style) fills the gaps.
+ * Shared by React `useSelectionTracker` and Vue `useEffectiveFont`, which
+ * previously each reimplemented this fallback with their own cache.
+ */
+export function resolveEffectiveFont(request: EffectiveFontRequest): EffectiveFont {
+  const direct = request.directFamily;
+  let family = direct?.ascii || direct?.hAnsi || null;
+  let size = request.directSizeHalfPoints ?? null;
+  if ((!family || !size) && request.styleDefinitions) {
+    const resolved = getSharedStyleResolver(request.styleDefinitions).resolveParagraphStyle(
+      request.styleId ?? undefined
+    );
+    if (!family) {
+      const fallback = resolved.runFormatting?.fontFamily;
+      family = fallback?.ascii || fallback?.hAnsi || null;
+    }
+    if (!size) size = resolved.runFormatting?.fontSize ?? null;
+  }
+  return { family, sizeHalfPoints: size };
 }

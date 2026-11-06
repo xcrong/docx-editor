@@ -10,7 +10,13 @@
 import { describe, test, expect } from 'bun:test';
 import { Schema } from 'prosemirror-model';
 import { EditorState } from 'prosemirror-state';
-import { extractTrackedChanges } from './extractTrackedChanges';
+import type { EditorView } from 'prosemirror-view';
+import {
+  extractTrackedChanges,
+  mergeTrackedChangesWithHf,
+  findViewOwningRevision,
+  type TrackedChangesResult,
+} from './extractTrackedChanges';
 
 const schema = new Schema({
   nodes: {
@@ -123,5 +129,45 @@ describe('extractTrackedChanges: foreign-doc coalescing by (author, date)', () =
     ]);
     const { entries } = extractTrackedChanges(makeState(doc));
     expect(entries).toHaveLength(3);
+  });
+});
+
+describe('header/footer merge kernels (shared React/Vue contract)', () => {
+  const empty: TrackedChangesResult = { entries: [], commentToRevision: new Map() };
+
+  test('merge concatenates body-first and unions the comment map (HF wins)', () => {
+    const bodyEntry = { revisionId: 1 } as TrackedChangesResult['entries'][number];
+    const hfEntry = { revisionId: 2 } as TrackedChangesResult['entries'][number];
+    const body: TrackedChangesResult = {
+      entries: [bodyEntry],
+      commentToRevision: new Map([[10, 1]]),
+    };
+    const hf: TrackedChangesResult = {
+      entries: [hfEntry],
+      commentToRevision: new Map([[10, 2]]),
+    };
+    const merged = mergeTrackedChangesWithHf(body, [hf]);
+    expect(merged.entries).toEqual([bodyEntry, hfEntry]);
+    expect(merged.commentToRevision.get(10)).toBe(2);
+    // Inputs untouched (adapters memoize on state identity).
+    expect(body.entries).toHaveLength(1);
+  });
+
+  test('merge with no HF results returns an equal copy', () => {
+    const merged = mergeTrackedChangesWithHf(empty, []);
+    expect(merged.entries).toEqual([]);
+    expect(merged.commentToRevision.size).toBe(0);
+  });
+
+  test('findViewOwningRevision matches revision/insertion/coalesced ids', () => {
+    const ins = (id: number) =>
+      schema.text('x', [schema.marks.insertion.create({ revisionId: id })]);
+    const doc = schema.nodes.doc.create({}, [schema.nodes.paragraph.create({}, [ins(7)])]);
+    const view = { state: makeState(doc) } as unknown as EditorView;
+    const hfViews = new Map([['rId9', view]]);
+    expect(findViewOwningRevision(hfViews, 7)).toBe(view);
+    expect(findViewOwningRevision(hfViews, 777)).toBeNull();
+    expect(findViewOwningRevision(null, 7)).toBeNull();
+    expect(findViewOwningRevision(undefined, 7)).toBeNull();
   });
 });

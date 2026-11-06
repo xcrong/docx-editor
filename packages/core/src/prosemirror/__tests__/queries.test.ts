@@ -18,6 +18,8 @@ import {
   findCommentRange,
   findChangeRange,
   clampRangeToDoc,
+  parseSidebarItemId,
+  findSidebarAnchorRange,
 } from '../queries';
 
 const schema = singletonManager.getSchema();
@@ -267,5 +269,21 @@ describe('getPageContent', () => {
     const state = stateWithDoc();
     expect(getPageContent(null, layoutFor(state), 1)).toBeNull();
     expect(getPageContent(asView(state), null, 1)).toBeNull();
+  });
+});
+
+describe('sidebar anchor ids (shared navigation contract)', () => {
+  test('parses comment and change ids, rejects plugin ids', () => {
+    expect(parseSidebarItemId('comment-42')).toEqual({ kind: 'comment', id: 42 });
+    expect(parseSidebarItemId('tc-7-0')).toEqual({ kind: 'change', revisionId: 7 });
+    expect(parseSidebarItemId('tc-abc')).toBeNull();
+    expect(parseSidebarItemId('template-tag-1')).toBeNull();
+    expect(parseSidebarItemId('plugin-foo')).toBeNull();
+    expect(parseSidebarItemId('')).toBeNull();
+  });
+
+  test('unknown ids resolve to null without a view', () => {
+    expect(findSidebarAnchorRange(null, 'comment-1')).toBeNull();
+    expect(findSidebarAnchorRange(null, 'plugin-x')).toBeNull();
   });
 });

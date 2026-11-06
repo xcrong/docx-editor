@@ -6,7 +6,10 @@
 
 import { ref, type Ref } from 'vue';
 import type { EditorView } from 'prosemirror-view';
-import { findHyperlinkRangeAt } from '@xcrong/docx-editor-core/prosemirror/commands/formatting';
+import {
+  setHyperlinkText,
+  removeHyperlinkRange,
+} from '@xcrong/docx-editor-core/prosemirror/commands';
 import type { HyperlinkPopupData } from '../components/ui/hyperlinkPopupTypes';
 export type { HyperlinkPopupData };
 
@@ -81,18 +84,10 @@ export function useHyperlinkManagement(opts: UseHyperlinkManagementOptions) {
   function handleHyperlinkPopupEdit(displayText: string, href: string) {
     const view = opts.editorView.value;
     if (!view) return;
-    const hit = findHyperlinkRangeAt(view.state);
-    if (!hit) {
+    if (!setHyperlinkText(view.state, (tr) => view.dispatch(tr), displayText, href)) {
       hyperlinkPopupData.value = null;
       return;
     }
-    const hlType = view.state.schema.marks.hyperlink;
-    const { $from } = view.state.selection;
-    const newMark = hlType.create({ href, tooltip: hit.mark.attrs.tooltip });
-    const otherMarks = $from.marks().filter((m) => m.type !== hlType);
-    const textNode = view.state.schema.text(displayText, [...otherMarks, newMark]);
-    const tr = view.state.tr.replaceWith(hit.start, hit.end, textNode);
-    view.dispatch(tr.scrollIntoView());
     hyperlinkPopupData.value = null;
     view.focus();
   }
@@ -100,14 +95,12 @@ export function useHyperlinkManagement(opts: UseHyperlinkManagementOptions) {
   function handleHyperlinkPopupRemove() {
     const view = opts.editorView.value;
     if (!view) return;
-    const hit = findHyperlinkRangeAt(view.state, hyperlinkPopupData.value?.href);
-    if (!hit) {
+    if (
+      !removeHyperlinkRange(view.state, (tr) => view.dispatch(tr), hyperlinkPopupData.value?.href)
+    ) {
       hyperlinkPopupData.value = null;
       return;
     }
-    const hlType = view.state.schema.marks.hyperlink;
-    const tr = view.state.tr.removeMark(hit.start, hit.end, hlType);
-    view.dispatch(tr.scrollIntoView());
     hyperlinkPopupData.value = null;
     view.focus();
   }

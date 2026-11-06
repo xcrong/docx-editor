@@ -2,12 +2,15 @@ import { useMemo } from 'react';
 import type { EditorState } from 'prosemirror-state';
 import {
   extractTrackedChanges,
+  mergeTrackedChangesWithHf,
+  findViewOwningRevision,
+  type HfViewsByRid,
   type TrackedChangesResult,
 } from '@xcrong/docx-editor-core/prosemirror/utils/extractTrackedChanges';
 
 // Re-export the canonical implementations so existing imports keep working.
-export { extractTrackedChanges };
-export type { TrackedChangesResult };
+export { extractTrackedChanges, mergeTrackedChangesWithHf, findViewOwningRevision };
+export type { TrackedChangesResult, HfViewsByRid };
 
 /**
  * Returns tracked changes (and the comment→revision overlap map for threading)

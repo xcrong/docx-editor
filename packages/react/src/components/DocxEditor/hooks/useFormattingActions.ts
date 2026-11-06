@@ -33,7 +33,7 @@ import {
   generateTOC,
   insertTable,
 } from '@xcrong/docx-editor-core/prosemirror/commands';
-import { createStyleResolver } from '@xcrong/docx-editor-core/prosemirror';
+import { getSharedStyleResolver } from '@xcrong/docx-editor-core/prosemirror';
 import { getCachedNumberingMap } from '@xcrong/docx-editor-core/docx';
 import type { EditorView } from 'prosemirror-view';
 import type { FormattingAction } from '../../Toolbar';
@@ -55,7 +55,6 @@ export function useFormattingActions({
   lastSelectionRef,
   hyperlinkDialog,
   historyStateRef,
-  getCachedStyleResolver,
 }: {
   getActiveEditorView: () => EditorView | null | undefined;
   focusActiveEditor: () => void;
@@ -63,9 +62,6 @@ export function useFormattingActions({
   lastSelectionRef: React.RefObject<{ from: number; to: number } | null>;
   hyperlinkDialog: ReturnType<typeof useHyperlinkDialog>;
   historyStateRef: React.RefObject<Document | null>;
-  getCachedStyleResolver: (
-    styles: Parameters<typeof createStyleResolver>[0]
-  ) => ReturnType<typeof createStyleResolver>;
 }) {
   const handleFormat = useCallback(
     (action: FormattingAction) => {
@@ -172,7 +168,7 @@ export function useFormattingActions({
             // Read latest doc through ref to dodge stale closures.
             const currentDoc = historyStateRef.current;
             const styleResolver = currentDoc?.package.styles
-              ? getCachedStyleResolver(currentDoc.package.styles)
+              ? getSharedStyleResolver(currentDoc.package.styles)
               : null;
 
             if (styleResolver) {
@@ -192,14 +188,7 @@ export function useFormattingActions({
         }
       }
     },
-    [
-      getActiveEditorView,
-      pagedEditorRef,
-      lastSelectionRef,
-      hyperlinkDialog,
-      historyStateRef,
-      getCachedStyleResolver,
-    ]
+    [getActiveEditorView, pagedEditorRef, lastSelectionRef, hyperlinkDialog, historyStateRef]
   );
 
   const handleInsertTable = useCallback(

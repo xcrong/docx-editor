@@ -8,6 +8,7 @@ import { Command } from 'prosemirror-state';
 import { EditorState } from 'prosemirror-state';
 import { Mark } from 'prosemirror-model';
 import { MarkType } from 'prosemirror-model';
+import { Transaction } from 'prosemirror-state';
 
 // @public (undocumented)
 export const clearFontFamily: Command;
@@ -58,8 +59,25 @@ export function isHyperlinkActive(state: EditorState): boolean;
 // @public
 export function isMarkActive(state: EditorState, markType: MarkType, attrs?: Record<string, unknown>): boolean;
 
+// @public
+export type LinkDialogTarget = {
+    mode: 'insert';
+    displayText: string;
+} | {
+    mode: 'edit';
+    href: string;
+    displayText: string;
+    tooltip?: string;
+};
+
 // @public (undocumented)
 export const removeHyperlink: Command;
+
+// @public
+export function removeHyperlinkRange(state: EditorState, dispatch: (tr: Transaction) => void, fallbackHref?: string): boolean;
+
+// @public
+export function resolveLinkDialogTarget(state: EditorState): LinkDialogTarget;
 
 // @public (undocumented)
 export function setFontFamily(fontName: string): Command;
@@ -72,6 +90,9 @@ export function setHighlight(color: string): Command;
 
 // @public (undocumented)
 export function setHyperlink(href: string, tooltip?: string): Command;
+
+// @public
+export function setHyperlinkText(state: EditorState, dispatch: (tr: Transaction) => void, displayText: string, href: string): boolean;
 
 // @public (undocumented)
 export function setTextColor(attrs: TextColorAttrs): Command;

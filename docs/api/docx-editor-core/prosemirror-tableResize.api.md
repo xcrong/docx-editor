@@ -35,6 +35,9 @@ export const MIN_CELL_WIDTH_TWIPS = 300;
 export const MIN_ROW_HEIGHT_TWIPS = 200;
 
 // @public
+export function pxDeltaToTwips(deltaPx: number): number;
+
+// @public
 export function readColumnWidthAt(view: EditorView, pmStart: number, colIndex: number): number | null;
 
 // @public
@@ -45,6 +48,21 @@ export function readColumnWidths(view: EditorView, pmStart: number, colIndex: nu
 
 // @public
 export function readRowHeight(view: EditorView, pmStart: number, rowIndex: number): number | null;
+
+// @public
+export function stepColumnResize(orig: {
+    left: number;
+    right: number;
+}, deltaTwips: number, minTwips?: number): {
+    left: number;
+    right: number;
+} | null;
+
+// @public
+export function stepRightEdgeResize(origWidthTwips: number, deltaTwips: number, minTwips?: number): number | null;
+
+// @public
+export function stepRowResize(origHeightTwips: number, deltaTwips: number, minTwips?: number): number | null;
 
 // @public
 export const TWIPS_PER_PIXEL = 15;

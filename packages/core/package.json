@@ -372,6 +372,21 @@
       "types": "./dist/prosemirror/styles/index.d.ts",
       "import": "./dist/prosemirror/styles/index.mjs",
       "require": "./dist/prosemirror/styles/index.js"
+    },
+    "./utils/zoom": {
+      "types": "./dist/utils/zoom.d.ts",
+      "import": "./dist/utils/zoom.mjs",
+      "require": "./dist/utils/zoom.js"
+    },
+    "./utils/fontSize": {
+      "types": "./dist/utils/fontSize.d.ts",
+      "import": "./dist/utils/fontSize.mjs",
+      "require": "./dist/utils/fontSize.js"
+    },
+    "./utils/sidebarLayout": {
+      "types": "./dist/utils/sidebarLayout.d.ts",
+      "import": "./dist/utils/sidebarLayout.mjs",
+      "require": "./dist/utils/sidebarLayout.js"
     }
   },
   "typesVersions": {
@@ -504,6 +519,15 @@
       ],
       "utils/units": [
         "./dist/utils/units.d.ts"
+      ],
+      "utils/zoom": [
+        "./dist/utils/zoom.d.ts"
+      ],
+      "utils/fontSize": [
+        "./dist/utils/fontSize.d.ts"
+      ],
+      "utils/sidebarLayout": [
+        "./dist/utils/sidebarLayout.d.ts"
       ],
       "utils/autoScroll": [
         "./dist/utils/autoScroll.d.ts"

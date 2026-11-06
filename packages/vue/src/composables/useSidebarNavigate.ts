@@ -14,7 +14,7 @@ import { computed, type ComputedRef, type Ref } from 'vue';
 import type { EditorView } from 'prosemirror-view';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import type { TrackedChangeEntry } from '../components/sidebar/sidebarUtils';
-import { findChangeRange, findCommentRange } from '@xcrong/docx-editor-core/prosemirror/queries';
+import { findSidebarAnchorRange } from '@xcrong/docx-editor-core/prosemirror/queries';
 
 export interface UseSidebarNavigateOptions {
   editorView: Ref<EditorView | null>;
@@ -40,14 +40,7 @@ export function useSidebarNavigate(opts: UseSidebarNavigateOptions): UseSidebarN
   function handleSidebarNavigate(itemId: string) {
     const view = opts.editorView.value;
     if (!view) return;
-    let range: { from: number; to: number } | null = null;
-    if (itemId.startsWith('comment-')) {
-      const id = Number(itemId.slice('comment-'.length));
-      if (Number.isInteger(id)) range = findCommentRange(view, id);
-    } else if (itemId.startsWith('tc-')) {
-      const rev = Number(itemId.slice(3).split('-')[0]);
-      if (Number.isInteger(rev)) range = findChangeRange(view, rev);
-    }
+    const range = findSidebarAnchorRange(view, itemId);
     if (!range) return;
     opts.scrollToVisiblePosition(range.from);
   }

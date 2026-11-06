@@ -11,10 +11,32 @@ export function createStyleResolver(styleDefinitions: StyleDefinitions | undefin
 export const DEFAULT_NEW_TABLE_LOOK: TableLook;
 
 // @public
+export interface EffectiveFont {
+    // (undocumented)
+    family: string | null;
+    // (undocumented)
+    sizeHalfPoints: number | null;
+}
+
+// @public
+export interface EffectiveFontRequest {
+    directFamily?: TextFormatting['fontFamily'] | null;
+    directSizeHalfPoints?: number | null;
+    styleDefinitions?: StyleDefinitions | null;
+    styleId?: string | null;
+}
+
+// @public (undocumented)
+export function getSharedStyleResolver(styleDefinitions: StyleDefinitions): StyleResolver;
+
+// @public
 export interface ResolvedParagraphStyle {
     paragraphFormatting?: ParagraphFormatting;
     runFormatting?: TextFormatting;
 }
+
+// @public
+export function resolveEffectiveFont(request: EffectiveFontRequest): EffectiveFont;
 
 // @public
 export function resolvePreferredNewTableStyleId(defaultTableStyleId: string | undefined | null, resolver: StyleResolver | null | undefined): string | undefined;

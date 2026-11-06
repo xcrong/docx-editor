@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { EditorView } from 'prosemirror-view';
-import { getHyperlinkAttrs, getSelectedText } from '@xcrong/docx-editor-core/prosemirror';
+import { resolveLinkDialogTarget } from '@xcrong/docx-editor-core/prosemirror/commands';
 import type { useHyperlinkDialog } from '../../dialogs/HyperlinkDialog';
 
 /**
@@ -48,16 +48,15 @@ export function useMenuActionCallbacks({
   const onInsertLink = useCallback(() => {
     const view = getActiveEditorView();
     if (!view) return;
-    const selectedText = getSelectedText(view.state);
-    const existing = getHyperlinkAttrs(view.state);
-    if (existing) {
+    const target = resolveLinkDialogTarget(view.state);
+    if (target.mode === 'edit') {
       hyperlinkDialog.openEdit({
-        url: existing.href,
-        displayText: selectedText,
-        tooltip: existing.tooltip,
+        url: target.href,
+        displayText: target.displayText,
+        tooltip: target.tooltip,
       });
     } else {
-      hyperlinkDialog.openInsert(selectedText);
+      hyperlinkDialog.openInsert(target.displayText);
     }
   }, [getActiveEditorView, hyperlinkDialog]);
 
