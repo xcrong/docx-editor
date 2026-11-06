@@ -164,16 +164,15 @@ export interface PagedEditorProps {
   /** Called when the popup should close. */
   onHyperlinkPopupClose?: () => void;
   /** Callback when user right-clicks on the pages (for context menu).
-   *  When the right-click target resolves to an image node, `image` carries
-   *  the image's PM doc position, current wrap type, current cssFloat (lets
-   *  the menu disambiguate Square Left vs Square Right), and — for inline
-   *  images only — the rendered EMU offset of the image relative to the
-   *  page content origin. The host promotes that offset into the new
-   *  anchor's `wp:positionH/V` if the user converts inline → anchor. */
+   *  `image` is set for image-node targets (PM pos, wrap type, cssFloat —
+   *  the latter disambiguates Square Left/Right; inline images also carry
+   *  the rendered EMU offset promoted into a new anchor's `wp:positionH/V`).
+   *  `pmPos` is the PM position under the cursor (null on miss). */
   onContextMenu?: (data: {
     x: number;
     y: number;
     hasSelection: boolean;
+    pmPos?: number | null;
     image?: {
       pos: number;
       wrapType: WrapType;

@@ -633,7 +633,14 @@
       "makeFormal": "Make Formal",
       "makeCasual": "Make Casual",
       "custom": "Custom"
-    }
+    },
+    "comment": "Comment",
+    "insertLink": "Insert link",
+    "editLink": "Edit link",
+    "removeLink": "Remove link",
+    "openLink": "Open link",
+    "clearFormatting": "Clear formatting",
+    "altText": "Alt text"
   },
   "documentOutline": {
     "ariaLabel": "Document outline",

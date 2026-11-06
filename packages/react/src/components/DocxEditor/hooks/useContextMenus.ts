@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
+import type { ContextInfo } from '@xcrong/docx-editor-core/prosemirror';
 import {
   getTableContext,
   addRowAbove,
@@ -13,17 +14,25 @@ import {
   selectTable as pmSelectTable,
   deleteTable as pmDeleteTable,
   type TableContextInfo,
+  resolveContext,
+  getHyperlinkAttrs,
+  getSelectedText,
 } from '@xcrong/docx-editor-core/prosemirror';
 import {
   setImageWrapType,
+  removeHyperlink,
+  clearFormatting,
+  findHyperlinkRangeAt,
   type ImageLayoutTarget,
 } from '@xcrong/docx-editor-core/prosemirror/commands';
+import { sanitizeHref } from '@xcrong/docx-editor-core/utils';
+import { clickToPositionDom } from '@xcrong/docx-editor-core/layout-bridge/clickToPositionDom';
 import type { WrapType } from '@xcrong/docx-editor-core/docx/wrapTypes';
-import { en as defaultLocale } from '@xcrong/docx-editor-i18n';
 import { useTranslation } from '../../../i18n';
 import type { Translations } from '@xcrong/docx-editor-i18n';
 import { useImageContextMenu } from '../../ImageContextMenu';
 import { type TextContextAction, type TextContextMenuItem } from '../../TextContextMenu';
+import { composeMenuItems } from '../../contextMenuItems';
 import { findSelectionYPosition } from '../internals/pmAnchors';
 import { PENDING_COMMENT_ID } from '../commentFactories';
 import { formatKeys } from '../../dialogs/KeyboardShortcutsDialog/ShortcutItem';
@@ -32,8 +41,10 @@ interface ContextMenuState {
   isOpen: boolean;
   position: { x: number; y: number };
   hasSelection: boolean;
-  cursorInTable: boolean;
   tableContext: TableContextInfo | null;
+  linkHref: string | null;
+  /** Click-scoped resolve — the single source for menu gating/counts. */
+  info: ContextInfo | null;
 }
 
 /**
@@ -61,6 +72,9 @@ export function useContextMenus({
   editorContentRef,
   i18n,
   onAddComment,
+  onInsertLink,
+  onEditLink,
+  zoom,
 }: {
   getActiveEditorView: () => EditorView | null | undefined;
   focusActiveEditor: () => void;
@@ -69,14 +83,19 @@ export function useContextMenus({
   editorContentRef: React.RefObject<HTMLDivElement | null>;
   i18n: Translations | undefined;
   onAddComment: (range: { from: number; to: number; yPos: number | null }) => void;
+  onInsertLink: () => void;
+  onEditLink: (href: string, displayText: string) => void;
+  /** Current zoom — used to resolve HF click positions. */
+  zoom: number;
 }) {
   const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     isOpen: false,
     position: { x: 0, y: 0 },
     hasSelection: false,
-    cursorInTable: false,
     tableContext: null,
+    linkHref: null,
+    info: null,
   });
 
   const imageContextMenu = useImageContextMenu();
@@ -96,23 +115,33 @@ export function useContextMenus({
       const view = getActiveEditorView();
       const tableContext = view ? getTableContext(view.state) : { isInTable: false };
       const { from, to } = view?.state.selection ?? { from: 0, to: 0 };
-      const hasSel = from !== to;
+      // Resolve the click position from the painted page — the selection
+      // may be elsewhere (e.g. a link the caret never visited), and the
+      // link items must reflect the click, not the stale selection.
+      const container = editorContentRef.current;
+      const clickPos =
+        view && container
+          ? (clickToPositionDom(container, e.clientX, e.clientY, zoom) ?? from)
+          : from;
+      const info = view ? resolveContext(view.state, clickPos) : null;
       setContextMenu({
         isOpen: true,
         position: { x: e.clientX, y: e.clientY },
-        hasSelection: hasSel,
-        cursorInTable: tableContext.isInTable,
+        hasSelection: from !== to,
         tableContext: tableContext.isInTable ? tableContext : null,
+        linkHref: info?.linkHref ?? null,
+        info,
       });
     },
-    [getActiveEditorView]
+    [getActiveEditorView, editorContentRef, zoom]
   );
-
   const handleContextMenu = useCallback(
     (data: {
       x: number;
       y: number;
       hasSelection: boolean;
+      /** PM position under the cursor (null when the click missed content). */
+      pmPos?: number | null;
       image?: {
         pos: number;
         wrapType: WrapType;
@@ -134,12 +163,15 @@ export function useContextMenus({
       }
       const view = getActiveEditorView();
       const tableContext = view ? getTableContext(view.state) : { isInTable: false };
+      const clickPos = data.pmPos ?? view?.state.selection.from ?? 0;
+      const info = view ? resolveContext(view.state, clickPos) : null;
       setContextMenu({
         isOpen: true,
         position: data,
         hasSelection: data.hasSelection,
-        cursorInTable: tableContext.isInTable,
         tableContext: tableContext.isInTable ? tableContext : null,
+        linkHref: info?.linkHref ?? null,
+        info,
       });
     },
     [getActiveEditorView, imageContextMenu]
@@ -195,88 +227,46 @@ export function useContextMenus({
       isOpen: false,
       position: { x: 0, y: 0 },
       hasSelection: false,
-      cursorInTable: false,
       tableContext: null,
+      linkHref: null,
+      info: null,
     });
   }, []);
 
   const contextMenuItems = useMemo((): TextContextMenuItem[] => {
-    // `formatKeys` handles all modifier swaps on Mac (Ctrl+ → ⌘, Shift+ → ⇧,
-    // Alt+ → ⌥) so multi-modifier strings like `Ctrl+Shift+V` render as
-    // `⌘⇧V` rather than the wrong `⌘+Shift+V`.
-    const items: TextContextMenuItem[] = [
+    // Menu gating and counts come from the click-scoped `info` (single
+    // source). Only the multi-cell/split flags are selection-scoped by
+    // nature and stay on `tableContext`.
+    const info = contextMenu.info;
+    const ctx: ContextInfo = {
+      isTextSelected: contextMenu.hasSelection,
+      isInTable: info?.isInTable ?? false,
+      isOnImage: info?.isOnImage ?? false,
+      isOnHyperlink: info?.isOnHyperlink ?? false,
+      linkHref: info?.linkHref ?? null,
+      imagePos: info?.imagePos ?? null,
+      tableRowCount: info?.tableRowCount ?? null,
+      tableColumnCount: info?.tableColumnCount ?? null,
+      tableRowIndex: info?.tableRowIndex ?? null,
+      tableColumnIndex: info?.tableColumnIndex ?? null,
+    };
+    return composeMenuItems(
+      ctx,
+      t,
       {
-        action: 'cut',
-        label: t('contextMenu.cut'),
-        shortcut: formatKeys(t('contextMenu.cutShortcut')),
+        hasMultiCellSelection: contextMenu.tableContext?.hasMultiCellSelection ?? false,
+        canSplitCell: contextMenu.tableContext?.canSplitCell ?? false,
       },
-      {
-        action: 'copy',
-        label: t('contextMenu.copy'),
-        shortcut: formatKeys(t('contextMenu.copyShortcut')),
-      },
-      {
-        action: 'paste',
-        label: t('contextMenu.paste'),
-        shortcut: formatKeys(t('contextMenu.pasteShortcut')),
-      },
-      {
-        action: 'pasteAsPlainText',
-        label: t('contextMenu.pastePlainText'),
-        shortcut: formatKeys(t('contextMenu.pastePlainTextShortcut')),
-        dividerAfter: true,
-      },
-      {
-        action: 'delete',
-        label: t('contextMenu.delete'),
-        shortcut: formatKeys(t('contextMenu.deleteShortcut')),
-        dividerAfter: !contextMenu.hasSelection && !contextMenu.cursorInTable,
-      },
-    ];
-    if (contextMenu.hasSelection) {
-      items.push({
-        action: 'addComment',
-        label: 'Comment',
-        dividerAfter: !contextMenu.cursorInTable,
-      });
-    }
-    if (contextMenu.cursorInTable) {
-      items.push(
-        { action: 'addRowAbove', label: 'Insert row above' },
-        { action: 'addRowBelow', label: 'Insert row below' },
-        { action: 'deleteRow', label: 'Delete row', dividerAfter: true },
-        { action: 'addColumnLeft', label: 'Insert column left' },
-        { action: 'addColumnRight', label: 'Insert column right' },
-        { action: 'deleteColumn', label: 'Delete column' },
-        {
-          action: 'mergeCells',
-          label: i18n?.table?.mergeCells ?? defaultLocale.table.mergeCells,
-          disabled: !contextMenu.tableContext?.hasMultiCellSelection,
-        },
-        {
-          action: 'splitCell',
-          label: i18n?.table?.splitCell ?? defaultLocale.table.splitCell,
-          disabled: !contextMenu.tableContext?.canSplitCell,
-          dividerAfter: true,
-        },
-        {
-          action: 'selectTable',
-          label: i18n?.table?.selectTable ?? defaultLocale.table.selectTable,
-        },
-        {
-          action: 'deleteTable',
-          label: i18n?.table?.deleteTable ?? defaultLocale.table.deleteTable,
-          dividerAfter: true,
-        }
-      );
-    }
-    items.push({
-      action: 'selectAll',
-      label: t('contextMenu.selectAll'),
-      shortcut: formatKeys(t('contextMenu.selectAllShortcut')),
-    });
-    return items;
-  }, [contextMenu.hasSelection, contextMenu.cursorInTable, contextMenu.tableContext, i18n, t]);
+      i18n?.table
+        ? {
+            mergeCells: i18n.table.mergeCells,
+            splitCell: i18n.table.splitCell,
+            selectTable: i18n.table.selectTable,
+            deleteTable: i18n.table.deleteTable,
+          }
+        : undefined
+    );
+  }, [contextMenu.hasSelection, contextMenu.info, contextMenu.tableContext, i18n, t]);
 
   const handleContextMenuAction = useCallback(
     async (action: TextContextAction) => {
@@ -397,6 +387,36 @@ export function useContextMenus({
           onAddComment({ from, to, yPos });
           break;
         }
+        case 'insertLink':
+          onInsertLink();
+          break;
+        case 'clearFormatting':
+          clearFormatting(view.state, view.dispatch);
+          break;
+        case 'editLink': {
+          // Select the link range first so the dialog prefills the full
+          // display text even on a collapsed caret (mirrors Vue).
+          const hit = findHyperlinkRangeAt(view.state);
+          if (hit) {
+            const text = view.state.doc.textBetween(hit.start, hit.end);
+            view.dispatch(
+              view.state.tr.setSelection(TextSelection.create(view.state.doc, hit.start, hit.end))
+            );
+            onEditLink(hit.mark.attrs.href as string, text);
+          } else {
+            const attrs = getHyperlinkAttrs(view.state);
+            onEditLink(attrs?.href ?? '', getSelectedText(view.state));
+          }
+          break;
+        }
+        case 'removeLink':
+          removeHyperlink(view.state, view.dispatch);
+          break;
+        case 'openLink': {
+          const href = sanitizeHref(contextMenu.linkHref);
+          if (href) window.open(href, '_blank', 'noopener,noreferrer');
+          break;
+        }
       }
       // TextContextMenu calls onClose after onAction, so no need to close here.
     },
@@ -407,6 +427,9 @@ export function useContextMenus({
       scrollContainerRef,
       editorContentRef,
       onAddComment,
+      onInsertLink,
+      onEditLink,
+      contextMenu.linkHref,
     ]
   );
 

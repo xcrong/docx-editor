@@ -81,6 +81,23 @@ export const clearStyle: Command;
 export const clearTextColor: Command;
 
 // @public
+export interface ContextInfo {
+    imagePos: number | null;
+    isInTable: boolean;
+    isOnHyperlink: boolean;
+    isOnImage: boolean;
+    isTextSelected: boolean;
+    linkHref: string | null;
+    // (undocumented)
+    tableColumnCount: number | null;
+    // (undocumented)
+    tableColumnIndex: number | null;
+    tableRowCount: number | null;
+    // (undocumented)
+    tableRowIndex: number | null;
+}
+
+// @public
 export function createDocumentContextPlugin(options?: Partial<DocumentContext>): Plugin_2;
 
 // @public
@@ -503,6 +520,9 @@ export function removeTableBorders(state: EditorState, dispatch?: (tr: Transacti
 
 // @public (undocumented)
 export function removeTabStop(position: number): Command;
+
+// @public
+export function resolveContext(state: EditorState, pos: number): ContextInfo;
 
 // @public
 export interface ResolvedParagraphStyle {

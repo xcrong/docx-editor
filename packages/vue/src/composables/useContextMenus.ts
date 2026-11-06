@@ -13,13 +13,20 @@
 import { computed, ref, type ComputedRef, type Ref, type ShallowRef } from 'vue';
 import type { EditorView } from 'prosemirror-view';
 import { TextSelection, NodeSelection } from 'prosemirror-state';
+import { getTableContext } from '@xcrong/docx-editor-core/prosemirror/extensions/nodes/TableExtension';
 import {
   captureInlinePositionEmu,
   findImageElement,
 } from '@xcrong/docx-editor-core/layout-painter';
-import { getTableContext } from '@xcrong/docx-editor-core/prosemirror/extensions/nodes/TableExtension';
 import type { ImageLayoutTarget } from '@xcrong/docx-editor-core/prosemirror/commands';
 import type { WrapType } from '@xcrong/docx-editor-core/docx/wrapTypes';
+import { resolveContext } from '@xcrong/docx-editor-core/prosemirror';
+import {
+  findHyperlinkRangeAt,
+  clearFormatting,
+  removeHyperlink,
+} from '@xcrong/docx-editor-core/prosemirror/commands';
+import { sanitizeHref } from '@xcrong/docx-editor-core/utils';
 import {
   copyImageToClipboard,
   pasteFromClipboard,
@@ -42,6 +49,8 @@ export interface TextContextMenuState {
   onImage: boolean;
   canMergeCells: boolean;
   canSplitCell: boolean;
+  /** Hyperlink target under the cursor, for link menu items. */
+  linkHref: string | null;
 }
 
 export interface UseContextMenusOptions {
@@ -53,6 +62,10 @@ export interface UseContextMenusOptions {
   clearOverlay: () => void;
   setPmSelection: (anchor: number, head?: number) => void;
   resolvePos: (clientX: number, clientY: number) => number | null;
+  /** Open the hyperlink dialog (insert flow). */
+  openHyperlinkDialog: () => void;
+  /** Start the add-comment flow for the current selection. */
+  startAddComment: () => void;
 }
 
 export interface UseContextMenusReturn {
@@ -76,6 +89,7 @@ export function useContextMenus(opts: UseContextMenusOptions): UseContextMenusRe
     onImage: false,
     canMergeCells: false,
     canSplitCell: false,
+    linkHref: null,
   });
 
   // Image-specific right-click menu — shows wrap-mode options instead of the
@@ -167,6 +181,8 @@ export function useContextMenus(opts: UseContextMenusOptions): UseContextMenusRe
 
     const tableCtx = getTableContext(view.state);
     const { empty } = view.state.selection;
+    const clickPos = opts.resolvePos(event.clientX, event.clientY);
+    const linkInfo = resolveContext(view.state, clickPos ?? view.state.selection.from);
 
     // Right-clicking outside an image clears any open image context menu
     // — otherwise the image menu can stay visible while TextContextMenu
@@ -178,10 +194,13 @@ export function useContextMenus(opts: UseContextMenusOptions): UseContextMenusRe
       isOpen: true,
       position: { x: event.clientX, y: event.clientY },
       hasSelection: !empty,
-      inTable: tableCtx.isInTable,
+      // Gating comes from the click-scoped resolve (single source, mirrors
+      // React); the merge/split flags stay selection-scoped by nature.
+      inTable: linkInfo.isInTable,
       onImage: !!imageEl,
       canMergeCells: !!tableCtx.hasMultiCellSelection,
       canSplitCell: !!tableCtx.canSplitCell,
+      linkHref: linkInfo.linkHref,
     };
   }
 
@@ -280,6 +299,31 @@ export function useContextMenus(opts: UseContextMenusOptions): UseContextMenusRe
       case 'selectAll': {
         const sel = TextSelection.create(view.state.doc, 0, view.state.doc.content.size);
         view.dispatch(view.state.tr.setSelection(sel));
+        break;
+      }
+      case 'addComment':
+        opts.startAddComment();
+        break;
+      case 'insertLink':
+        opts.openHyperlinkDialog();
+        break;
+      case 'clearFormatting':
+        clearFormatting(view.state, view.dispatch, view);
+        break;
+      case 'editLink': {
+        const hit = findHyperlinkRangeAt(view.state);
+        if (hit) {
+          opts.setPmSelection(hit.start, hit.end);
+          opts.openHyperlinkDialog();
+        }
+        break;
+      }
+      case 'removeLink':
+        removeHyperlink(view.state, view.dispatch, view);
+        break;
+      case 'openLink': {
+        const href = sanitizeHref(contextMenu.value.linkHref);
+        if (href) window.open(href, '_blank', 'noopener,noreferrer');
         break;
       }
       case 'imageProperties':

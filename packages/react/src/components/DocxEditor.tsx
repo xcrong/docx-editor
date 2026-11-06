@@ -22,6 +22,7 @@ import { useFileIO } from './DocxEditor/hooks/useFileIO';
 import { usePageSetupControls } from './DocxEditor/hooks/usePageSetupControls';
 import { useWatermarkControls } from './DocxEditor/hooks/useWatermarkControls';
 import { useHyperlinkActions } from './DocxEditor/hooks/useHyperlinkActions';
+import { useMenuActionCallbacks } from './DocxEditor/hooks/useMenuActionCallbacks';
 import { useFindReplaceBridge } from './DocxEditor/hooks/useFindReplaceBridge';
 import { useFormattingActions } from './DocxEditor/hooks/useFormattingActions';
 import { useImageActions } from './DocxEditor/hooks/useImageActions';
@@ -1205,16 +1206,16 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
     scrollContainerRef,
     editorContentRef,
     i18n,
-    onAddComment: useCallback(
-      ({ from, to, yPos }: { from: number; to: number; yPos: number | null }) => {
-        setCommentSelectionRange({ from, to });
-        setAddCommentYPosition(yPos);
-        setShowCommentsSidebar(true);
-        setIsAddingComment(true);
-        setFloatingCommentBtn(null);
-      },
-      []
-    ),
+    ...useMenuActionCallbacks({
+      getActiveEditorView,
+      hyperlinkDialog,
+      setCommentSelectionRange,
+      setAddCommentYPosition,
+      setShowCommentsSidebar,
+      setIsAddingComment,
+      setFloatingCommentBtn,
+    }),
+    zoom: state.zoom,
   });
 
   // Handle margin changes from rulers

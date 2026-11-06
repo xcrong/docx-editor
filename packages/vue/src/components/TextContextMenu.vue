@@ -11,7 +11,9 @@
       ref="menuRef"
       :class="['ctx-menu', portalClass]"
       :style="menuStyle"
+      tabindex="-1"
       @contextmenu.prevent
+      @mousedown.prevent
       @keydown="handleKeyDown"
     >
       <button
@@ -19,11 +21,18 @@
         :key="item.id || i"
         :class="[
           'ctx-menu__item',
-          { 'ctx-menu__item--disabled': item.disabled, 'ctx-menu__item--divider': item.divider },
+          {
+            'ctx-menu__item--disabled': item.disabled,
+            'ctx-menu__item--divider': item.divider,
+            'ctx-menu__item--highlighted':
+              !item.divider && navigableItems.indexOf(item) === highlightedIndex,
+          },
         ]"
-        :disabled="item.disabled"
-        @mousedown.prevent="onAction(item.action)"
+      :disabled="item.disabled"
+      @click="onAction(item.action)"
+      @mouseenter="onItemHover(item)"
       >
+        <MaterialSymbol v-if="item.icon" :name="item.icon" :size="18" class="ctx-menu__icon" />
         <span class="ctx-menu__label">{{ item.label }}</span>
         <span v-if="item.shortcut" class="ctx-menu__shortcut">{{ item.shortcut }}</span>
       </button>
@@ -32,14 +41,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue';
 import { useTranslation } from '../i18n';
 import { useDocxPortalClass } from '../composables/usePortalClass';
+import MaterialSymbol from './ui/MaterialSymbol.vue';
 
 export interface ContextMenuItem {
   id: string;
   label: string;
   action: string;
+  icon?: string;
   shortcut?: string;
   disabled?: boolean;
   divider?: boolean;
@@ -52,11 +63,8 @@ const props = defineProps<{
   isEditable: boolean;
   inTable?: boolean;
   onImage?: boolean;
+  isOnHyperlink?: boolean;
   // Mirrors React's tableContext gates: merge needs a multi-cell
-  // selection; split is offered whenever the caret sits in a single
-  // cell (prosemirror-tables' splitCell no-ops if it can't split).
-  canMergeCells?: boolean;
-  canSplitCell?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -80,6 +88,7 @@ const visibleItems = computed<ContextMenuItem[]>(() => {
       id: 'cut',
       label: t('contextMenu.cut'),
       action: 'cut',
+      icon: 'content_cut',
       shortcut: t('contextMenu.cutShortcut'),
       disabled: !props.hasSelection || !props.isEditable,
     },
@@ -87,6 +96,7 @@ const visibleItems = computed<ContextMenuItem[]>(() => {
       id: 'copy',
       label: t('contextMenu.copy'),
       action: 'copy',
+      icon: 'content_copy',
       shortcut: t('contextMenu.copyShortcut'),
       disabled: !props.hasSelection,
     },
@@ -94,6 +104,7 @@ const visibleItems = computed<ContextMenuItem[]>(() => {
       id: 'paste',
       label: t('contextMenu.paste'),
       action: 'paste',
+      icon: 'content_paste',
       shortcut: t('contextMenu.pasteShortcut'),
       disabled: !props.isEditable,
     },
@@ -101,6 +112,7 @@ const visibleItems = computed<ContextMenuItem[]>(() => {
       id: 'pasteAsPlainText',
       label: t('contextMenu.pastePlainText'),
       action: 'pasteAsPlainText',
+      icon: 'content_paste_off',
       shortcut: t('contextMenu.pastePlainTextShortcut'),
       disabled: !props.isEditable,
     },
@@ -109,17 +121,63 @@ const visibleItems = computed<ContextMenuItem[]>(() => {
       id: 'delete',
       label: t('contextMenu.delete'),
       action: 'delete',
+      icon: 'delete',
       shortcut: t('contextMenu.deleteShortcut'),
       disabled: !props.hasSelection || !props.isEditable,
     },
-    {
-      id: 'selectAll',
-      label: t('contextMenu.selectAll'),
-      action: 'selectAll',
-      shortcut: t('contextMenu.selectAllShortcut'),
-    },
   ];
 
+  if (props.hasSelection && props.isEditable) {
+    items.push(
+      { id: 'div-text', label: '', action: '', divider: true },
+      {
+        id: 'addComment',
+        label: t('contextMenu.comment'),
+        action: 'addComment',
+        icon: 'add_comment',
+      },
+      {
+        id: 'insertLink',
+        label: t('contextMenu.insertLink'),
+        action: 'insertLink',
+        icon: 'add_link',
+      },
+      {
+        id: 'clearFormatting',
+        label: t('contextMenu.clearFormatting'),
+        action: 'clearFormatting',
+        icon: 'format_clear',
+      }
+    );
+  }
+
+  if (props.isOnHyperlink && props.isEditable) {
+    items.push(
+      { id: 'div-link', label: '', action: '', divider: true },
+      {
+        id: 'editLink',
+        label: t('contextMenu.editLink'),
+        action: 'editLink',
+        icon: 'link',
+      },
+      {
+        id: 'removeLink',
+        label: t('contextMenu.removeLink'),
+        action: 'removeLink',
+        icon: 'link_off',
+      },
+      {
+        id: 'openLink',
+        label: t('contextMenu.openLink'),
+        action: 'openLink',
+        icon: 'open_in_new',
+      }
+    );
+  }
+
+  // Fallback only: image right-clicks normally route to the dedicated
+  // image menu (which closes this menu); these rows cover a missed
+  // image lookup on a click flagged on-image.
   if (props.onImage && props.isEditable) {
     items.push(
       { id: 'div-img', label: '', action: '', divider: true },
@@ -141,31 +199,44 @@ const visibleItems = computed<ContextMenuItem[]>(() => {
   if (props.inTable && props.isEditable) {
     items.push(
       { id: 'div2', label: '', action: '', divider: true },
-      { id: 'addRowAbove', label: t('table.insertRowAbove'), action: 'addRowAbove' },
-      { id: 'addRowBelow', label: t('table.insertRowBelow'), action: 'addRowBelow' },
-      { id: 'deleteRow', label: t('table.deleteRow'), action: 'deleteRow' },
+      { id: 'addRowAbove', label: t('table.insertRowAbove'), action: 'addRowAbove', icon: 'keyboard_arrow_up' },
+      { id: 'addRowBelow', label: t('table.insertRowBelow'), action: 'addRowBelow', icon: 'keyboard_arrow_down' },
+      { id: 'deleteRow', label: t('table.deleteRow'), action: 'deleteRow', icon: 'delete' },
       { id: 'div3', label: '', action: '', divider: true },
-      { id: 'addColLeft', label: t('table.insertColumnLeft'), action: 'addColumnLeft' },
-      { id: 'addColRight', label: t('table.insertColumnRight'), action: 'addColumnRight' },
-      { id: 'deleteCol', label: t('table.deleteColumn'), action: 'deleteColumn' },
+      { id: 'addColLeft', label: t('table.insertColumnLeft'), action: 'addColumnLeft', icon: 'keyboard_arrow_left' },
+      { id: 'addColRight', label: t('table.insertColumnRight'), action: 'addColumnRight', icon: 'keyboard_arrow_right' },
+      { id: 'deleteCol', label: t('table.deleteColumn'), action: 'deleteColumn', icon: 'delete' },
       { id: 'div4', label: '', action: '', divider: true },
       {
         id: 'mergeCells',
         label: t('table.mergeCells'),
         action: 'mergeCells',
+        icon: 'call_merge',
         disabled: !props.canMergeCells,
       },
       {
         id: 'splitCell',
         label: t('table.splitCell'),
         action: 'splitCell',
+        icon: 'call_split',
         disabled: !props.canSplitCell,
       },
-      { id: 'div5', label: '', action: '', divider: true },
-      { id: 'selectTable', label: t('table.selectTable'), action: 'selectTable' },
-      { id: 'deleteTable', label: t('table.deleteTable'), action: 'deleteTable' }
+      { id: 'selectTable', label: t('table.selectTable'), action: 'selectTable', icon: 'table_rows' },
+      { id: 'deleteTable', label: t('table.deleteTable'), action: 'deleteTable', icon: 'delete' }
     );
   }
+
+  // selectAll closes the menu (base, text, link, [image fallback,] table,
+  // then selectAll) — same trailing position as React's composeMenuItems.
+  items.push(
+    { id: 'div-select-all', label: '', action: '', divider: true },
+    {
+      id: 'selectAll',
+      label: t('contextMenu.selectAll'),
+      action: 'selectAll',
+      shortcut: t('contextMenu.selectAllShortcut'),
+    }
+  );
 
   return items;
 });
@@ -194,6 +265,16 @@ const menuStyle = computed(() => {
   };
 });
 
+const highlightedIndex = ref(0);
+
+const navigableItems = computed(() => visibleItems.value.filter((i) => !i.divider));
+
+function onItemHover(item: ContextMenuItem) {
+  if (item.divider || item.disabled) return;
+  const idx = navigableItems.value.indexOf(item);
+  if (idx >= 0) highlightedIndex.value = idx;
+}
+
 function onAction(action: string) {
   if (!action) return;
   emit('action', action);
@@ -202,18 +283,50 @@ function onAction(action: string) {
 
 function handleKeyDown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
+    e.preventDefault();
     emit('close');
+    return;
   }
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Enter') return;
+  e.preventDefault();
+  const items = navigableItems.value;
+  if (e.key === 'Enter') {
+    const item = items[highlightedIndex.value];
+    if (item && !item.disabled) onAction(item.action);
+    return;
+  }
+  const dir = e.key === 'ArrowDown' ? 1 : -1;
+  let next = highlightedIndex.value;
+  for (let i = 0; i < items.length; i++) {
+    next = (next + dir + items.length) % items.length;
+    if (!items[next].disabled) break;
+  }
+  highlightedIndex.value = next;
 }
 
 watch(
   () => props.isOpen,
   (open) => {
     if (open) {
+      highlightedIndex.value = 0;
       nextTick(() => menuRef.value?.focus());
     }
   }
 );
+
+// The menu is position:fixed — close it when the page scrolls underneath.
+// Registered while open only; capture phase catches scrolls in any scroller.
+function handleWindowScroll() {
+  emit('close');
+}
+watch(
+  () => props.isOpen,
+  (open) => {
+    if (open) window.addEventListener('scroll', handleWindowScroll, true);
+    else window.removeEventListener('scroll', handleWindowScroll, true);
+  }
+);
+onUnmounted(() => window.removeEventListener('scroll', handleWindowScroll, true));
 </script>
 
 <style scoped>
@@ -262,6 +375,14 @@ watch(
 }
 .ctx-menu__label {
   flex: 1;
+}
+.ctx-menu__icon {
+  display: inline-flex;
+  margin-right: 10px;
+  color: var(--doc-text-muted);
+}
+.ctx-menu__item--highlighted:not(.ctx-menu__item--disabled) {
+  background: var(--doc-bg-hover);
 }
 .ctx-menu__shortcut {
   font-size: 11px;

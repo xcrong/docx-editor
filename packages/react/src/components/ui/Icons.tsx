@@ -6,6 +6,7 @@
  */
 
 import type { CSSProperties } from 'react';
+import { contextMenuIconMap } from './contextMenuIcons';
 
 export interface IconProps {
   size?: number;
@@ -16,7 +17,7 @@ export interface IconProps {
 const defaultSize = 20;
 
 // SVG wrapper for Material Symbols (viewBox 0 -960 960 960)
-function SvgIcon({
+export function SvgIcon({
   size = defaultSize,
   className = '',
   style,
@@ -844,6 +845,7 @@ export function IconAgentSparkle(props: IconProps) {
     </SvgIcon>
   );
 }
+// Context-menu icons live in `./contextMenuIcons`; entries merge below.
 
 // ============================================================================
 // ICON MAP - for MaterialSymbol compatibility
@@ -961,6 +963,7 @@ const iconMap: Record<string, React.ComponentType<IconProps>> = {
   format_textdirection_r_to_l: IconTextDirectionRtl,
   // Agent
   'agent-sparkle': IconAgentSparkle,
+  ...contextMenuIconMap, // context-menu icons (see `./contextMenuIcons`)
 };
 
 /**
