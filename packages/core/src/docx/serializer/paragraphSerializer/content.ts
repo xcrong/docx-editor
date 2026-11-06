@@ -204,6 +204,14 @@ export function serializeComplexField(field: ComplexField): string {
   return parts.join('');
 }
 
+/** `ST_Lock` — the only values valid for `w:lock/@w:val` (ECMA-376 §17.5.2.35). */
+const SDT_LOCK_VALUES: Record<string, true> = {
+  sdtLocked: true,
+  contentLocked: true,
+  sdtContentLocked: true,
+  unlocked: true,
+};
+
 /**
  * Synthesize a `<w:sdtPr>` element from the modeled {@link SdtProperties}.
  *
@@ -223,7 +231,16 @@ export function synthesizeSdtPr(props: SdtProperties): string {
   if (props.alias) prParts.push(`<w:alias w:val="${escapeXml(props.alias)}"/>`);
   if (props.tag) prParts.push(`<w:tag w:val="${escapeXml(props.tag)}"/>`);
   if (props.id != null) prParts.push(`<w:id w:val="${props.id}"/>`);
-  if (props.lock && props.lock !== 'unlocked') prParts.push(`<w:lock w:val="${props.lock}"/>`);
+  if (
+    props.lock &&
+    props.lock !== 'unlocked' &&
+    Object.prototype.hasOwnProperty.call(SDT_LOCK_VALUES, props.lock)
+  ) {
+    // Whitelisted above; never interpolate a runtime-cast value here (a crafted
+    // PM attr / pasted HTML would otherwise inject markup into document.xml).
+    // `hasOwnProperty` keeps inherited keys (`constructor`, `toString`, …) out.
+    prParts.push(`<w:lock w:val="${props.lock}"/>`);
+  }
   // `placeholder` precedes `showingPlcHdr` in the CT_SdtPr sequence (ECMA-376
   // §17.5.2.38); emit it so a synthesized control keeps a valid element order.
   if (props.placeholder)

@@ -17,6 +17,7 @@
  */
 
 import type { BlockContent, BlockSdt } from '../../types/document';
+import { synthesizeSdtPr } from './paragraphSerializer/content';
 
 /**
  * Serialize a {@link BlockSdt} to a `<w:sdt>` element.
@@ -30,10 +31,11 @@ export function serializeBlockSdt(
   serializeChild: (child: BlockContent) => string
 ): string {
   const sdtContentXml = block.content.map(serializeChild).join('');
-  // Replay the captured properties verbatim. A `BlockSdt` without captured
-  // raw can only arise from a source `w:sdt` that had no `w:sdtPr` at all
-  // (CT_SdtBlock makes sdtPr optional) — faithfully emit none in that case.
-  const sdtPrXml = block.properties.rawPropertiesXml ?? '';
+  // Replay captured properties verbatim when present. A `BlockSdt` built in
+  // code (PM attrs, programmatic construction) has no raw capture, so fall
+  // back to a minimal, sequence-valid `w:sdtPr` synthesized from the modeled
+  // projection — same contract as the inline SDT serializer.
+  const sdtPrXml = block.properties.rawPropertiesXml ?? synthesizeSdtPr(block.properties);
   const sdtEndPrXml = block.properties.rawEndPropertiesXml ?? '';
   return `<w:sdt>${sdtPrXml}${sdtEndPrXml}<w:sdtContent>${sdtContentXml}</w:sdtContent></w:sdt>`;
 }
