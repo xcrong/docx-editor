@@ -1,7 +1,6 @@
 <template>
   <div class="preview-banner" role="status">
-    <span>This is a <strong>preview deployment</strong>. The released editor lives at</span>
-    <a href="https://docx-editor.dev" target="_blank" rel="noopener">docx-editor.dev ↗</a>
+    <span>{{ PREVIEW_BANNER_LEAD }}<a :href="PREVIEW_BANNER_HREF" target="_blank" rel="noopener">{{ PREVIEW_BANNER_FORK_LABEL }}</a>{{ PREVIEW_BANNER_TRAIL }}</span>
   </div>
   <div class="app">
     <main class="main">
@@ -111,6 +110,12 @@ import { templatePlugin, templatePluginKey } from '@xcrong/docx-editor-vue/plugi
 import { de as deLocale } from '@xcrong/docx-editor-i18n';
 import ExampleSwitcher from '../../shared/ExampleSwitcher.vue';
 import BrandLogo from '../../shared/BrandLogo.vue';
+import {
+  PREVIEW_BANNER_FORK_LABEL,
+  PREVIEW_BANNER_HREF,
+  PREVIEW_BANNER_LEAD,
+  PREVIEW_BANNER_TRAIL,
+} from '../../shared/bannerCopy';
 import { createEmptyDocument, findStartPosForParaId } from '@xcrong/docx-editor-core';
 import type { Document } from '@xcrong/docx-editor-core/types/document';
 import { setSuggestionMode } from '@xcrong/docx-editor-core/prosemirror/plugins';

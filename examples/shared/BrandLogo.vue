@@ -5,7 +5,7 @@
     `examples/shared` so the React + Vue previews show an identical brand.
   -->
   <a
-    href="https://docx-editor.dev"
+    href="https://github.com/eigenpal/docx-editor"
     target="_blank"
     rel="noopener noreferrer"
     class="brand-logo"
