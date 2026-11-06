@@ -1120,7 +1120,7 @@ export interface TableToolbarProps {
 }
 
 // @public
-export type TextContextAction = 'cut' | 'copy' | 'paste' | 'pasteAsPlainText' | 'selectAll' | 'delete' | 'separator' | 'addRowAbove' | 'addRowBelow' | 'deleteRow' | 'addColumnLeft' | 'addColumnRight' | 'deleteColumn' | 'mergeCells' | 'splitCell' | 'selectTable' | 'deleteTable' | 'addComment';
+export type TextContextAction = 'cut' | 'copy' | 'paste' | 'pasteAsPlainText' | 'selectAll' | 'delete' | 'separator' | 'addRowAbove' | 'addRowBelow' | 'deleteRow' | 'addColumnLeft' | 'addColumnRight' | 'deleteColumn' | 'mergeCells' | 'splitCell' | 'selectTable' | 'deleteTable' | 'addComment' | 'insertLink' | 'clearFormatting' | 'editLink' | 'removeLink' | 'openLink';
 
 // @public (undocumented)
 export const TextContextMenu: React__default.FC<TextContextMenuProps>;
@@ -1130,6 +1130,7 @@ export interface TextContextMenuItem {
     action: TextContextAction;
     disabled?: boolean;
     dividerAfter?: boolean;
+    icon?: string;
     label: string;
     shortcut?: string;
 }

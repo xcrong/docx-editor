@@ -618,7 +618,14 @@
       "makeFormal": "Resmi yap",
       "makeCasual": "Samimi yap",
       "custom": "Özel"
-    }
+    },
+    "altText": null,
+    "clearFormatting": null,
+    "comment": null,
+    "editLink": null,
+    "insertLink": null,
+    "openLink": null,
+    "removeLink": null
   },
   "documentOutline": {
     "ariaLabel": "Belge ana hattı",

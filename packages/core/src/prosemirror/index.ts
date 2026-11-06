@@ -185,4 +185,6 @@ export {
 export { findStartPosForParaId } from './utils/findStartPosForParaId';
 export { findParagraphByParaId } from './utils/findParagraphByParaId';
 export { LayoutSelectionGate } from './utils/LayoutSelectionGate';
+/** Right-click context resolution for context menus. */
+export { resolveContext, type ContextInfo } from './utils/contextResolver';
 export { ensureParaIdsInState } from './extensions/features/ParaIdAllocatorExtension';

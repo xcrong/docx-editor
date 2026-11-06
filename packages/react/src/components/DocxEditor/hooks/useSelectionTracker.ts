@@ -141,17 +141,18 @@ export function useSelectionTracker({
       const { textFormatting, paragraphFormatting } = selectionState;
 
       // Font/size fall back to the paragraph style's resolved values when no
-      // explicit run-level mark is present.
+      // explicit run-level mark is present. The resolver cascades
+      // docDefaults -> Normal -> paragraph style, so even unstyled text
+      // (no styleId) resolves instead of falling through to Arial/11.
       let fontFamily = textFormatting.fontFamily?.ascii || textFormatting.fontFamily?.hAnsi;
       let fontSize = textFormatting.fontSize;
       if (!fontFamily || !fontSize) {
         const currentDoc = historyStateRef.current;
-        const paraStyleId = selectionState.styleId;
-        if (currentDoc?.package.styles && paraStyleId) {
+        if (currentDoc?.package.styles) {
           const resolver = getCachedStyleResolver(
             currentDoc.package.styles as Parameters<typeof createStyleResolver>[0]
           );
-          const resolved = resolver.resolveParagraphStyle(paraStyleId);
+          const resolved = resolver.resolveParagraphStyle(selectionState.styleId ?? undefined);
           if (!fontFamily && resolved.runFormatting?.fontFamily) {
             fontFamily =
               resolved.runFormatting.fontFamily.ascii || resolved.runFormatting.fontFamily.hAnsi;

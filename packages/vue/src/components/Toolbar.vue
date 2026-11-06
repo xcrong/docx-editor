@@ -468,6 +468,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, getCurrentInstance } from 'vue';
+import type { StyleDefinitions } from '@xcrong/docx-editor-core/types/document';
+import { createStyleResolver } from '@xcrong/docx-editor-core/prosemirror/styles';
 import type { EditorView } from 'prosemirror-view';
 import { undoDepth, redoDepth } from 'prosemirror-history';
 import { extractSelectionContext } from '@xcrong/docx-editor-core/prosemirror/plugins/selectionTracker';
@@ -541,6 +543,9 @@ const props = defineProps<{
       When present, the style picker shows the document's real styles + names,
       matching React's Toolbar `documentStyles` prop. Falls back to presets. */
   documentStyles?: Style[];
+  /** Full style definitions (styles + docDefaults) for the effective
+   *  font/size fallback when the cursor carries no explicit run marks. */
+  styleDefinitions?: StyleDefinitions;
   /**
    * Whether to show the tracked-changes review group. When omitted, the
    * group shows iff the host wires any `review-*` listener (mirrors React's
@@ -675,14 +680,49 @@ const showReviewGroup = computed(() => {
 // and correctly handles both cursor and range selections — including the
 // "$from at a mark boundary" case. No local mark snapshot needed.
 
+// Cached style resolvers by definitions object identity — mirrors React's
+// `getCachedStyleResolver` so selection changes don't rebuild the cascade.
+const resolverCache = new WeakMap<
+  NonNullable<typeof props.styleDefinitions>,
+  ReturnType<typeof createStyleResolver>
+>();
+function getResolver(defs: NonNullable<typeof props.styleDefinitions>) {
+  let r = resolverCache.get(defs);
+  if (!r) {
+    r = createStyleResolver(defs);
+    resolverCache.set(defs, r);
+  }
+  return r;
+}
+
 const currentFontFamily = computed(() => {
   const ff = ctx.value.textFormatting.fontFamily;
-  return ff?.ascii || ff?.hAnsi || 'Arial';
+  const direct = ff?.ascii || ff?.hAnsi;
+  if (direct) return direct;
+  // No explicit run mark: resolve the effective font through the style
+  // cascade (docDefaults -> Normal -> paragraph style).
+  if (props.styleDefinitions) {
+    const styleId = ctx.value.paragraphFormatting.styleId;
+    const resolved = getResolver(props.styleDefinitions).resolveParagraphStyle(
+      styleId ?? undefined
+    );
+    const f = resolved.runFormatting?.fontFamily;
+    if (f?.ascii || f?.hAnsi) return (f.ascii || f.hAnsi) as string;
+  }
+  return 'Arial';
 });
 
 const currentFontSize = computed(() => {
   const sz = ctx.value.textFormatting.fontSize;
-  return sz ? sz / 2 : 11; // half-points to points
+  if (sz) return sz / 2; // half-points to points
+  if (props.styleDefinitions) {
+    const styleId = ctx.value.paragraphFormatting.styleId;
+    const resolved = getResolver(props.styleDefinitions).resolveParagraphStyle(
+      styleId ?? undefined
+    );
+    if (resolved.runFormatting?.fontSize) return resolved.runFormatting.fontSize / 2;
+  }
+  return 11;
 });
 
 const currentAlignment = computed(() => {

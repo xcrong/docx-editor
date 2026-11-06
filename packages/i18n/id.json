@@ -633,7 +633,14 @@
       "makeFormal": "Jadikan Formal",
       "makeCasual": "Jadikan Santai",
       "custom": "Kustom"
-    }
+    },
+    "altText": null,
+    "clearFormatting": null,
+    "comment": null,
+    "editLink": null,
+    "insertLink": null,
+    "openLink": null,
+    "removeLink": null
   },
   "documentOutline": {
     "ariaLabel": "Struktur dokumen",

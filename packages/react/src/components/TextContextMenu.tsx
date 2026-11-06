@@ -6,10 +6,12 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { MaterialSymbol } from './ui/Icons';
 import { useTranslation } from '../i18n';
 import { en as defaultLocale } from '@xcrong/docx-editor-i18n';
 import type { TranslationKey } from '@xcrong/docx-editor-i18n';
 import { Z_INDEX } from '../styles/zIndex';
+import { formatKeys } from './dialogs/KeyboardShortcutsDialog/ShortcutItem';
 
 // ============================================================================
 // TYPES
@@ -36,7 +38,12 @@ export type TextContextAction =
   | 'splitCell'
   | 'selectTable'
   | 'deleteTable'
-  | 'addComment';
+  | 'addComment'
+  | 'insertLink'
+  | 'clearFormatting'
+  | 'editLink'
+  | 'removeLink'
+  | 'openLink';
 
 /**
  * Menu item configuration
@@ -46,6 +53,8 @@ export interface TextContextMenuItem {
   action: TextContextAction;
   /** Display label */
   label: string;
+  /** Material Symbol icon name (rendered via `<MaterialSymbol>`) */
+  icon?: string;
   /** Keyboard shortcut hint */
   shortcut?: string;
   /** Whether the item is disabled */
@@ -436,7 +445,7 @@ const MenuItemComponent: React.FC<MenuItemComponentProps> = ({
             color: item.disabled ? 'var(--doc-border)' : 'var(--doc-text-muted)',
           }}
         >
-          {getActionIcon(item.action)}
+          {item.icon ? <MaterialSymbol name={item.icon} size={18} /> : getActionIcon(item.action)}
         </span>
         <span style={{ flex: 1 }}>{item.label}</span>
         {item.shortcut && (
@@ -519,7 +528,8 @@ export const TextContextMenu: React.FC<TextContextMenuProps> = ({
   // Filter out separators for keyboard navigation
   const navigableItems = menuItems.filter((item) => item.action !== 'separator');
 
-  // Handle click outside
+  // Handle click outside + scroll (menu is position:fixed, so it must close
+  // when the page scrolls underneath it).
   useEffect(() => {
     if (!isOpen) return;
 
@@ -528,15 +538,18 @@ export const TextContextMenu: React.FC<TextContextMenuProps> = ({
         onClose();
       }
     };
+    const handleScroll = () => onClose();
 
     // Use timeout to avoid immediately closing on right-click
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('scroll', handleScroll, true);
     }, 0);
 
     return () => {
       clearTimeout(timer);
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('scroll', handleScroll, true);
     };
   }, [isOpen, onClose]);
 
@@ -642,7 +655,12 @@ export const TextContextMenu: React.FC<TextContextMenuProps> = ({
       className={`docx-text-context-menu ${className}`}
       style={getMenuStyle()}
       role="menu"
-      aria-label={t('contextMenu.textMenuAriaLabel')}
+      // Preserve PM focus/selection: mousedown here must neither move focus
+      // nor bubble to the document outside-click closer.
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
     >
       {menuItems.map((item, index) => {
         // Find the index in navigable items for highlighting
@@ -807,7 +825,8 @@ export function useTextContextMenu(
 // ============================================================================
 
 /**
- * Get action label
+ * Get action label (English source-locale fallback for headless callers —
+ * the rendered menu uses `t()` providers instead).
  */
 export function getTextActionLabel(action: TextContextAction): string {
   const labels: Record<TextContextAction, string> = {
@@ -829,21 +848,26 @@ export function getTextActionLabel(action: TextContextAction): string {
     selectTable: defaultLocale.table.selectTable,
     deleteTable: defaultLocale.table.deleteTable,
     addComment: 'Comment',
+    insertLink: 'Insert link',
+    clearFormatting: 'Clear formatting',
+    editLink: 'Edit link',
+    removeLink: 'Remove link',
+    openLink: 'Open link',
   };
   return labels[action];
 }
 
 /**
- * Get action shortcut
+ * Get action shortcut, platform-mapped (`Ctrl` -> `⌘` on Mac).
  */
 export function getTextActionShortcut(action: TextContextAction): string {
   const shortcuts: Record<TextContextAction, string> = {
-    cut: 'Ctrl+X',
-    copy: 'Ctrl+C',
-    paste: 'Ctrl+V',
-    pasteAsPlainText: 'Ctrl+Shift+V',
-    selectAll: 'Ctrl+A',
-    delete: 'Del',
+    cut: formatKeys('Ctrl+X'),
+    copy: formatKeys('Ctrl+C'),
+    paste: formatKeys('Ctrl+V'),
+    pasteAsPlainText: formatKeys('Ctrl+Shift+V'),
+    selectAll: formatKeys('Ctrl+A'),
+    delete: formatKeys('Del'),
     separator: '',
     addRowAbove: '',
     addRowBelow: '',
@@ -856,6 +880,11 @@ export function getTextActionShortcut(action: TextContextAction): string {
     selectTable: '',
     deleteTable: '',
     addComment: '',
+    insertLink: '',
+    clearFormatting: '',
+    editLink: '',
+    removeLink: '',
+    openLink: '',
   };
   return shortcuts[action];
 }

@@ -83,6 +83,8 @@ import {
   createStyleResolver,
   type TableContextInfo,
   type PMContentControl,
+  getSelectedText,
+  getHyperlinkAttrs,
 } from '@xcrong/docx-editor-core/prosemirror';
 import type { ContentControlFilter, ContentControlValue } from '@xcrong/docx-editor-core/agent';
 import {
@@ -1215,6 +1217,28 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
       },
       []
     ),
+    onInsertLink: useCallback(() => {
+      const view = getActiveEditorView();
+      if (!view) return;
+      const selectedText = getSelectedText(view.state);
+      const existing = getHyperlinkAttrs(view.state);
+      if (existing) {
+        hyperlinkDialog.openEdit({
+          url: existing.href,
+          displayText: selectedText,
+          tooltip: existing.tooltip,
+        });
+      } else {
+        hyperlinkDialog.openInsert(selectedText);
+      }
+    }, [getActiveEditorView, hyperlinkDialog]),
+    onEditLink: useCallback(
+      (href: string, displayText: string) => {
+        hyperlinkDialog.openEdit({ url: href, displayText });
+      },
+      [hyperlinkDialog]
+    ),
+    zoom: state.zoom,
   });
 
   // Handle margin changes from rulers

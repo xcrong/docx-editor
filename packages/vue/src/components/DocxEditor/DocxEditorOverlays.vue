@@ -22,6 +22,7 @@
     :is-editable="!readOnly"
     :in-table="contextMenu.inTable"
     :on-image="contextMenu.onImage"
+    :is-on-hyperlink="contextMenu.linkHref !== null"
     :can-merge-cells="contextMenu.canMergeCells"
     :can-split-cell="contextMenu.canSplitCell"
     @action="(action) => emit('context-menu-action', action)"

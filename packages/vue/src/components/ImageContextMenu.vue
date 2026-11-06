@@ -44,7 +44,20 @@
         </span>
         <span class="image-ctx-menu__label">{{ t('imageWrap.menu.imageProperties') }}</span>
       </button>
-      <div v-if="canOpenProperties" class="image-ctx-menu__divider" role="separator" />
+      <button
+        v-if="canOpenProperties"
+        type="button"
+        role="menuitem"
+        class="image-ctx-menu__item"
+        data-action="alt-text"
+        @mousedown.prevent
+        @click="handleAltText"
+      >
+        <span class="image-ctx-menu__icon">
+          <MaterialSymbol name="description" :size="ICON_SIZE" />
+        </span>
+        <span class="image-ctx-menu__label">{{ t('contextMenu.altText') }}</span>
+      </button>
 
       <button
         v-for="option in options"
@@ -142,6 +155,12 @@ const emit = defineEmits<{
 }>();
 
 function handleOpenProperties() {
+  emit('open-properties');
+  emit('close');
+}
+
+function handleAltText() {
+  // Alt text lives in the image properties dialog — same flow.
   emit('open-properties');
   emit('close');
 }

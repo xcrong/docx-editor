@@ -174,6 +174,8 @@ export interface PagedEditorProps {
     x: number;
     y: number;
     hasSelection: boolean;
+    /** PM position under the cursor (null when the click missed content). */
+    pmPos?: number | null;
     image?: {
       pos: number;
       wrapType: WrapType;

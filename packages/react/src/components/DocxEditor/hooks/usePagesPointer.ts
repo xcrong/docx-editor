@@ -89,6 +89,8 @@ export interface UsePagesPointerOptions {
     x: number;
     y: number;
     hasSelection: boolean;
+    /** PM position under the cursor (null when the click missed content). */
+    pmPos?: number | null;
     image?: ImageInfo | null;
   }) => void;
   onHyperlinkClick?: (data: {
@@ -810,7 +812,7 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
 
       const hasSelection = view.state.selection.from !== view.state.selection.to;
 
-      onContextMenu({ x: e.clientX, y: e.clientY, hasSelection, image: imageInfo });
+      onContextMenu({ x: e.clientX, y: e.clientY, hasSelection, pmPos, image: imageInfo });
     },
     // `zoom` is read inside captureInlinePositionEmu to convert post-
     // transform px deltas back to authored space.

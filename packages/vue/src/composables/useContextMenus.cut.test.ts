@@ -42,6 +42,8 @@ function makeOpts() {
     clearOverlay: () => {},
     setPmSelection: () => {},
     resolvePos: () => null,
+    openHyperlinkDialog: () => {},
+    startAddComment: () => {},
   };
 }
 
