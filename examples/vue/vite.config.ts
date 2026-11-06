@@ -1,8 +1,23 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
 import path from 'path';
+import { demoHeadTags } from '../shared/siteMeta';
+
+/**
+ * Inject the shared demo `<head>` tags (og + optional canonical) at build
+ * time so `examples/vite/index.html` and `examples/vue/index.html` cannot
+ * drift. `VITE_SITE_URL` supplies the canonical domain; unset → omitted.
+ */
+function demoHead(): Plugin {
+  return {
+    name: 'demo-head',
+    transformIndexHtml(html: string) {
+      return html.replace('<!-- DEMO_HEAD -->', demoHeadTags(process.env.VITE_SITE_URL));
+    },
+  };
+}
 
 const monorepoRoot = path.resolve(__dirname, '../..');
 
@@ -39,7 +54,7 @@ const coreAliases = [
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? '/',
-  plugins: [vue()],
+  plugins: [vue(), demoHead()],
   define: {
     // Matches the React examples — the parity build sets this to true so
     // the framework-switcher pills render alongside the chevron source

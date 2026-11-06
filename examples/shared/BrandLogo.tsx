@@ -96,7 +96,7 @@ function EigenpalLogo() {
 export function BrandLogo() {
   return (
     <a
-      href="https://docx-editor.dev"
+      href="https://github.com/eigenpal/docx-editor"
       target="_blank"
       rel="noopener noreferrer"
       style={{

@@ -1,3 +1,10 @@
+import {
+  PREVIEW_BANNER_HREF,
+  PREVIEW_BANNER_FORK_LABEL,
+  PREVIEW_BANNER_LEAD,
+  PREVIEW_BANNER_TRAIL,
+} from './bannerCopy';
+
 export function PreviewBanner() {
   return (
     <div
@@ -17,16 +24,17 @@ export function PreviewBanner() {
       }}
     >
       <span>
-        This is a <strong>preview deployment</strong>. The released editor lives at
+        {PREVIEW_BANNER_LEAD}
+        <a
+          href={PREVIEW_BANNER_HREF}
+          target="_blank"
+          rel="noopener"
+          style={{ color: '#92400e', textDecoration: 'underline', textDecorationColor: '#fcd34d' }}
+        >
+          {PREVIEW_BANNER_FORK_LABEL}
+        </a>
+        {PREVIEW_BANNER_TRAIL}
       </span>
-      <a
-        href="https://docx-editor.dev"
-        target="_blank"
-        rel="noopener"
-        style={{ color: '#92400e', textDecoration: 'underline', textDecorationColor: '#fcd34d' }}
-      >
-        docx-editor.dev ↗
-      </a>
     </div>
   );
 }
