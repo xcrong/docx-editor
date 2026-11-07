@@ -17,6 +17,7 @@
  * @public
  */
 import type { EditorState } from 'prosemirror-state';
+import type { EditorView } from 'prosemirror-view';
 import type { Mark } from 'prosemirror-model';
 import type { TrackedChangeEntry } from '../../utils/comments';
 
@@ -637,4 +638,65 @@ export function extractTrackedChanges(state: EditorState | null): TrackedChanges
     return true;
   });
   return { entries: deduped, commentToRevision };
+}
+
+/**
+ * Merge a body `TrackedChangesResult` with per-header/footer results.
+ * Entries concatenate body-first; the comment→revision map unions (later
+ * sources win on collision — the rule both adapters applied inline).
+ *
+ * Pure. The legacy `hfRid` stamp both adapters wrote onto merged entries
+ * is intentionally dropped: it was write-only (no reader in either
+ * adapter, e2e, or core).
+ *
+ * @public
+ */
+export function mergeTrackedChangesWithHf(
+  body: TrackedChangesResult,
+  hfResults: ReadonlyArray<TrackedChangesResult>
+): TrackedChangesResult {
+  const entries = [...body.entries];
+  const commentToRevision = new Map(body.commentToRevision);
+  for (const result of hfResults) {
+    entries.push(...result.entries);
+    for (const [commentId, revisionId] of result.commentToRevision) {
+      commentToRevision.set(commentId, revisionId);
+    }
+  }
+  return { entries, commentToRevision };
+}
+
+/** Header/footer views owning a revision lookup, keyed by relationship id. */
+export type HfViewsByRid = ReadonlyMap<string, EditorView>;
+
+/**
+ * Find the header/footer view whose document owns `revisionId` (body edits
+ * excluded — callers fall back to the body view on null). Both adapters ran
+ * this identical scan before accept/reject-by-id; an entry owns the
+ * revision when its `revisionId`, `insertionRevisionId`, or coalesced ids
+ * contain it.
+ *
+ * Pure read of `view.state`.
+ *
+ * @public
+ */
+export function findViewOwningRevision(
+  hfViews: HfViewsByRid | null | undefined,
+  revisionId: number
+): EditorView | null {
+  if (!hfViews) return null;
+  for (const view of hfViews.values()) {
+    const { entries } = extractTrackedChanges(view.state);
+    if (
+      entries.some(
+        (e) =>
+          e.revisionId === revisionId ||
+          e.insertionRevisionId === revisionId ||
+          e.coalescedRevisionIds?.includes(revisionId)
+      )
+    ) {
+      return view;
+    }
+  }
+  return null;
 }

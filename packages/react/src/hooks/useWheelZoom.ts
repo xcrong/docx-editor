@@ -11,6 +11,18 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  normalizeZoomLevel,
+  nearestZoomPreset,
+  nextZoomPreset,
+  prevZoomPreset,
+  formatZoomPercent,
+  parseZoomPercent,
+  isZoomPresetLevel,
+  zoomToPercent,
+  zoomToFitLevel,
+  DEFAULT_ZOOM_STEP,
+} from '@xcrong/docx-editor-core/utils/zoom';
 
 // ============================================================================
 // TYPES
@@ -77,7 +89,6 @@ export interface UseWheelZoomReturn {
 const DEFAULT_INITIAL_ZOOM = 1.0;
 const DEFAULT_MIN_ZOOM = 0.25;
 const DEFAULT_MAX_ZOOM = 4.0;
-const DEFAULT_ZOOM_STEP = 0.1;
 
 /**
  * Preset zoom levels for snapping
@@ -85,64 +96,9 @@ const DEFAULT_ZOOM_STEP = 0.1;
 export const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0];
 
 // ============================================================================
-// HELPER FUNCTIONS
+// HELPER FUNCTIONS — pure math lives in core (`utils/zoom`); the presets,
+// ranges, and event wiring below stay adapter-side.
 // ============================================================================
-
-/**
- * Clamp a value between min and max
- */
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-/**
- * Round zoom to 2 decimal places
- */
-function roundZoom(zoom: number): number {
-  return Math.round(zoom * 100) / 100;
-}
-
-/**
- * Find nearest preset zoom level
- */
-function nearestPreset(zoom: number): number {
-  let nearest = ZOOM_PRESETS[0];
-  let minDiff = Math.abs(zoom - nearest);
-
-  for (const preset of ZOOM_PRESETS) {
-    const diff = Math.abs(zoom - preset);
-    if (diff < minDiff) {
-      minDiff = diff;
-      nearest = preset;
-    }
-  }
-
-  return nearest;
-}
-
-/**
- * Get next preset zoom level (for zoom in)
- */
-function nextPreset(currentZoom: number): number {
-  for (const preset of ZOOM_PRESETS) {
-    if (preset > currentZoom + 0.01) {
-      return preset;
-    }
-  }
-  return ZOOM_PRESETS[ZOOM_PRESETS.length - 1];
-}
-
-/**
- * Get previous preset zoom level (for zoom out)
- */
-function prevPreset(currentZoom: number): number {
-  for (let i = ZOOM_PRESETS.length - 1; i >= 0; i--) {
-    if (ZOOM_PRESETS[i] < currentZoom - 0.01) {
-      return ZOOM_PRESETS[i];
-    }
-  }
-  return ZOOM_PRESETS[0];
-}
 
 // ============================================================================
 // USE WHEEL ZOOM HOOK
@@ -177,7 +133,7 @@ export function useWheelZoom(options: UseWheelZoomOptions = {}): UseWheelZoomRet
    */
   const setZoom = useCallback(
     (newZoom: number) => {
-      const clampedZoom = roundZoom(clamp(newZoom, minZoom, maxZoom));
+      const clampedZoom = normalizeZoomLevel(newZoom, minZoom, maxZoom);
       if (clampedZoom !== zoomRef.current) {
         setZoomState(clampedZoom);
         onZoomChange?.(clampedZoom);
@@ -219,10 +175,8 @@ export function useWheelZoom(options: UseWheelZoomOptions = {}): UseWheelZoomRet
    */
   const zoomToFit = useCallback(
     (containerWidth: number, contentWidth: number) => {
-      if (contentWidth > 0) {
-        const fitZoom = containerWidth / contentWidth;
-        setZoom(fitZoom);
-      }
+      const fitZoom = zoomToFitLevel(containerWidth, contentWidth);
+      if (fitZoom !== null) setZoom(fitZoom);
     },
     [setZoom]
   );
@@ -329,7 +283,7 @@ export function useWheelZoom(options: UseWheelZoomOptions = {}): UseWheelZoomRet
     zoomToFit,
     isMinZoom: zoom <= minZoom,
     isMaxZoom: zoom >= maxZoom,
-    zoomPercent: Math.round(zoom * 100),
+    zoomPercent: zoomToPercent(zoom),
     handleWheel,
     handleKeyDown,
   };
@@ -350,49 +304,42 @@ export function getZoomPresets(): number[] {
  * Find nearest zoom preset
  */
 export function findNearestZoomPreset(zoom: number): number {
-  return nearestPreset(zoom);
+  return nearestZoomPreset(ZOOM_PRESETS, zoom);
 }
 
 /**
  * Get next zoom preset (for zoom in)
  */
 export function getNextZoomPreset(zoom: number): number {
-  return nextPreset(zoom);
+  return nextZoomPreset(ZOOM_PRESETS, zoom);
 }
 
 /**
  * Get previous zoom preset (for zoom out)
  */
 export function getPreviousZoomPreset(zoom: number): number {
-  return prevPreset(zoom);
+  return prevZoomPreset(ZOOM_PRESETS, zoom);
 }
 
 /**
  * Format zoom level for display
  */
 export function formatZoom(zoom: number): string {
-  return `${Math.round(zoom * 100)}%`;
+  return formatZoomPercent(zoom);
 }
 
 /**
  * Parse zoom from percentage string
  */
 export function parseZoom(zoomString: string): number | null {
-  const match = zoomString.match(/(\d+(\.\d+)?)/);
-  if (match) {
-    const value = parseFloat(match[1]);
-    if (!isNaN(value)) {
-      return value / 100;
-    }
-  }
-  return null;
+  return parseZoomPercent(zoomString);
 }
 
 /**
  * Check if zoom level is at a preset
  */
 export function isZoomPreset(zoom: number): boolean {
-  return ZOOM_PRESETS.some((preset) => Math.abs(preset - zoom) < 0.01);
+  return isZoomPresetLevel(ZOOM_PRESETS, zoom);
 }
 
 /**
@@ -403,7 +350,7 @@ export function clampZoom(
   minZoom: number = DEFAULT_MIN_ZOOM,
   maxZoom: number = DEFAULT_MAX_ZOOM
 ): number {
-  return roundZoom(clamp(zoom, minZoom, maxZoom));
+  return normalizeZoomLevel(zoom, minZoom, maxZoom);
 }
 
 // ============================================================================

@@ -33,7 +33,7 @@ import {
   setCellFillColor,
   setTableBorderColor,
   setTableBorderWidth,
-  createStyleResolver,
+  getSharedStyleResolver,
 } from '@xcrong/docx-editor-core/prosemirror';
 import type { EditorView } from 'prosemirror-view';
 import type { useTableSelection } from '../../../hooks/useTableSelection';
@@ -75,16 +75,12 @@ export function useTableDialogs({
   tableSelection,
   borderSpecRef,
   historyStateRef,
-  getCachedStyleResolver,
 }: {
   getActiveEditorView: () => EditorView | null | undefined;
   focusActiveEditor: () => void;
   tableSelection: ReturnType<typeof useTableSelection>;
   borderSpecRef: React.RefObject<BorderSpec>;
   historyStateRef: React.RefObject<Document | null>;
-  getCachedStyleResolver: (
-    styles: Parameters<typeof createStyleResolver>[0]
-  ) => ReturnType<typeof createStyleResolver>;
 }) {
   const [tablePropsOpen, setTablePropsOpen] = useState(false);
   const [splitCellDialogState, setSplitCellDialogState] = useState<SplitCellDialogState>({
@@ -228,7 +224,7 @@ export function useTableDialogs({
               let preset: TableStylePreset | undefined = getBuiltinTableStyle(action.styleId);
               const currentDoc = historyStateRef.current;
               if (!preset && currentDoc?.package.styles) {
-                const styleResolver = getCachedStyleResolver(currentDoc.package.styles);
+                const styleResolver = getSharedStyleResolver(currentDoc.package.styles);
                 const docStyle = styleResolver.getStyle(action.styleId);
                 if (docStyle) {
                   preset = { id: docStyle.styleId, name: docStyle.name ?? docStyle.styleId };
@@ -305,7 +301,6 @@ export function useTableDialogs({
       openSplitCellDialog,
       borderSpecRef,
       historyStateRef,
-      getCachedStyleResolver,
     ]
   );
 

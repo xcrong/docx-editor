@@ -210,3 +210,36 @@ export function getPageContent(
   const text = paragraphs.map((paragraph) => `[${paragraph.paraId}] ${paragraph.text}`).join('\n');
   return { pageNumber, text, paragraphs };
 }
+
+/**
+ * Sidebar card id → anchor target. `comment-<id>` and `tc-<rev>(-…)` ids
+ * resolve to a PM range via the live marks; plugin ids (`template-tag-*`,
+ * `plugin-*`) carry no document anchor and yield `null`.
+ * Previously parsed inline in both adapters' sidebar navigation.
+ */
+export type SidebarAnchorTarget =
+  | { kind: 'comment'; id: number }
+  | { kind: 'change'; revisionId: number };
+
+export function parseSidebarItemId(itemId: string): SidebarAnchorTarget | null {
+  if (itemId.startsWith('comment-')) {
+    const id = Number(itemId.slice('comment-'.length));
+    if (Number.isInteger(id)) return { kind: 'comment', id };
+  } else if (itemId.startsWith('tc-')) {
+    const rev = Number(itemId.slice(3).split('-')[0]);
+    if (Number.isInteger(rev)) return { kind: 'change', revisionId: rev };
+  }
+  return null;
+}
+
+/**
+ * Resolve a sidebar card id straight to a PM range (`null` when the id
+ * carries no anchor or the anchor is stale). Pure read, no dispatch.
+ */
+export function findSidebarAnchorRange(view: EditorView | null, itemId: string): PmRange | null {
+  const target = parseSidebarItemId(itemId);
+  if (!target) return null;
+  return target.kind === 'comment'
+    ? findCommentRange(view, target.id)
+    : findChangeRange(view, target.revisionId);
+}

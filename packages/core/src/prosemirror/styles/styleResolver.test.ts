@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { createStyleResolver } from './styleResolver';
+import { createStyleResolver, resolveEffectiveFont } from './styleResolver';
 import type { StyleDefinitions, DocDefaults } from '../../types/document';
 
 describe('StyleResolver', () => {
@@ -521,6 +521,51 @@ describe('StyleResolver', () => {
       expect(result.runFormatting?.fontFamily?.hAnsiTheme).toBe('majorHAnsi');
       expect(result.runFormatting?.fontFamily?.ascii).toBeUndefined();
       expect(result.runFormatting?.fontFamily?.hAnsi).toBeUndefined();
+    });
+  });
+
+  describe('resolveEffectiveFont (shared toolbar-display contract)', () => {
+    const defs: StyleDefinitions = {
+      docDefaults: { rPr: { fontSize: 20, fontFamily: { ascii: 'Calibri' } } },
+      styles: [
+        {
+          styleId: 'Heading1',
+          type: 'paragraph',
+          name: 'Heading 1',
+          rPr: { fontSize: 32, fontFamily: { ascii: 'Georgia' } },
+        },
+      ],
+    };
+
+    test('explicit run marks win over the cascade', () => {
+      expect(
+        resolveEffectiveFont({
+          directFamily: { ascii: 'Arial' },
+          directSizeHalfPoints: 24,
+          styleId: 'Heading1',
+          styleDefinitions: defs,
+        })
+      ).toEqual({ family: 'Arial', sizeHalfPoints: 24 });
+    });
+
+    test('missing members fall back through docDefaults → style', () => {
+      // No direct marks, no style → docDefaults.
+      expect(resolveEffectiveFont({ styleDefinitions: defs })).toEqual({
+        family: 'Calibri',
+        sizeHalfPoints: 20,
+      });
+      // Style fills what direct marks leave out.
+      expect(
+        resolveEffectiveFont({
+          directSizeHalfPoints: 24,
+          styleId: 'Heading1',
+          styleDefinitions: defs,
+        })
+      ).toEqual({ family: 'Georgia', sizeHalfPoints: 24 });
+    });
+
+    test('unresolvable members stay null (adapters apply display defaults)', () => {
+      expect(resolveEffectiveFont({})).toEqual({ family: null, sizeHalfPoints: null });
     });
   });
 });

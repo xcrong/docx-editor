@@ -11,6 +11,7 @@
  */
 import { ref, type Ref, type ComputedRef } from 'vue';
 import { fontSizePresets } from '../components/Toolbar/presets';
+import { nextFontSize, prevFontSize } from '@xcrong/docx-editor-core/utils/fontSize';
 
 export interface UseToolbarFontSizeReturn {
   onSizeFocus: () => void;
@@ -62,11 +63,11 @@ export function useToolbarFontSize(opts: {
   // Step to the next/prev preset; ±1 beyond the list (matches React's stepper).
   function increaseFontSize() {
     const c = opts.currentFontSize.value;
-    setFontSize(fontSizePresets.find((s) => s > c) || c + 1);
+    setFontSize(nextFontSize(fontSizePresets, c));
   }
   function decreaseFontSize() {
     const c = opts.currentFontSize.value;
-    setFontSize([...fontSizePresets].reverse().find((s) => s < c) || Math.max(1, c - 1));
+    setFontSize(prevFontSize(fontSizePresets, c));
   }
 
   return {

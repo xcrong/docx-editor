@@ -23,7 +23,7 @@ import {
   findNextChange,
   findPreviousChange,
 } from '@xcrong/docx-editor-core/prosemirror/commands';
-import { extractTrackedChanges } from '@xcrong/docx-editor-core/prosemirror/utils/extractTrackedChanges';
+import { findViewOwningRevision } from '@xcrong/docx-editor-core/prosemirror/utils/extractTrackedChanges';
 import {
   addCommentToRange,
   applyProposedChange,
@@ -228,24 +228,7 @@ export function useCommentManagement(opts: UseCommentManagementOptions) {
   }
 
   function handleAcceptChangeById(revisionId: number) {
-    const hfViews = opts.getHfPmViews?.();
-    let targetView = null;
-    if (hfViews) {
-      for (const view of hfViews.values()) {
-        const { entries } = extractTrackedChanges(view.state);
-        if (
-          entries.some(
-            (e) =>
-              e.revisionId === revisionId ||
-              e.insertionRevisionId === revisionId ||
-              e.coalescedRevisionIds?.includes(revisionId)
-          )
-        ) {
-          targetView = view;
-          break;
-        }
-      }
-    }
+    const targetView = findViewOwningRevision(opts.getHfPmViews?.(), revisionId);
     const view = targetView || opts.editorView.value;
     if (!view) return;
     acceptChangeById(revisionId)(view.state, view.dispatch);
@@ -254,24 +237,7 @@ export function useCommentManagement(opts: UseCommentManagementOptions) {
   }
 
   function handleRejectChangeById(revisionId: number) {
-    const hfViews = opts.getHfPmViews?.();
-    let targetView = null;
-    if (hfViews) {
-      for (const view of hfViews.values()) {
-        const { entries } = extractTrackedChanges(view.state);
-        if (
-          entries.some(
-            (e) =>
-              e.revisionId === revisionId ||
-              e.insertionRevisionId === revisionId ||
-              e.coalescedRevisionIds?.includes(revisionId)
-          )
-        ) {
-          targetView = view;
-          break;
-        }
-      }
-    }
+    const targetView = findViewOwningRevision(opts.getHfPmViews?.(), revisionId);
     const view = targetView || opts.editorView.value;
     if (!view) return;
     rejectChangeById(revisionId)(view.state, view.dispatch);

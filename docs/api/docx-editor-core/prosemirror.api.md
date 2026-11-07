@@ -143,6 +143,22 @@ export const documentContextKey: PluginKey<DocumentContext>;
 export const documentStylesKey: PluginKey<StyleResolver | null>;
 
 // @public
+export interface EffectiveFont {
+    // (undocumented)
+    family: string | null;
+    // (undocumented)
+    sizeHalfPoints: number | null;
+}
+
+// @public
+export interface EffectiveFontRequest {
+    directFamily?: TextFormatting['fontFamily'] | null;
+    directSizeHalfPoints?: number | null;
+    styleDefinitions?: StyleDefinitions | null;
+    styleId?: string | null;
+}
+
+// @public
 export function ensureParaIdsInState(state: EditorState): EditorState;
 
 // @public
@@ -259,6 +275,9 @@ export function getSelectedText(state: EditorState): string;
 
 // @public
 export function getSelectionContext(state: EditorState): SelectionContext | null;
+
+// @public (undocumented)
+export function getSharedStyleResolver(styleDefinitions: StyleDefinitions): StyleResolver;
 
 // @public (undocumented)
 export function getStyleId(state: EditorState): string | null;
@@ -529,6 +548,9 @@ export interface ResolvedParagraphStyle {
     paragraphFormatting?: ParagraphFormatting;
     runFormatting?: TextFormatting;
 }
+
+// @public
+export function resolveEffectiveFont(request: EffectiveFontRequest): EffectiveFont;
 
 // @public (undocumented)
 export const schema: prosemirror_model.Schema<any, any>;

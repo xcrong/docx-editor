@@ -43,6 +43,7 @@ export { halfPointsToPoints, pointsToHalfPoints } from '@xcrong/docx-editor-core
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { nextFontSize, prevFontSize } from '@xcrong/docx-editor-core/utils/fontSize';
 
 const props = withDefaults(
   defineProps<{
@@ -74,12 +75,10 @@ const displayValue = computed(() =>
 );
 
 function getNext(curr: number) {
-  const next = resolvedSizes.value.find((s) => s > curr);
-  return next ?? Math.min(curr + 1, props.maxSize);
+  return nextFontSize(resolvedSizes.value, curr, props.maxSize);
 }
 function getPrev(curr: number) {
-  const prev = [...resolvedSizes.value].reverse().find((s) => s < curr);
-  return prev ?? Math.max(curr - 1, props.minSize);
+  return prevFontSize(resolvedSizes.value, curr, props.minSize);
 }
 
 function handleDecrease() {

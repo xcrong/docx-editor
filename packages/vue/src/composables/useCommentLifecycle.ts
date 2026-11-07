@@ -36,7 +36,10 @@ import { ref, onMounted, onBeforeUnmount, watch, unref, type MaybeRef, type Ref 
 import type { EditorView } from 'prosemirror-view';
 import type { Document } from '@xcrong/docx-editor-core/types/document';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
-import { extractTrackedChanges } from '@xcrong/docx-editor-core/prosemirror/utils/extractTrackedChanges';
+import {
+  extractTrackedChanges,
+  mergeTrackedChangesWithHf,
+} from '@xcrong/docx-editor-core/prosemirror/utils/extractTrackedChanges';
 import { findElementAtPosition } from '../utils/domQueries';
 import { createComment as createCommentCore } from '@xcrong/docx-editor-core/prosemirror/commentOps';
 import {
@@ -89,23 +92,15 @@ export function useCommentLifecycle(opts: UseCommentLifecycleOptions) {
     // shallowRef reactivity fires.
     opts.comments.value = [...(doc.package?.document?.comments ?? [])];
 
-    // Same merge/replacement logic React uses, lifted to core so both
-    // adapters share one implementation.
+    // Body + header/footer merge lives in core so both adapters share one
+    // implementation.
     const bodyResult = extractTrackedChanges(view.state);
-    const mergedEntries = [...bodyResult.entries];
+    const hfResults = opts.getHfPmViews
+      ? [...opts.getHfPmViews().values()].map((hfView) => extractTrackedChanges(hfView.state))
+      : [];
+    const merged = mergeTrackedChangesWithHf(bodyResult, hfResults);
 
-    if (opts.getHfPmViews) {
-      const hfViews = opts.getHfPmViews();
-      for (const [rId, hfView] of hfViews.entries()) {
-        const hfResult = extractTrackedChanges(hfView.state);
-        for (const entry of hfResult.entries) {
-          (entry as any).hfRid = rId;
-          mergedEntries.push(entry);
-        }
-      }
-    }
-
-    opts.trackedChanges.value = mergedEntries;
+    opts.trackedChanges.value = merged.entries;
 
     // Auto-open the sidebar on first load if the document carries comments
     // or tracked changes.

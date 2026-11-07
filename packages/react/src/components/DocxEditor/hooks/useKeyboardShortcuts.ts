@@ -1,10 +1,9 @@
 import { useEffect } from 'react';
 import {
-  getHyperlinkAttrs,
-  getSelectedText,
   getTableContext,
   deleteTable as pmDeleteTable,
 } from '@xcrong/docx-editor-core/prosemirror';
+import { resolveLinkDialogTarget } from '@xcrong/docx-editor-core/prosemirror/commands';
 import type { useTableSelection } from '../../../hooks/useTableSelection';
 import type { useFindReplace } from '../../../hooks/useFindReplace';
 import type { useHyperlinkDialog } from '../../dialogs/HyperlinkDialog';
@@ -103,16 +102,15 @@ export function useKeyboardShortcuts({
           e.preventDefault();
           const view = pagedEditorRef.current?.getView();
           if (view) {
-            const selectedText = getSelectedText(view.state);
-            const existingLink = getHyperlinkAttrs(view.state);
-            if (existingLink) {
+            const target = resolveLinkDialogTarget(view.state);
+            if (target.mode === 'edit') {
               hyperlinkDialog.openEdit({
-                url: existingLink.href,
-                displayText: selectedText,
-                tooltip: existingLink.tooltip,
+                url: target.href,
+                displayText: target.displayText,
+                tooltip: target.tooltip,
               });
             } else {
-              hyperlinkDialog.openInsert(selectedText);
+              hyperlinkDialog.openInsert(target.displayText);
             }
           }
         }

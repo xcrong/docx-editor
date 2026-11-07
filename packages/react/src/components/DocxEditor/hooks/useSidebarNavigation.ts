@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { shouldUseSidebarOverlay } from '@xcrong/docx-editor-core/utils/sidebarConstants';
-import { findChangeRange, findCommentRange } from '@xcrong/docx-editor-core/prosemirror/queries';
+import { findSidebarAnchorRange } from '@xcrong/docx-editor-core/prosemirror/queries';
 import type { PagedEditorRef } from '../PagedEditor';
 
 /**
@@ -52,20 +52,9 @@ export function useSidebarNavigation({
 
   const handleSidebarNavigate = useCallback(
     (itemId: string) => {
-      // Plugin sidebar items (`template-tag-*`, `plugin-*`) carry no
-      // document anchor — only `comment-*` / `tc-*` ids resolve to a PM
-      // range via the live marks.
-      if (!itemId.startsWith('comment-') && !itemId.startsWith('tc-')) return;
       const view = pagedEditorRef.current?.getView();
       if (!view) return;
-      let range: { from: number; to: number } | null = null;
-      if (itemId.startsWith('comment-')) {
-        const id = Number(itemId.slice('comment-'.length));
-        if (Number.isInteger(id)) range = findCommentRange(view, id);
-      } else if (itemId.startsWith('tc-')) {
-        const rev = Number(itemId.slice(3).split('-')[0]);
-        if (Number.isInteger(rev)) range = findChangeRange(view, rev);
-      }
+      const range = findSidebarAnchorRange(view, itemId);
       if (!range) return;
       pagedEditorRef.current?.scrollToPosition(range.from);
     },

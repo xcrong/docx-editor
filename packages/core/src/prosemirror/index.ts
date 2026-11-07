@@ -43,8 +43,13 @@ export {
 export type { ToProseDocOptions } from './conversion';
 
 // Styles
-export { StyleResolver, createStyleResolver } from './styles';
-export type { ResolvedParagraphStyle } from './styles';
+export {
+  StyleResolver,
+  createStyleResolver,
+  getSharedStyleResolver,
+  resolveEffectiveFont,
+} from './styles';
+export type { ResolvedParagraphStyle, EffectiveFontRequest, EffectiveFont } from './styles';
 
 // Selection state utilities
 export { extractSelectionState } from './selectionState';

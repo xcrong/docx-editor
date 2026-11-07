@@ -49,7 +49,11 @@ import type { FontOption } from './ui/FontPicker';
 import { useSidebarNavigation } from './DocxEditor/hooks/useSidebarNavigation';
 import { useSidebarLayout } from './DocxEditor/hooks/useSidebarLayout';
 import { useCommentSidebarItems, type CommentCallbacks } from '../hooks/useCommentSidebarItems';
-import { extractTrackedChanges } from '../hooks/useTrackedChanges';
+import {
+  extractTrackedChanges,
+  mergeTrackedChangesWithHf,
+  findViewOwningRevision,
+} from '../hooks/useTrackedChanges';
 import { type EditorState as PMEditorState } from 'prosemirror-state';
 import type { ReactSidebarItem } from '../plugin-api/types';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
@@ -81,7 +85,6 @@ import {
 import {
   type SelectionState,
   extractSelectionState,
-  createStyleResolver,
   type TableContextInfo,
   type PMContentControl,
 } from '@xcrong/docx-editor-core/prosemirror';
@@ -739,27 +742,11 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
 
   const { entries: trackedChanges, commentToRevision } = useMemo(() => {
     const bodyResult = extractTrackedChanges(pmState);
-    const mergedEntries = [...bodyResult.entries];
-    const mergedCommentToRevision = new Map(bodyResult.commentToRevision);
-
     const hfViews = pagedEditorRef.current?.getHfPmViews?.();
-    if (hfViews) {
-      for (const [rId, view] of hfViews.entries()) {
-        const hfResult = extractTrackedChanges(view.state);
-        for (const entry of hfResult.entries) {
-          (entry as any).hfRid = rId;
-          mergedEntries.push(entry);
-        }
-        for (const [commentId, revisionId] of hfResult.commentToRevision.entries()) {
-          mergedCommentToRevision.set(commentId, revisionId);
-        }
-      }
-    }
-
-    return {
-      entries: mergedEntries,
-      commentToRevision: mergedCommentToRevision,
-    };
+    const hfResults = hfViews
+      ? [...hfViews.values()].map((view) => extractTrackedChanges(view.state))
+      : [];
+    return mergeTrackedChangesWithHf(bodyResult, hfResults);
   }, [pmState, hfVersion]);
 
   const [anchorPositions, setAnchorPositions] =
@@ -850,23 +837,6 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
   historyStateRef.current = history.state;
   // Track current border color/width for border presets (like Google Docs)
   const borderSpecRef = useRef({ style: 'single', size: 4, color: { rgb: '000000' } });
-  // Cache style resolver to avoid recreating on every selection change
-  const styleResolverCacheRef = useRef<{
-    styles: unknown;
-    resolver: ReturnType<typeof createStyleResolver>;
-  } | null>(null);
-  const getCachedStyleResolver = useCallback(
-    (styles: Parameters<typeof createStyleResolver>[0]) => {
-      const cached = styleResolverCacheRef.current;
-      if (cached && cached.styles === styles) {
-        return cached.resolver;
-      }
-      const resolver = createStyleResolver(styles);
-      styleResolverCacheRef.current = { styles, resolver };
-      return resolver;
-    },
-    []
-  );
 
   const { getActiveEditorView, focusActiveEditor, undoActiveEditor, redoActiveEditor } =
     useActiveEditor({
@@ -1051,7 +1021,6 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
     borderSpecRef,
     theme,
     historyStateRef,
-    getCachedStyleResolver,
     setFloatingCommentBtn,
     applySelectionDelta: useCallback((delta) => setState((prev) => ({ ...prev, ...delta })), []),
     recomputeFloatingCommentBtn,
@@ -1139,7 +1108,6 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
     tableSelection,
     borderSpecRef,
     historyStateRef,
-    getCachedStyleResolver,
   });
 
   const {
@@ -1156,7 +1124,6 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
     lastSelectionRef,
     hyperlinkDialog,
     historyStateRef,
-    getCachedStyleResolver,
   });
 
   const handleZoomChange = useCallback((zoom: number) => {
@@ -1295,7 +1262,6 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
     setShowCommentsSidebar,
     contentChangeSubscribersRef,
     selectionChangeSubscribersRef,
-    getCachedStyleResolver,
     commentIdAllocator: commentIdAllocatorRef.current,
   });
 
@@ -1429,24 +1395,10 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
       if (view) rejectChange(from, to)(view.state, view.dispatch);
     },
     onAcceptChangeById: (revisionId) => {
-      const hfViews = pagedEditorRef.current?.getHfPmViews?.();
-      let targetView = null;
-      if (hfViews) {
-        for (const view of hfViews.values()) {
-          const { entries } = extractTrackedChanges(view.state);
-          if (
-            entries.some(
-              (e) =>
-                e.revisionId === revisionId ||
-                e.insertionRevisionId === revisionId ||
-                e.coalescedRevisionIds?.includes(revisionId)
-            )
-          ) {
-            targetView = view;
-            break;
-          }
-        }
-      }
+      const targetView = findViewOwningRevision(
+        pagedEditorRef.current?.getHfPmViews?.(),
+        revisionId
+      );
       const view = targetView || pagedEditorRef.current?.getView();
       if (view) {
         acceptChangeById(revisionId)(view.state, view.dispatch);
@@ -1456,24 +1408,10 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
       }
     },
     onRejectChangeById: (revisionId) => {
-      const hfViews = pagedEditorRef.current?.getHfPmViews?.();
-      let targetView = null;
-      if (hfViews) {
-        for (const view of hfViews.values()) {
-          const { entries } = extractTrackedChanges(view.state);
-          if (
-            entries.some(
-              (e) =>
-                e.revisionId === revisionId ||
-                e.insertionRevisionId === revisionId ||
-                e.coalescedRevisionIds?.includes(revisionId)
-            )
-          ) {
-            targetView = view;
-            break;
-          }
-        }
-      }
+      const targetView = findViewOwningRevision(
+        pagedEditorRef.current?.getHfPmViews?.(),
+        revisionId
+      );
       const view = targetView || pagedEditorRef.current?.getView();
       if (view) {
         rejectChangeById(revisionId)(view.state, view.dispatch);

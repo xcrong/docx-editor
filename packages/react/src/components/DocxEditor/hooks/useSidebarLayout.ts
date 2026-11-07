@@ -3,6 +3,7 @@ import { OUTLINE_BUTTON_RESERVED_SPACE, OUTLINE_RESERVED_SPACE } from '../../Doc
 import { RULER_WIDTH } from '../../ui/VerticalRuler';
 import { SIDEBAR_DOCUMENT_SHIFT } from '../../sidebar/constants';
 import { DEFAULT_PAGE_WIDTH } from '../PagedEditor';
+import { computeSidebarLayoutWidths } from '@xcrong/docx-editor-core/utils/sidebarLayout';
 import type { Document } from '@xcrong/docx-editor-core/types/document';
 
 /**
@@ -35,38 +36,29 @@ export function useSidebarLayout({
   const sidebarShifted = sidebarOpen && !sidebarOverlayMode;
 
   const { minLayoutWidth, pageWidthPx } = useMemo(() => {
-    // Reserve 2× the left-edge allowance so the centered page clears whatever
-    // outline UI is showing, without forcing a shift on wide viewports.
-    const outlineLeftAllowance =
-      (showOutline
-        ? OUTLINE_RESERVED_SPACE
-        : showOutlineButton
-          ? OUTLINE_BUTTON_RESERVED_SPACE
-          : 20) +
-      // The outline toggle/panel inset past the vertical ruler when it's shown,
-      // so the page must clear that extra width too.
-      (showRuler && (showOutline || showOutlineButton) ? RULER_WIDTH : 0);
-    // Reserve against the WIDEST page in the doc, not the portrait default.
-    // Taking the max across all section widths also covers mixed-orientation docs.
     const docBody = historyDocument?.package?.document;
-    const sectionPageWidths = [
-      docBody?.finalSectionProperties?.pageWidth,
-      ...(docBody?.sections?.map((s) => s.properties?.pageWidth) ?? []),
-    ].filter((w): w is number => typeof w === 'number' && w > 0);
-    const maxPageWidthPx = sectionPageWidths.length
-      ? Math.round(Math.max(...sectionPageWidths) / 15)
-      : DEFAULT_PAGE_WIDTH;
-
-    const minLayoutWidth =
-      2 * outlineLeftAllowance + maxPageWidthPx + (sidebarShifted ? SIDEBAR_DOCUMENT_SHIFT * 2 : 0);
-
-    // The final section's width — positions the sidebar / comment margin
-    // markers against the page most content lives under.
-    const sectionPropsPageWidth = docBody?.finalSectionProperties?.pageWidth;
-    const pageWidthPx = sectionPropsPageWidth
-      ? Math.round(sectionPropsPageWidth / 15)
-      : DEFAULT_PAGE_WIDTH;
-    return { minLayoutWidth, pageWidthPx };
+    // Width math lives in core; geometry constants stay owned by the
+    // components that render them, passed explicitly so a constant change
+    // can't silently diverge from the kernel defaults.
+    return computeSidebarLayoutWidths({
+      showOutline,
+      showOutlineButton,
+      showRuler,
+      sidebarShifted,
+      sectionPageWidthsTwips: [
+        docBody?.finalSectionProperties?.pageWidth,
+        ...(docBody?.sections?.map((s) => s.properties?.pageWidth) ?? []),
+      ],
+      finalPageWidthTwips: docBody?.finalSectionProperties?.pageWidth,
+      spaces: {
+        outlinePanel: OUTLINE_RESERVED_SPACE,
+        outlineButton: OUTLINE_BUTTON_RESERVED_SPACE,
+        outlineFallback: 20,
+        rulerWidth: RULER_WIDTH,
+        defaultPageWidth: DEFAULT_PAGE_WIDTH,
+        sidebarShift: SIDEBAR_DOCUMENT_SHIFT,
+      },
+    });
   }, [historyDocument, showOutline, showOutlineButton, showRuler, sidebarShifted]);
 
   return { sidebarShifted, minLayoutWidth, pageWidthPx };

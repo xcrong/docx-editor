@@ -18,6 +18,49 @@ export const MIN_CELL_WIDTH_TWIPS = 300;
 /** Minimum row height (~0.14"). */
 export const MIN_ROW_HEIGHT_TWIPS = 200;
 
+/** Pixel drag delta → twips (rounded; 0 means "no visible movement yet"). */
+export function pxDeltaToTwips(deltaPx: number): number {
+  return Math.round(deltaPx * TWIPS_PER_PIXEL);
+}
+
+/**
+ * One column-drag step: shift `deltaTwips` from the right column to the
+ * left, honouring the min width on both sides. Returns the accepted pair,
+ * or `null` when clamped — in which case the adapter must NOT advance its
+ * anchor or move the visual handle (otherwise the handle desyncs from the
+ * model and the user can never drag back).
+ */
+export function stepColumnResize(
+  orig: { left: number; right: number },
+  deltaTwips: number,
+  minTwips: number = MIN_CELL_WIDTH_TWIPS
+): { left: number; right: number } | null {
+  const left = orig.left + deltaTwips;
+  const right = orig.right - deltaTwips;
+  if (left < minTwips || right < minTwips) return null;
+  return { left, right };
+}
+
+/** One row-drag step: accept iff the new height clears the min. */
+export function stepRowResize(
+  origHeightTwips: number,
+  deltaTwips: number,
+  minTwips: number = MIN_ROW_HEIGHT_TWIPS
+): number | null {
+  const height = origHeightTwips + deltaTwips;
+  return height >= minTwips ? height : null;
+}
+
+/** One right-edge step: the last column grows alone, min-clamped. */
+export function stepRightEdgeResize(
+  origWidthTwips: number,
+  deltaTwips: number,
+  minTwips: number = MIN_CELL_WIDTH_TWIPS
+): number | null {
+  const width = origWidthTwips + deltaTwips;
+  return width >= minTwips ? width : null;
+}
+
 interface FoundTable {
   node: PMNode;
   /** PM doc position of the table node (its `before(d)`) */

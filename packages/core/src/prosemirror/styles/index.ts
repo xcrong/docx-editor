@@ -4,6 +4,11 @@
  * @public
  */
 
-export { StyleResolver, createStyleResolver } from './styleResolver';
-export type { ResolvedParagraphStyle } from './styleResolver';
+export {
+  StyleResolver,
+  createStyleResolver,
+  getSharedStyleResolver,
+  resolveEffectiveFont,
+} from './styleResolver';
+export type { ResolvedParagraphStyle, EffectiveFontRequest, EffectiveFont } from './styleResolver';
 export { resolvePreferredNewTableStyleId, DEFAULT_NEW_TABLE_LOOK } from './newTableStyle';

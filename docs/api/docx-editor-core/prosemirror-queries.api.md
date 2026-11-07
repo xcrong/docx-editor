@@ -35,6 +35,9 @@ export interface FindInDocumentMatch {
 }
 
 // @public
+export function findSidebarAnchorRange(view: EditorView | null, itemId: string): PmRange | null;
+
+// @public
 export function getPageContent(view: EditorView | null, layout: Layout | null, pageNumber: number): PageContent | null;
 
 // @public
@@ -53,6 +56,9 @@ export interface PageContent {
     // (undocumented)
     text: string;
 }
+
+// @public (undocumented)
+export function parseSidebarItemId(itemId: string): SidebarAnchorTarget | null;
 
 // @public
 export interface PmRange {
@@ -75,6 +81,15 @@ export interface SelectionInfo {
     // (undocumented)
     selectedText: string;
 }
+
+// @public
+export type SidebarAnchorTarget = {
+    kind: 'comment';
+    id: number;
+} | {
+    kind: 'change';
+    revisionId: number;
+};
 
 // (No @packageDocumentation comment for this package)
 

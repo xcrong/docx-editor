@@ -7,12 +7,19 @@
  */
 
 import { ref, computed, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue';
+import {
+  clampZoom,
+  normalizeZoomLevel,
+  stepZoom,
+  zoomToPercent,
+  DEFAULT_ZOOM_STEP,
+} from '@xcrong/docx-editor-core/utils/zoom';
 
 // Range + presets match React (Toolbar.tsx minZoom=0.5/maxZoom=2 +
 // ZoomControl DEFAULT_ZOOM_LEVELS) so both adapters offer the same zoom levels.
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2.0;
-const ZOOM_STEP = 0.1;
+const ZOOM_STEP = DEFAULT_ZOOM_STEP;
 const ZOOM_PRESETS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
 export interface UseZoomReturn {
@@ -31,22 +38,22 @@ export interface UseZoomReturn {
 }
 
 export function useZoom(initialZoom = 1.0): UseZoomReturn {
-  const zoom = ref(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, initialZoom)));
+  const zoom = ref(clampZoom(initialZoom, MIN_ZOOM, MAX_ZOOM));
 
-  const zoomPercent = computed(() => Math.round(zoom.value * 100));
+  const zoomPercent = computed(() => zoomToPercent(zoom.value));
   const isMinZoom = computed(() => zoom.value <= MIN_ZOOM);
   const isMaxZoom = computed(() => zoom.value >= MAX_ZOOM);
 
   function setZoom(level: number) {
-    zoom.value = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(level * 100) / 100));
+    zoom.value = normalizeZoomLevel(level, MIN_ZOOM, MAX_ZOOM);
   }
 
   function zoomIn() {
-    setZoom(zoom.value + ZOOM_STEP);
+    zoom.value = stepZoom(zoom.value, ZOOM_STEP, MIN_ZOOM, MAX_ZOOM);
   }
 
   function zoomOut() {
-    setZoom(zoom.value - ZOOM_STEP);
+    zoom.value = stepZoom(zoom.value, -ZOOM_STEP, MIN_ZOOM, MAX_ZOOM);
   }
 
   function resetZoom() {

@@ -36,6 +36,9 @@ export {
   setHyperlink,
   removeHyperlink,
   insertHyperlink,
+  resolveLinkDialogTarget,
+  setHyperlinkText,
+  removeHyperlinkRange,
 } from './formatting';
 
 // Paragraph formatting
@@ -74,6 +77,7 @@ export {
   setLtr,
 } from './paragraph';
 export type { ResolvedStyleAttrs, GenerateTOCOptions } from './paragraph';
+export type { LinkDialogTarget } from './formatting';
 
 // Table operations
 export {
