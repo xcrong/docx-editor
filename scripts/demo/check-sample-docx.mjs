@@ -2,7 +2,7 @@
 /**
  * Demo showcase guard (T25-03, #54). Run: `bun run check:sample-docx`
  *
- * Seven checks over the 7 committed `sample.docx` copies (see TARGETS in
+ * Eight checks over the 7 committed `sample.docx` copies (see TARGETS in
  * `build-sample-docx.ts`):
  *
  * 1. staleness — rebuild in memory, compare content digests (`digest.ts`).
@@ -14,6 +14,8 @@
  * 5. copies — all 7 distribution targets byte-identical (md5).
  * 6. dogfood round-trip — parse → create → parse → create → parse is stable.
  * 7. size — every copy stays within the 400 KB homepage budget.
+ * 8. coverage — every `editing !== 'none'` matrix feature is DEMOED or
+ *    NOT_DEMOABLE in `coverage.ts` (T25-08, #59).
  *
  * Prints one line per check (`ok` / `FAIL`) plus a summary. Exit 0 when all
  * pass, 1 otherwise. Each failure message says how to reproduce/fix.
@@ -25,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import JSZip from 'jszip';
 import { digestDocx, shortDigest } from './digest.ts';
 import { TARGETS, buildSampleDocxBuffer } from './build-sample-docx.ts';
+import { checkCoverage } from './coverage.ts';
 import { parseDocx, createDocx } from '../../packages/core/src/headless.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -104,7 +107,7 @@ function normalizeDoc(doc) {
 }
 
 async function main() {
-  console.log('check:sample-docx — 7 checks over the committed sample.docx copies');
+  console.log('check:sample-docx — 8 checks over the committed sample.docx copies');
 
   const abs = TARGETS.map((rel) => path.join(REPO_ROOT, rel));
   const missing = TARGETS.filter((_, i) => !existsSync(abs[i]));
@@ -316,6 +319,22 @@ async function main() {
     } else {
       pass('size', `最大 ${biggest}B ≤ 400KB`);
     }
+  }
+
+  // 8. Coverage ledger (T25-08, #59): every editing !== 'none' feature
+  // DEMOED or NOT_DEMOABLE in coverage.ts. Failure text guides the fix.
+  try {
+    const report = checkCoverage();
+    if (report.failures.length > 0) {
+      fail('coverage', report.failures.join('\n'));
+    } else {
+      pass(
+        'coverage',
+        `${report.demoedCount} 处演示 + ${report.exemptCount} 项豁免，覆盖全部 ${report.required} 个可编辑特性（矩阵共 ${report.total} 条）`,
+      );
+    }
+  } catch (err) {
+    fail('coverage', `台账检查异常：${err.message}`);
   }
 
   const failed = results.filter((r) => !r.ok);
