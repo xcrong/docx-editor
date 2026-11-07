@@ -14,14 +14,14 @@ function makeDoc(overrides: Partial<Document['package']> = {}): Document {
 
 const SEPARATOR_ENDNOTE: Endnote = {
   type: 'endnote',
-  id: -1,
+  id: 0,
   noteType: 'separator',
   content: [{ type: 'paragraph', content: [{ type: 'run', content: [{ type: 'separator' }] }] }],
 };
 
 const NORMAL_ENDNOTE: Endnote = {
   type: 'endnote',
-  id: 1,
+  id: 2,
   noteType: 'normal',
   content: [
     {
@@ -36,14 +36,14 @@ const NORMAL_ENDNOTE: Endnote = {
 
 const SEPARATOR_FOOTNOTE: Footnote = {
   type: 'footnote',
-  id: -1,
+  id: 0,
   noteType: 'separator',
   content: [{ type: 'paragraph', content: [{ type: 'run', content: [{ type: 'separator' }] }] }],
 };
 
 const NORMAL_FOOTNOTE: Footnote = {
   type: 'footnote',
-  id: 1,
+  id: 2,
   noteType: 'normal',
   content: [
     {
@@ -68,8 +68,8 @@ describe('serializeEndnotesToZip', () => {
     expect(xml).not.toBeNull();
     expect(xml!).toContain('Edited endnote body.');
     expect(xml!).toContain('<w:separator/>');
-    // Separator note (id=-1) must precede the normal note (id=1)
-    expect(xml!.indexOf('w:id="-1"')).toBeLessThan(xml!.indexOf('w:id="1"'));
+    // Separator note (id=0) must precede the normal note (id=2)
+    expect(xml!.indexOf('w:id="0"')).toBeLessThan(xml!.indexOf('w:id="2"'));
   });
 
   test('does not write the part when the document has no endnotes', async () => {
@@ -89,7 +89,7 @@ describe('serializeFootnotesToZip', () => {
     expect(xml).not.toBeNull();
     expect(xml!).toContain('A footnote.');
     expect(xml!).toContain('<w:separator/>');
-    expect(xml!.indexOf('w:id="-1"')).toBeLessThan(xml!.indexOf('w:id="1"'));
+    expect(xml!.indexOf('w:id="0"')).toBeLessThan(xml!.indexOf('w:id="2"'));
   });
 
   test('does not write the part when the document has no footnotes', async () => {

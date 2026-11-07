@@ -64,9 +64,9 @@ const DOCUMENT_XML =
   `<w:document xmlns:w="${NS_W}" xmlns:r="${NS_R}"><w:body>` +
   `<w:p>` +
   `<w:r><w:t xml:space="preserve">First claim</w:t></w:r>` +
-  `<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="1"/></w:r>` +
-  `<w:r><w:t xml:space="preserve"> and second claim</w:t></w:r>` +
   `<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="2"/></w:r>` +
+  `<w:r><w:t xml:space="preserve"> and second claim</w:t></w:r>` +
+  `<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="3"/></w:r>` +
   `<w:r><w:t>.</w:t></w:r>` +
   `</w:p>` +
   `<w:sectPr>` +
@@ -75,17 +75,16 @@ const DOCUMENT_XML =
   `</w:sectPr>` +
   `</w:body></w:document>`;
 
-// Footnote 1: clean. Footnote 2: a tracked DELETION (w:del/w:delText) — the
-// distinct emit path this suite is here to cover (endnotes already cover w:ins).
+// Footnote 2: clean. Footnote 3: a tracked DELETION (w:del/w:delText) — the
 const FOOTNOTES_XML =
   `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
   `<w:footnotes xmlns:w="${NS_W}">` +
-  `<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>` +
-  `<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>` +
-  `<w:footnote w:id="1"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr>` +
+  `<w:footnote w:type="separator" w:id="0"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>` +
+  `<w:footnote w:type="continuationSeparator" w:id="1"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>` +
+  `<w:footnote w:id="2"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr>` +
   `<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteRef/></w:r>` +
   `<w:r><w:t xml:space="preserve"> First footnote, clean.</w:t></w:r></w:p></w:footnote>` +
-  `<w:footnote w:id="2"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr>` +
+  `<w:footnote w:id="3"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr>` +
   `<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteRef/></w:r>` +
   `<w:r><w:t xml:space="preserve"> Second footnote with a </w:t></w:r>` +
   `<w:del w:id="200" w:author="Reviewer" w:date="2024-01-01T00:00:00Z">` +
@@ -135,7 +134,7 @@ describe('footnote round-trip (synthetic fixture)', () => {
 
   test('an edit to a footnote body persists through repack and reparse', async () => {
     const doc = await parseDocx(await buildFootnoteDocx(), { preloadFonts: false });
-    const target = doc.package.footnotes!.find((f) => f.id === 1)!;
+    const target = doc.package.footnotes!.find((f) => f.id === 2)!;
     const para = target.content.find((b) => b.type === 'paragraph') as Paragraph;
     para.content.push({
       type: 'run',
@@ -149,7 +148,7 @@ describe('footnote round-trip (synthetic fixture)', () => {
     const reparsed = await parseDocx(out, { preloadFonts: false });
     expect(reparsed.package.footnotes?.length).toBe(2);
     expect(reparsed.package.footnoteSeparators?.length).toBe(2);
-    const reEdited = reparsed.package.footnotes!.find((f) => f.id === 1)!;
+    const reEdited = reparsed.package.footnotes!.find((f) => f.id === 2)!;
     expect(noteText(reEdited)).toContain('EDITED');
   });
 
@@ -167,7 +166,7 @@ describe('tracked w:del inside a note survives repack', () => {
     const doc = await parseDocx(await buildFootnoteDocx(), { preloadFonts: false });
 
     // The deletion is modeled, not verbatim-copied.
-    const target = doc.package.footnotes!.find((f) => f.id === 2)!;
+    const target = doc.package.footnotes!.find((f) => f.id === 3)!;
     const para = target.content.find((b) => b.type === 'paragraph') as Paragraph;
     expect(para.content.some((c) => c.type === 'deletion')).toBe(true);
 
@@ -187,7 +186,7 @@ describe('tracked w:del inside a note survives repack', () => {
 
     // Re-parse: the deletion is still a modeled deletion carrying the text.
     const reparsed = await parseDocx(out, { preloadFonts: false });
-    const reTarget = reparsed.package.footnotes!.find((f) => f.id === 2)!;
+    const reTarget = reparsed.package.footnotes!.find((f) => f.id === 3)!;
     const rePara = reTarget.content.find((b) => b.type === 'paragraph') as Paragraph;
     expect(rePara.content.some((c) => c.type === 'deletion')).toBe(true);
     expect(noteText(reTarget)).toContain('tracked deletion');

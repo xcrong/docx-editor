@@ -4,17 +4,17 @@ import { serializeFootnotes, serializeEndnotes } from './noteSerializer';
 
 const ENDNOTES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:endnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:endnote>
-  <w:endnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:endnote>
-  <w:endnote w:id="1"><w:p><w:pPr><w:pStyle w:val="EndnoteText"/></w:pPr><w:r><w:rPr><w:rStyle w:val="EndnoteReference"/></w:rPr><w:endnoteRef/></w:r><w:r><w:t xml:space="preserve"> First endnote.</w:t></w:r></w:p></w:endnote>
-  <w:endnote w:id="2"><w:p><w:r><w:rPr><w:rStyle w:val="EndnoteReference"/></w:rPr><w:endnoteRef/></w:r><w:ins w:id="5" w:author="Reviewer" w:date="2024-01-01T00:00:00Z"><w:r><w:t>inserted text</w:t></w:r></w:ins></w:p></w:endnote>
+  <w:endnote w:type="separator" w:id="0"><w:p><w:r><w:separator/></w:r></w:p></w:endnote>
+  <w:endnote w:type="continuationSeparator" w:id="1"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:endnote>
+  <w:endnote w:id="2"><w:p><w:pPr><w:pStyle w:val="EndnoteText"/></w:pPr><w:r><w:rPr><w:rStyle w:val="EndnoteReference"/></w:rPr><w:endnoteRef/></w:r><w:r><w:t xml:space="preserve"> First endnote.</w:t></w:r></w:p></w:endnote>
+  <w:endnote w:id="3"><w:p><w:r><w:rPr><w:rStyle w:val="EndnoteReference"/></w:rPr><w:endnoteRef/></w:r><w:ins w:id="5" w:author="Reviewer" w:date="2024-01-01T00:00:00Z"><w:r><w:t>inserted text</w:t></w:r></w:ins></w:p></w:endnote>
 </w:endnotes>`;
 
 const FOOTNOTES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>
-  <w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>
-  <w:footnote w:id="1"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr><w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> A footnote.</w:t></w:r></w:p></w:footnote>
+  <w:footnote w:type="separator" w:id="0"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>
+  <w:footnote w:type="continuationSeparator" w:id="1"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>
+  <w:footnote w:id="2"><w:p><w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr><w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> A footnote.</w:t></w:r></w:p></w:footnote>
 </w:footnotes>`;
 
 describe('noteSerializer — endnotes', () => {
@@ -52,10 +52,10 @@ describe('noteSerializer — endnotes', () => {
     expect(xml.trim().endsWith('</w:endnotes>')).toBe(true);
   });
 
-  test('preserves negative separator id distinct from continuationSeparator id=0', () => {
+  test('preserves reserved separator ids 0/1 distinct from content notes', () => {
     const reparsed = parseEndnotes(serializeEndnotes(parseEndnotes(ENDNOTES_XML).endnotes));
-    expect(reparsed.getEndnote(-1)?.noteType).toBe('separator');
-    expect(reparsed.getEndnote(0)?.noteType).toBe('continuationSeparator');
+    expect(reparsed.getEndnote(0)?.noteType).toBe('separator');
+    expect(reparsed.getEndnote(1)?.noteType).toBe('continuationSeparator');
   });
 });
 
