@@ -8,13 +8,17 @@
  */
 import type {
   BlockContent,
+  BlockSdt,
   Hyperlink,
+  InlineSdt,
   Insertion,
   Deletion,
   Paragraph,
   ParagraphContent,
   Run,
   RunContent,
+  SdtProperties,
+  Shape,
   Table,
   TableCell,
   TableRow,
@@ -120,6 +124,21 @@ export function tbl(rows: TableRow[], columnWidths: number[], formatting?: Table
 export function gridBorders(): TableFormatting['borders'] {
   const side = { style: 'single' as const, size: 4, space: 0, color: { rgb: '999999' } };
   return { top: side, left: side, bottom: side, right: side, insideH: side, insideV: side };
+}
+
+/** Block-level content control (`w:sdt` wrapping block content). */
+export function blockSdt(properties: SdtProperties, content: BlockContent[]): BlockSdt {
+  return { type: 'blockSdt', properties, content };
+}
+
+/** Inline content control (`w:sdt` inside a paragraph). */
+export function inlineSdt(properties: SdtProperties, content: InlineSdt['content']): InlineSdt {
+  return { type: 'inlineSdt', properties, content };
+}
+
+/** Run carrying a DrawingML shape / text box (`w:drawing` with `wps:wsp`). */
+export function shapeRun(shape: Shape): Run {
+  return { type: 'run', content: [{ type: 'shape', shape }] };
 }
 
 /** Re-exported so sections share one BlockContent import surface. */
