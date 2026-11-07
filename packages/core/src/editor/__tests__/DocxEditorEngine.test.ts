@@ -7,8 +7,8 @@
 
 import { describe, expect, test } from 'bun:test';
 import type { Node as PMNode } from 'prosemirror-model';
-import { EditorState } from 'prosemirror-state';
-
+import { EditorState, type Transaction } from 'prosemirror-state';
+import type { EditorView } from 'prosemirror-view';
 import { singletonManager } from '../../prosemirror/schema';
 import { LayoutSelectionGate } from '../../prosemirror/utils/LayoutSelectionGate';
 import type {
@@ -244,5 +244,146 @@ describe('DocxEditorEngine.run', () => {
     expect(threw).toBe(false);
     expect(result).toBeUndefined();
     expect(captured.errors.length).toBe(1);
+  });
+});
+
+describe('DocxEditorEngine.scheduleLayout', () => {
+  test('coalesces a burst into one run with the latest state', () => {
+    const queue: Array<() => void> = [];
+    const { host, captured } = makeHost(basicDoc());
+    const framing: EngineHost = {
+      ...host,
+      scheduleFrame: (cb) => {
+        queue.push(cb);
+        return queue.length;
+      },
+      cancelFrame: () => {},
+    };
+    const engine = new DocxEditorEngine(framing);
+
+    engine.scheduleLayout(stateFor(paraNode('A1', 'a')));
+    engine.scheduleLayout(stateFor(paraNode('A1', 'ab'), paraNode('A2', 'b')));
+    engine.scheduleLayout(
+      stateFor(paraNode('A1', 'abc'), paraNode('A2', 'bc'), paraNode('A3', 'c'))
+    );
+
+    expect(captured.layouts.length).toBe(0);
+    expect(queue.length).toBe(1);
+
+    queue.forEach((cb) => cb());
+    expect(captured.layouts.length).toBe(1);
+    expect(captured.blockCounts).toEqual([3]);
+  });
+
+  test('synchronous frame stub runs immediately and deterministically', () => {
+    // makeHost's scheduleFrame invokes the callback inline.
+    const { host, captured } = makeHost(basicDoc());
+    const engine = new DocxEditorEngine(host);
+
+    engine.scheduleLayout(stateFor(paraNode('A1', 'hello')));
+
+    expect(captured.layouts.length).toBe(1);
+  });
+
+  test('cancelScheduledLayout drops the pending frame', () => {
+    const queue: Array<() => void> = [];
+    const { host, captured } = makeHost(basicDoc());
+    const framing: EngineHost = {
+      ...host,
+      scheduleFrame: (cb) => {
+        queue.push(cb);
+        return queue.length;
+      },
+      cancelFrame: () => {},
+    };
+    const engine = new DocxEditorEngine(framing);
+
+    engine.scheduleLayout(stateFor(paraNode('A1', 'hello')));
+    engine.cancelScheduledLayout();
+    queue.forEach((cb) => cb());
+
+    expect(captured.layouts.length).toBe(0);
+  });
+});
+
+describe('DocxEditorEngine.handleTransaction', () => {
+  const tr = (docChanged: boolean): Transaction => ({ docChanged }) as Transaction;
+
+  test('docChanged bumps seq, schedules, and notifies (no overlay refresh)', () => {
+    const { host, captured } = makeHost(basicDoc());
+    const calls: string[] = [];
+    const hooked: EngineHost = {
+      ...host,
+      onDecorationsChanged: () => calls.push('decorations'),
+      onDocumentChanged: (s) => calls.push(`doc:${(s.doc.textContent ?? '').length}`),
+      onSelectionTransaction: () => calls.push('selection'),
+    };
+    const engine = new DocxEditorEngine(hooked);
+    const state = stateFor(paraNode('A1', 'hello'));
+    const gate = hooked.getSyncCoordinator() as LayoutSelectionGate;
+    const seqBefore = gate.getStateSeq();
+
+    engine.handleTransaction(tr(true), state);
+
+    expect(calls).toEqual(['decorations', 'doc:5']);
+    expect(gate.getStateSeq()).toBe(seqBefore + 1);
+    expect(captured.layouts.length).toBe(1);
+  });
+
+  test('selection-only refreshes the overlay without scheduling', () => {
+    const { host, captured } = makeHost(basicDoc());
+    const calls: string[] = [];
+    const hooked: EngineHost = {
+      ...host,
+      onDecorationsChanged: () => calls.push('decorations'),
+      onDocumentChanged: () => calls.push('doc'),
+      onSelectionTransaction: () => calls.push('selection'),
+    };
+    const engine = new DocxEditorEngine(hooked);
+
+    engine.handleTransaction(tr(false), stateFor(paraNode('A1', 'hello')));
+
+    expect(calls).toEqual(['decorations', 'selection']);
+    expect(captured.layouts.length).toBe(0);
+  });
+});
+
+describe('DocxEditorEngine.handleHfTransaction', () => {
+  const tr = (docChanged: boolean): Transaction => ({ docChanged }) as Transaction;
+  const viewFor = (state: EditorState): EditorView => ({ state }) as EditorView;
+
+  test('docChanged writes back, schedules the body, and notifies', () => {
+    const { host, captured } = makeHost(basicDoc());
+    const calls: string[] = [];
+    const bodyState = stateFor(paraNode('A1', 'body'));
+    const hooked: EngineHost = {
+      ...host,
+      getBodyState: () => bodyState,
+      onHfDocumentChanged: (rId) => calls.push(`writeback:${rId}`),
+      onHfTransaction: (rId, _view, docChanged) => calls.push(`notify:${rId}:${docChanged}`),
+    };
+    const engine = new DocxEditorEngine(hooked);
+
+    engine.handleHfTransaction('rId9', viewFor(stateFor(paraNode('H1', 'hf'))), tr(true));
+
+    expect(calls).toEqual(['writeback:rId9', 'notify:rId9:true']);
+    expect(captured.layouts.length).toBe(1);
+  });
+
+  test('selection-only just notifies (no writeback, no schedule)', () => {
+    const { host, captured } = makeHost(basicDoc());
+    const calls: string[] = [];
+    const hooked: EngineHost = {
+      ...host,
+      getBodyState: () => stateFor(paraNode('A1', 'body')),
+      onHfDocumentChanged: (rId) => calls.push(`writeback:${rId}`),
+      onHfTransaction: (rId, _view, docChanged) => calls.push(`notify:${rId}:${docChanged}`),
+    };
+    const engine = new DocxEditorEngine(hooked);
+
+    engine.handleHfTransaction('rId9', viewFor(stateFor(paraNode('H1', 'hf'))), tr(false));
+
+    expect(calls).toEqual(['notify:rId9:false']);
+    expect(captured.layouts.length).toBe(0);
   });
 });

@@ -20,8 +20,9 @@
  * transaction loop, view lifecycle, and session seam follow.
  */
 
-import type { EditorState } from 'prosemirror-state';
+import type { EditorState, Transaction } from 'prosemirror-state';
 import type { Node as PMNode } from 'prosemirror-model';
+import type { EditorView } from 'prosemirror-view';
 
 import type {
   BlockLookup,
@@ -55,6 +56,7 @@ import {
   reclampIncrementalSnapshot,
   type PendingScrollRestore,
 } from './scrollRestore';
+import { createLayoutScheduler, type LayoutScheduler } from './layoutScheduler';
 
 export type {
   LayoutComputation,
@@ -149,6 +151,34 @@ export interface EngineHost {
    */
   onTotalPages?(total: number): void;
   onError?(error: unknown): void;
+  // -- transaction loop (step 3) ---------------------------------------
+  /**
+   * Decoration resync on every PM transaction (doc, selection, meta-only).
+   * React bumps its decoration token here; Vue has no equivalent.
+   */
+  onDecorationsChanged?(): void;
+  /**
+   * Fired for doc-changing body transactions, after the layout is
+   * scheduled. React reads the writeback document off its hidden view;
+   * Vue writes its document model back and notifies its host.
+   */
+  onDocumentChanged?(newState: EditorState): void;
+  /**
+   * Fired for selection-only body transactions (no relayout). React
+   * refreshes its selection overlay; Vue re-applies content-control focus
+   * and notifies its selection listener.
+   */
+  onSelectionTransaction?(newState: EditorState): void;
+  /** Current body EditorState, for scheduling a relayout after HF edits. */
+  getBodyState?(): EditorState | null;
+  /**
+   * Persist an HF EditorView's doc back into the document package on
+   * doc-changing HF transactions (React keeps its own writeback; Vue
+   * implements this hook).
+   */
+  onHfDocumentChanged?(rId: string, state: EditorState): void;
+  /** Fired after every HF transaction (caret overlays, toolbar sync). */
+  onHfTransaction?(rId: string, view: EditorView, docChanged: boolean): void;
 
   // -- scheduler seam (consumed by `scheduleLayout` from step 2 on) -----
   scheduleFrame(cb: () => void): number;
@@ -158,8 +188,78 @@ export interface EngineHost {
 export class DocxEditorEngine {
   private pendingScrollRestore: PendingScrollRestore | null = null;
   private pendingIncrementalScrollSnapshotWrittenAt = 0;
+  private layoutScheduler: LayoutScheduler | null = null;
 
   constructor(private readonly host: EngineHost) {}
+
+  /**
+   * Coalesced layout: rapid bursts (keystrokes) collapse to one `run` per
+   * frame with the latest state. Owns the core coalescer both adapters
+   * used to hold separately; the frame source is the host's
+   * `scheduleFrame`/`cancelFrame` so headless hosts stay synchronous.
+   */
+  scheduleLayout(state: EditorState): void {
+    if (!this.layoutScheduler) {
+      const host = this.host;
+      this.layoutScheduler = createLayoutScheduler(
+        (s) => {
+          this.run(s);
+        },
+        (cb) => host.scheduleFrame(cb),
+        (handle) => {
+          if (host.cancelFrame) host.cancelFrame(handle);
+          else cancelAnimationFrame(handle);
+        }
+      );
+    }
+    this.layoutScheduler.schedule(state);
+  }
+
+  /** Drop a pending coalesced frame (view teardown / document reload). */
+  cancelScheduledLayout(): void {
+    this.layoutScheduler?.cancel();
+  }
+
+  /**
+   * Body transaction → repaint loop (step 3, lifted from React's
+   * `PagedEditor.handleTransaction`). Decoration-notify on every
+   * transaction; doc changes bump the state seq, schedule a coalesced
+   * layout, and notify the document listener; selection-only updates
+   * refresh the overlay without laying out. Scroll-flag stripping stays
+   * in the adapter `dispatchTransaction` (it must run pre-apply).
+   */
+  handleTransaction(tr: Transaction, newState: EditorState): void {
+    this.host.onDecorationsChanged?.();
+
+    const gate = this.host.getSyncCoordinator();
+    if (tr.docChanged) {
+      gate?.incrementStateSeq();
+      this.scheduleLayout(newState);
+      this.host.onDocumentChanged?.(newState);
+    }
+
+    gate?.requestRender();
+
+    if (!tr.docChanged) {
+      this.host.onSelectionTransaction?.(newState);
+    }
+  }
+
+  /**
+   * HF transaction → writeback + body schedule + notify (step 3, shared
+   * by React's `HiddenHeaderFooterPMs` and Vue's `syncHfPMs` dispatches).
+   * Only doc changes schedule the body pass; selection-only moves just
+   * notify. The caller applies the transaction first; the post-apply
+   * `view.state` is read here.
+   */
+  handleHfTransaction(rId: string, view: EditorView, tr: Transaction): void {
+    if (tr.docChanged) {
+      this.host.onHfDocumentChanged?.(rId, view.state);
+      const bodyState = this.host.getBodyState?.();
+      if (bodyState) this.scheduleLayout(bodyState);
+    }
+    this.host.onHfTransaction?.(rId, view, tr.docChanged);
+  }
 
   /**
    * Run the full layout pass for `state`: compute → paint → hooks.

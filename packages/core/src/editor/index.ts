@@ -7,10 +7,16 @@
  */
 
 export { computeLayout } from './computeLayout';
-export type { ComputeLayoutInputs, LayoutComputation } from './computeLayout';
-export type { MeasureBlocksFn } from './computeLayout';
-export { createLayoutScheduler } from './layoutScheduler';
-export type { LayoutScheduler } from './layoutScheduler';
+export type {
+  ComputeLayoutInputs,
+  LayoutComputation,
+  MeasureBlocksFn,
+} from './computeLayout';
+export {
+  createLayoutScheduler,
+  createRafFrameScheduler,
+} from './layoutScheduler';
+export type { FrameScheduler, LayoutScheduler } from './layoutScheduler';
 export { stripScrollFlag } from './scrollFlag';
 export { resolveLayoutGeometry } from './geometry';
 export type { LayoutGeometry, PageSizePx } from './geometry';

@@ -18,6 +18,22 @@ export interface LayoutScheduler {
   cancel(): void;
 }
 
+export interface FrameScheduler {
+  scheduleFrame(cb: () => void): number;
+  cancelFrame(handle: number): void;
+}
+
+/**
+ * rAF-backed {@link FrameScheduler} for real adapters. Headless/test hosts
+ * pass synchronous stubs instead (see `DocxEditorEngine`'s host seam).
+ */
+export function createRafFrameScheduler(): FrameScheduler {
+  return {
+    scheduleFrame: (cb) => requestAnimationFrame(cb),
+    cancelFrame: (handle) => cancelAnimationFrame(handle),
+  };
+}
+
 export function createLayoutScheduler(
   run: (state: EditorState) => void,
   scheduleFrame: (cb: () => void) => number = (cb) => requestAnimationFrame(cb),

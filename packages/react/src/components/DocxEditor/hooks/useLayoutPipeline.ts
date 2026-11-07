@@ -22,10 +22,9 @@ import type { Node as PMNode } from 'prosemirror-model';
 import {
   DocxEditorEngine,
   applyScrollRestore,
-  createLayoutScheduler,
+  createRafFrameScheduler,
   resolveLayoutGeometry,
   type EngineHost,
-  type LayoutScheduler,
 } from '@xcrong/docx-editor-core/editor';
 import { findVerticalScrollParentOrRoot } from '@xcrong/docx-editor-core/utils/findVerticalScrollParent';
 import type {
@@ -190,7 +189,11 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
   };
 
   const engineRef = useRef<DocxEditorEngine | null>(null);
+  // rAF frame source for the engine's coalescer (step 2). Stable for the
+  // hook's lifetime; teardown cancels through the engine.
+  const frameSchedulerRef = useRef(createRafFrameScheduler());
   if (!engineRef.current) {
+    const frameScheduler = frameSchedulerRef.current;
     const host: EngineHost = {
       getDocument: () => hostInputsRef.current.document,
       getStyles: () => hostInputsRef.current.styles,
@@ -319,7 +322,8 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
       onError: (error) => {
         console.error('[PagedEditor] Layout pipeline error:', error);
       },
-      scheduleFrame: (cb) => requestAnimationFrame(cb),
+      scheduleFrame: frameScheduler.scheduleFrame,
+      cancelFrame: frameScheduler.cancelFrame,
     };
     engineRef.current = new DocxEditorEngine(host);
   }
@@ -355,25 +359,18 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
   /**
    * Multiple rapid transactions (e.g. typing "hello") within the same frame
    * are coalesced so only the final state triggers a full layout pass. The
-   * coalescer lives in core (`createLayoutScheduler`) so React and Vue share
-   * it; the `runRef` indirection lets the stable scheduler always call the
-   * latest `runLayoutPipeline` without recreating itself.
+   * coalescer lives in the engine (`engine.scheduleLayout`, step 2) so
+   * React and Vue share one; the host's rAF frame source keeps teardown
+   * semantics identical (pending frame dropped on unmount).
    */
-  const runRef = useRef(runLayoutPipeline);
-  runRef.current = runLayoutPipeline;
-  const schedulerRef = useRef<LayoutScheduler | null>(null);
-  if (!schedulerRef.current) {
-    schedulerRef.current = createLayoutScheduler((state) => runRef.current(state));
-  }
-
   const scheduleLayout = useCallback((state: EditorState) => {
-    schedulerRef.current!.schedule(state);
+    engineRef.current!.scheduleLayout(state);
   }, []);
 
   // Clean up pending rAF on unmount
   useEffect(() => {
-    const scheduler = schedulerRef.current;
-    return () => scheduler?.cancel();
+    const engine = engineRef.current;
+    return () => engine?.cancelScheduledLayout();
   }, []);
 
   return {

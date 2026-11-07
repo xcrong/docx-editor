@@ -59,7 +59,7 @@ import {
 } from '@xcrong/docx-editor-core/layout-bridge';
 import {
   applyScrollRestore,
-  createLayoutScheduler,
+  createRafFrameScheduler,
   DocxEditorEngine,
   stripScrollFlag,
 } from '@xcrong/docx-editor-core/editor';
@@ -325,6 +325,8 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     const finalSp = body?.finalSectionProperties ?? initialSp;
     return { initialSp, finalSp };
   }
+  // rAF frame source for the engine's coalescer (step 2).
+  const frameScheduler = createRafFrameScheduler();
 
   const engineHost: EngineHost = {
     getDocument: () => document.value,
@@ -375,7 +377,8 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       console.error('[useDocxEditor] Layout pipeline error:', error);
       onError?.(error instanceof Error ? error : new Error(String(error)));
     },
-    scheduleFrame: (cb) => requestAnimationFrame(cb),
+    scheduleFrame: frameScheduler.scheduleFrame,
+    cancelFrame: frameScheduler.cancelFrame,
   };
   const engine = new DocxEditorEngine(engineHost);
 
@@ -392,10 +395,9 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     );
   }
 
-  // rAF-coalescing layout scheduler (shared with React via core). Body
-  // doc-change transactions schedule through this so a burst of keystrokes
-  // lays out once per frame instead of synchronously per keystroke.
-  const layoutScheduler = createLayoutScheduler(runLayoutPipeline);
+  // Explicit refresh (`reLayout` below: page setup, zoom) stays synchronous —
+  // callers read the fresh layout right after, unlike the coalesced
+  // transaction path which settles next frame. Step 2 decision.
 
   // ========================================================================
   // ProseMirror setup
@@ -478,7 +480,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
         // selection overlay waits via `syncCoordinator`, matching React).
         if (transaction.docChanged) {
           syncCoordinator?.incrementStateSeq();
-          layoutScheduler.schedule(newState);
+          engine.scheduleLayout(newState);
           // Notify parent about document change
           try {
             if (document.value) {
@@ -529,7 +531,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   function destroyEditorView() {
     // Drop any pending coalesced layout frame so a reload (destroy → recreate)
     // can't repaint the old document's state against the new document.
-    layoutScheduler.cancel();
+    engine.cancelScheduledLayout();
     if (editorView.value) {
       editorView.value.destroy();
       editorView.value = null;
@@ -695,7 +697,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
           }
           // Only re-layout when the HF doc actually changed — selection-only
           // transactions don't move text so the painter has nothing new.
-          if (tr.docChanged && editorState.value) runLayoutPipeline(editorState.value);
+          if (tr.docChanged && editorState.value) engine.scheduleLayout(editorState.value);
           onHfTransactionRef.value?.(rId, view, tr.docChanged);
         },
       });

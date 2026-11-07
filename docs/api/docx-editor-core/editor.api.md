@@ -5,6 +5,7 @@
 ```ts
 
 import { EditorState } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
 import { Node as Node_2 } from 'prosemirror-model';
 import { Transaction } from 'prosemirror-state';
 
@@ -65,11 +66,18 @@ export interface ComputeLayoutInputs {
 // @public (undocumented)
 export function createLayoutScheduler(run: (state: EditorState) => void, scheduleFrame?: (cb: () => void) => number, cancelFrame?: (handle: number) => void): LayoutScheduler;
 
+// @public
+export function createRafFrameScheduler(): FrameScheduler;
+
 // @public (undocumented)
 export class DocxEditorEngine {
     constructor(host: EngineHost);
+    cancelScheduledLayout(): void;
     consumePendingScrollRestore(): PendingScrollRestore | null;
+    handleHfTransaction(rId: string, view: EditorView, tr: Transaction): void;
+    handleTransaction(tr: Transaction, newState: EditorState): void;
     run(state: EditorState): LayoutComputation | undefined;
+    scheduleLayout(state: EditorState): void;
 }
 
 // @public
@@ -89,6 +97,7 @@ export interface EngineHost {
     // (undocumented)
     cancelFrame?(handle: number): void;
     computeAnchorPositions?(layout: Layout, blocks: FlowBlock[], measures: Measure[]): Map<string, number> | undefined;
+    getBodyState?(): EditorState | null;
     getDocument(): Document_2 | null;
     getFinalSectionProperties(): SectionProperties | null | undefined;
     getHeaderFooter(): EngineHeaderFooter;
@@ -108,12 +117,17 @@ export interface EngineHost {
     measureBlocks(blocks: FlowBlock[], contentWidth: number | number[], pageGeometry?: FloatPageGeometry): Measure[];
     // (undocumented)
     onAnchorPositions?(positions: Map<string, number>): void;
+    onDecorationsChanged?(): void;
+    onDocumentChanged?(newState: EditorState): void;
     // (undocumented)
     onError?(error: unknown): void;
+    onHfDocumentChanged?(rId: string, state: EditorState): void;
+    onHfTransaction?(rId: string, view: EditorView, docChanged: boolean): void;
     onLayout(layout: Layout, blocks: FlowBlock[], measures: Measure[], lookup: BlockLookup): void;
     onPaintContainer?(layout: Layout): void;
     onPainted?(info: EnginePaintedInfo): void;
     onScrollRestore?(pending: PendingScrollRestore): boolean | void;
+    onSelectionTransaction?(newState: EditorState): void;
     onTotalPages?(total: number): void;
     // (undocumented)
     scheduleFrame(cb: () => void): number;
@@ -131,6 +145,14 @@ export interface EnginePaintedInfo {
 
 // @public
 export function findPaintedPmStartAtOrBefore(pages: HTMLElement, pmPos: number): number | null;
+
+// @public (undocumented)
+export interface FrameScheduler {
+    // (undocumented)
+    cancelFrame(handle: number): void;
+    // (undocumented)
+    scheduleFrame(cb: () => void): number;
+}
 
 // @public (undocumented)
 export interface LayoutComputation {
