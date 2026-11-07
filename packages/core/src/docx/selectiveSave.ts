@@ -30,7 +30,7 @@ import {
 import { RELATIONSHIP_TYPES } from './relsParser';
 import { collectParts, headerFooterFilename } from './rezip/parts';
 import { collectNewImages, hasRelId } from './rezip/images';
-
+import { collectReferencedNumIds } from './numberingReconcile';
 /**
  * Check if document content has new images (data: URL without rId) or
  * new hyperlinks (href without rId). Combined into a single traversal
@@ -114,6 +114,19 @@ export async function attemptSelectiveSave(
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(originalBuffer);
+    // Bail when the model references list numIds the archive's numbering.xml
+    // doesn't define (e.g. toggling a list in a document that shipped without
+    // numbering.xml). Selective save patches document.xml only and can't
+    // register the part — full repack backfills the definitions instead.
+    const referencedNumIds = collectReferencedNumIds(doc);
+    if (referencedNumIds.length > 0) {
+      const numberingFile = zip.file('word/numbering.xml');
+      const numberingXml = numberingFile ? await numberingFile.async('text') : '';
+      const definedNumIds = new Set(
+        [...numberingXml.matchAll(/<w:num\b[^>]*\bw:numId="(\d+)"/g)].map((m) => Number(m[1]))
+      );
+      if (referencedNumIds.some((r) => !definedNumIds.has(r.numId))) return null;
+    }
     const updates = new Map<string, string>();
 
     // Images with data: URLs whose rId isn't registered in their part's
