@@ -45,12 +45,13 @@ export {
 } from './TableSelectionManager';
 
 export {
+  ClipboardManager,
   getSelectionRuns,
   createSelectionFromDOM,
   extractFormattingFromElement,
   rgbToHex,
 } from './ClipboardManager';
-export type { ClipboardSelection } from './ClipboardManager';
+export type { ClipboardSelection, ClipboardManagerOptions } from './ClipboardManager';
 
 export { ErrorManager } from './ErrorManager';
 

@@ -1,25 +1,23 @@
 /**
- * Vue port of packages/react/src/hooks/useClipboard.ts. Wraps the
- * framework-agnostic clipboard helpers in core. Same surface as the
- * React hook but without the React-specific useRef wrappers.
+ * Vue port of packages/react/src/hooks/useClipboard.ts. Thin wrapper around
+ * the framework-agnostic ClipboardManager in core: all clipboard I/O lives in
+ * the manager, this composable only adds Vue glue (refs and callbacks).
+ * Same surface as the React hook but without the React-specific useRef wrappers.
  */
 import { ref, type Ref } from 'vue';
 import {
-  copyRuns,
-  parseClipboardHtml,
+  ClipboardManager,
+  getSelectionRuns,
+  createSelectionFromDOM,
+} from '@xcrong/docx-editor-core';
+import {
   runsToClipboardContent,
   type ParsedClipboardContent,
 } from '@xcrong/docx-editor-core/utils';
-import {
-  getSelectionRuns,
-  createSelectionFromDOM,
-  type ClipboardSelection,
-  type Theme,
-} from '@xcrong/docx-editor-core';
+import type { ClipboardSelection, Theme } from '@xcrong/docx-editor-core';
 
 export { getSelectionRuns, createSelectionFromDOM, runsToClipboardContent };
 export type { ClipboardSelection };
-
 export interface UseClipboardOptions {
   onCopy?: (selection: ClipboardSelection) => void;
   onCut?: (selection: ClipboardSelection) => void;
@@ -49,6 +47,9 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
     theme,
   } = options;
 
+  // ClipboardManager owns all clipboard I/O, mirroring the React hook.
+  const manager = new ClipboardManager({ cleanWordFormatting, onError, theme });
+
   const isProcessing = ref(false);
   const lastPastedContent = ref<ParsedClipboardContent | null>(null);
 
@@ -56,7 +57,7 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
     if (isProcessing.value) return false;
     isProcessing.value = true;
     try {
-      const ok = await copyRuns(selection.runs, { onError, theme });
+      const ok = await manager.copy(selection);
       if (ok) onCopy?.(selection);
       return ok;
     } finally {
@@ -68,7 +69,7 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
     if (isProcessing.value || !editable) return false;
     isProcessing.value = true;
     try {
-      const ok = await copyRuns(selection.runs, { onError, theme });
+      const ok = await manager.cut(selection);
       if (ok) onCut?.(selection);
       return ok;
     } finally {
@@ -80,28 +81,12 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
     if (isProcessing.value || !editable) return null;
     isProcessing.value = true;
     try {
-      if (navigator.clipboard && navigator.clipboard.read) {
-        const items = await navigator.clipboard.read();
-        let html = '';
-        let plainText = '';
-        for (const item of items) {
-          if (item.types.includes('text/html')) {
-            html = await (await item.getType('text/html')).text();
-          }
-          if (item.types.includes('text/plain')) {
-            plainText = await (await item.getType('text/plain')).text();
-          }
-        }
-        if (asPlainText) html = '';
-        const content = parseClipboardHtml(html, plainText, cleanWordFormatting);
+      const content = await manager.readClipboard(asPlainText);
+      if (content) {
         lastPastedContent.value = content;
         onPaste?.(content, asPlainText);
-        return content;
       }
-      return null;
-    } catch (e) {
-      onError?.(e instanceof Error ? e : new Error(String(e)));
-      return null;
+      return content;
     } finally {
       isProcessing.value = false;
     }

@@ -1,19 +1,19 @@
 /**
  * useClipboard Hook
  *
- * Thin React wrapper around the framework-agnostic ClipboardManager.
- * Handles clipboard operations with formatting preservation.
+ * Thin React wrapper around the framework-agnostic ClipboardManager from core.
+ * All clipboard I/O (copy/cut/read, event serialize + parse) lives in the
+ * manager; this hook only adds React glue: the processing flag, the
+ * last-pasted ref, and the option callbacks.
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import {
-  copyRuns,
-  handlePasteEvent,
-  parseClipboardHtml,
-  runsToClipboardContent,
-  type ParsedClipboardContent,
-} from '@xcrong/docx-editor-core/utils';
-import { getSelectionRuns, createSelectionFromDOM } from '@xcrong/docx-editor-core';
+  ClipboardManager,
+  getSelectionRuns,
+  createSelectionFromDOM,
+} from '@xcrong/docx-editor-core';
+import type { ParsedClipboardContent } from '@xcrong/docx-editor-core/utils';
 import type { ClipboardSelection, Theme } from '@xcrong/docx-editor-core';
 
 // ============================================================================
@@ -65,6 +65,11 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
     theme,
   } = options;
 
+  // ClipboardManager owns all clipboard I/O. Created once; options are
+  // refreshed every render so handlers never see stale callbacks/theme.
+  const manager = useMemo(() => new ClipboardManager(), []);
+  manager.setOptions({ cleanWordFormatting, onError, theme });
+
   const isProcessingRef = useRef<boolean>(false);
   const lastPastedContentRef = useRef<ParsedClipboardContent | null>(null);
 
@@ -74,7 +79,7 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
 
       isProcessingRef.current = true;
       try {
-        const success = await copyRuns(selection.runs, { onError, theme });
+        const success = await manager.copy(selection);
         if (success) {
           onCopy?.(selection);
         }
@@ -83,7 +88,7 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
         isProcessingRef.current = false;
       }
     },
-    [onCopy, onError, theme]
+    [manager, onCopy]
   );
 
   const cut = useCallback(
@@ -92,7 +97,7 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
 
       isProcessingRef.current = true;
       try {
-        const success = await copyRuns(selection.runs, { onError, theme });
+        const success = await manager.cut(selection);
         if (success) {
           onCut?.(selection);
         }
@@ -101,7 +106,7 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
         isProcessingRef.current = false;
       }
     },
-    [onCut, editable, onError, theme]
+    [manager, onCut, editable]
   );
 
   const paste = useCallback(
@@ -110,41 +115,17 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
 
       isProcessingRef.current = true;
       try {
-        if (navigator.clipboard && navigator.clipboard.read) {
-          const items = await navigator.clipboard.read();
-          let html = '';
-          let plainText = '';
-
-          for (const item of items) {
-            if (item.types.includes('text/html')) {
-              const blob = await item.getType('text/html');
-              html = await blob.text();
-            }
-            if (item.types.includes('text/plain')) {
-              const blob = await item.getType('text/plain');
-              plainText = await blob.text();
-            }
-          }
-
-          if (asPlainText) {
-            html = '';
-          }
-
-          const content = parseClipboardHtml(html, plainText, cleanWordFormatting);
+        const content = await manager.readClipboard(asPlainText);
+        if (content) {
           lastPastedContentRef.current = content;
           onPaste?.(content, asPlainText);
-          return content;
         }
-
-        return null;
-      } catch (error) {
-        onError?.(error as Error);
-        return null;
+        return content;
       } finally {
         isProcessingRef.current = false;
       }
     },
-    [editable, cleanWordFormatting, onPaste, onError]
+    [manager, editable, onPaste]
   );
 
   const handleCopy = useCallback(
@@ -153,20 +134,11 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
       if (!selection) return;
 
       event.preventDefault();
-
-      const content = runsToClipboardContent(selection.runs, true, theme);
-
-      if (event.clipboardData) {
-        event.clipboardData.setData('text/plain', content.plainText);
-        event.clipboardData.setData('text/html', content.html);
-        if (content.internal) {
-          event.clipboardData.setData('application/x-docx-editor', content.internal);
-        }
-      }
+      manager.writeEventData(event, selection);
 
       onCopy?.(selection);
     },
-    [onCopy, theme]
+    [manager, onCopy]
   );
 
   const handleCut = useCallback(
@@ -177,20 +149,11 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
       if (!selection) return;
 
       event.preventDefault();
-
-      const content = runsToClipboardContent(selection.runs, true, theme);
-
-      if (event.clipboardData) {
-        event.clipboardData.setData('text/plain', content.plainText);
-        event.clipboardData.setData('text/html', content.html);
-        if (content.internal) {
-          event.clipboardData.setData('application/x-docx-editor', content.internal);
-        }
-      }
+      manager.writeEventData(event, selection);
 
       onCut?.(selection);
     },
-    [editable, onCut, theme]
+    [manager, editable, onCut]
   );
 
   const handlePaste = useCallback(
@@ -199,14 +162,14 @@ export function useClipboard(options: UseClipboardOptions = {}): UseClipboardRet
 
       event.preventDefault();
 
-      const content = handlePasteEvent(event, { cleanWordFormatting });
+      const content = manager.parsePasteEvent(event);
       if (content) {
         lastPastedContentRef.current = content;
         const asPlainText = (event as unknown as KeyboardEvent).shiftKey ?? false;
         onPaste?.(content, asPlainText);
       }
     },
-    [editable, cleanWordFormatting, onPaste]
+    [manager, editable, onPaste]
   );
 
   const handleKeyDown = useCallback((_event: KeyboardEvent) => {

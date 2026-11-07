@@ -22,19 +22,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onErrorCaptured, onMounted, onBeforeUnmount } from 'vue';
+/**
+ * ErrorBoundary — Vue counterpart to React's `ErrorProvider` + `ErrorBoundary`.
+ *
+ * Thin Vue wrapper around the framework-agnostic ErrorManager from core.
+ * All notification state (show/dismiss/auto-dismiss) lives in the manager;
+ * this component only subscribes to its snapshot and forwards Vue/global
+ * errors into it — the same semantics React gets via useSyncExternalStore.
+ */
+import { computed, onBeforeUnmount, onErrorCaptured, onMounted, ref } from 'vue';
+import { ErrorManager } from '@xcrong/docx-editor-core';
+import type { ErrorSeverity as CoreErrorSeverity } from '@xcrong/docx-editor-core';
 
-export type ErrorSeverity = 'error' | 'warning' | 'info';
-
-interface Toast {
-  id: number;
-  message: string;
-  severity: ErrorSeverity;
-}
+export type ErrorSeverity = CoreErrorSeverity;
 
 const props = withDefaults(
   defineProps<{
-    /** Auto-dismiss timeout in ms (0 = no auto-dismiss) */
+    /** Auto-dismiss timeout in ms (0 = rely on the manager's own policy) */
     autoDismiss?: number;
   }>(),
   { autoDismiss: 5000 }
@@ -44,20 +48,36 @@ const emit = defineEmits<{
   (e: 'error', error: Error, severity: ErrorSeverity): void;
 }>();
 
-const toasts = ref<Toast[]>([]);
-let nextId = 0;
+// ErrorManager owns all notification state, mirroring React's ErrorProvider.
+const manager = new ErrorManager();
 
-function addToast(message: string, severity: ErrorSeverity = 'error') {
-  const id = nextId++;
-  toasts.value.push({ id, message, severity });
+// Re-render whenever the manager snapshot changes (same role as
+// useSyncExternalStore in React).
+const version = ref(0);
+const toasts = computed(() => {
+  void version.value;
+  return manager.getSnapshot().notifications.filter((n) => !n.dismissed);
+});
+const unsubscribe = manager.subscribe(() => {
+  version.value++;
+});
+
+function addToast(message: string, severity: ErrorSeverity = 'error'): string {
+  const id =
+    severity === 'warning'
+      ? manager.showWarning(message)
+      : severity === 'info'
+        ? manager.showInfo(message)
+        : manager.showError(message);
 
   if (props.autoDismiss > 0) {
-    setTimeout(() => dismissToast(id), props.autoDismiss);
+    setTimeout(() => manager.dismiss(id), props.autoDismiss);
   }
+  return id;
 }
 
-function dismissToast(id: number) {
-  toasts.value = toasts.value.filter(t => t.id !== id);
+function dismissToast(id: string) {
+  manager.dismiss(id);
 }
 
 function severityIcon(severity: ErrorSeverity): string {
@@ -70,9 +90,9 @@ function severityIcon(severity: ErrorSeverity): string {
 
 // Capture Vue component errors
 onErrorCaptured((err, instance, info) => {
-  const message = err instanceof Error ? err.message : String(err);
-  addToast(message, 'error');
-  emit('error', err instanceof Error ? err : new Error(message), 'error');
+  const error = err instanceof Error ? err : new Error(String(err));
+  addToast(error.message, 'error');
+  emit('error', error, 'error');
   return false; // prevent propagation
 });
 
@@ -83,7 +103,7 @@ function handleGlobalError(event: ErrorEvent) {
 
 function handleUnhandledRejection(event: PromiseRejectionEvent) {
   const msg = event.reason?.message || String(event.reason) || 'Unhandled promise rejection';
-  addToast(msg, 'warning');
+  manager.showWarning(msg);
 }
 
 onMounted(() => {
@@ -94,6 +114,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('error', handleGlobalError);
   window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+  unsubscribe();
+  manager.destroy();
 });
 
 defineExpose({ addToast, dismissToast });
