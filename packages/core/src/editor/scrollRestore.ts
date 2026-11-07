@@ -1,5 +1,5 @@
 /**
- * Scroll-restore helpers for the layout pipeline.
+ * Scroll-restore helpers for the layout pipeline (issue #696 Tier 2, step 1).
  *
  * Re-painting the visible pages tears down DOM and rebuilds it from
  * scratch. Without restore, the user's scrollTop would snap to wherever
@@ -16,12 +16,18 @@
  *     across page-break inserts / deletes that re-flow content.
  *   - **Ratio fallback** (no anchor available): preserve the relative
  *     scroll position (top / scrollHeight ratio). Coarse but always works.
+ *
+ * Lifted verbatim from the React adapter (`internals/scrollRestore.ts` +
+ * the `findPaintedPmStartAtOrBefore` half of `internals/scrollUtils.ts`)
+ * so the engine can own the capture/build/apply sequence and both adapters
+ * share it. DOM-only, no framework imports.
  */
 
-import { findBodyPmAnchor } from '@xcrong/docx-editor-core/layout-bridge';
-import type { RenderPagesUpdateKind } from '@xcrong/docx-editor-core/layout-painter';
-
-import { findPaintedPmStartAtOrBefore } from './scrollUtils';
+import {
+  findBodyPmAnchor,
+  findBodyPmAnchors,
+} from '../layout-bridge';
+import type { RenderPagesUpdateKind } from '../layout-painter';
 
 export interface PendingScrollRestore {
   renderKind: RenderPagesUpdateKind;
@@ -38,6 +44,27 @@ export interface ScrollAnchor {
   domAnchorPmStart: number | null;
   /** Pre-paint pixel offset of that anchor relative to the scroll container. */
   domAnchorOffsetInScroller: number;
+}
+
+/**
+ * Largest painted body `[data-pm-start]` value ≤ `pmPos`. Used to anchor scroll
+ * restore when `renderPages` rebuilds the DOM. Header/footer anchors are skipped
+ * because their PM positions live in a separate document and would mis-resolve.
+ */
+export function findPaintedPmStartAtOrBefore(
+  pages: HTMLElement,
+  pmPos: number
+): number | null {
+  let best: number | null = null;
+  const list = findBodyPmAnchors(pages);
+  for (let i = 0; i < list.length; i++) {
+    const raw = list[i].dataset.pmStart;
+    if (raw == null) continue;
+    const p = Number(raw);
+    if (Number.isNaN(p)) continue;
+    if (p <= pmPos && (best === null || p > best)) best = p;
+  }
+  return best;
 }
 
 /**
@@ -72,9 +99,9 @@ export function captureScrollAnchor(
 }
 
 /**
- * Build the pending-restore payload that will be consumed by the
- * post-paint useLayoutEffect. Incremental re-paints carry an explicit
- * scrollTopSnapshot; full re-paints rely on the DOM anchor + ratio.
+ * Build the pending-restore payload that will be consumed post-paint.
+ * Incremental re-paints carry an explicit scrollTopSnapshot; full
+ * re-paints rely on the DOM anchor + ratio.
  */
 export function buildPendingScrollRestore(
   renderPagesKind: RenderPagesUpdateKind,
@@ -133,9 +160,9 @@ export function applyScrollRestore(
 
 /**
  * Re-clamp scroll when a second layout pass runs before the post-paint
- * useLayoutEffect consumes the pending snapshot. Without this, the
- * second pass would overwrite the snapshot with its own and the first
- * pass's exact scrollTop would be lost.
+ * apply consumes the pending snapshot. Without this, the second pass
+ * would overwrite the snapshot with its own and the first pass's exact
+ * scrollTop would be lost.
  *
  * `onlyIfSnapshotJustWritten` gates the re-clamp on snapshot age — the
  * 32ms threshold catches the "second pass runs before the next frame"

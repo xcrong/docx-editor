@@ -55,22 +55,20 @@ import type {
 } from '@xcrong/docx-editor-core/layout-bridge/measuring';
 import {
   measureTableBlock,
-  getPageSize,
-  getMargins,
-  getColumns,
   resolveHeaderFooter,
 } from '@xcrong/docx-editor-core/layout-bridge';
 import {
-  computeLayout,
+  applyScrollRestore,
   createLayoutScheduler,
+  DocxEditorEngine,
   stripScrollFlag,
 } from '@xcrong/docx-editor-core/editor';
+import type { EngineHost } from '@xcrong/docx-editor-core/editor';
 import {
   DEFAULT_TEXTBOX_MARGINS,
   DEFAULT_TEXTBOX_WIDTH,
   assertExhaustiveFlowBlock,
 } from '@xcrong/docx-editor-core/layout-engine';
-import { renderPages } from '@xcrong/docx-editor-core/layout-painter/renderPage';
 import type {
   FlowBlock,
   Layout,
@@ -81,12 +79,8 @@ import type {
   TextBoxBlock,
 } from '@xcrong/docx-editor-core/layout-engine/types';
 import {
-  buildBlockLookup,
   enclosingSdtGroupIds,
   applySdtFocus,
-  type BlockLookup,
-  type FootnoteRenderItem,
-  type RenderPageOptions,
 } from '@xcrong/docx-editor-core/layout-painter';
 import type { Document } from '@xcrong/docx-editor-core/types/document';
 import type { LayoutSelectionGate } from '@xcrong/docx-editor-core/prosemirror';
@@ -110,9 +104,9 @@ const DEFAULT_PAGE_GAP = 24;
 // HELPERS
 // ============================================================================
 
-// `getPageSize`, `getMargins`, `resolveHeaderFooter` live in
-// `@xcrong/docx-editor-core/layout-bridge` so React and Vue agree on
-// twips→px math + HF lookup. Imported at the top of this file.
+// `resolveHeaderFooter` lives in `@xcrong/docx-editor-core/layout-bridge`
+// so React and Vue agree on HF lookup; `resolveLayoutGeometry` (used by the
+// engine) agrees on twips→px math.
 
 /**
  * Block measurement for the Vue harness. Two-pass HF measurement is still
@@ -321,105 +315,46 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   // Layout pipeline
   // ========================================================================
 
-  function runLayoutPipeline(state: EditorState) {
-    const container = pagesContainer.value;
-    if (!container || !document.value) return;
-    const layoutSeq = syncCoordinator?.getStateSeq() ?? 0;
-    syncCoordinator?.onLayoutStart();
-
-    const body = document.value.package?.document;
-    // Initial geometry comes from the FIRST section's properties; the trailing
-    // section uses `finalSectionProperties`. Mirrors React's PagedEditor split
-    // so multi-section docs paginate the lead pages with the correct margins.
+  // Section split the engine derives geometry from: the body pages use the
+  // FIRST section's properties, the trailing section uses
+  // `finalSectionProperties`. Mirrors React's PagedEditor split so
+  // multi-section docs paginate the lead pages with the correct margins.
+  function currentSectionProperties() {
+    const body = document.value?.package?.document;
     const initialSp = body?.sections?.[0]?.properties ?? body?.finalSectionProperties ?? null;
     const finalSp = body?.finalSectionProperties ?? initialSp;
-    const pageSize = getPageSize(initialSp);
-    const margins = getMargins(initialSp);
-    const finalPageSize = getPageSize(finalSp);
-    const finalMargins = getMargins(finalSp);
-    const columns = getColumns(initialSp);
-    const finalColumns = getColumns(finalSp);
-    const contentWidth = pageSize.w - margins.left - margins.right;
-    const theme = document.value.package?.theme ?? null;
-    const styles = document.value.package?.styles ?? null;
+    return { initialSp, finalSp };
+  }
 
-    try {
-      // Steps 1-5 (blocks → measure → HF resolve → margin extend → layout →
-      // footnote items) are the shared compute pass in core/editor. Paint +
-      // container styling + SDT focus stay here. Routing through the same
-      // `computeLayout` as React keeps the adapters in lockstep and gives Vue
-      // column / per-block-width support it lacked.
+  const engineHost: EngineHost = {
+    getDocument: () => document.value,
+    getStyles: () => document.value?.package?.styles ?? null,
+    getTheme: () => document.value?.package?.theme ?? null,
+    getSectionProperties: () => currentSectionProperties().initialSp,
+    getFinalSectionProperties: () => currentSectionProperties().finalSp,
+    getHeaderFooter: () => {
+      const { initialSp } = currentSectionProperties();
       const { header, footer, firstHeader, firstFooter } = resolveHeaderFooter(
         document.value,
         initialSp
       );
-      const {
-        blocks,
-        measures,
-        layout: newLayout,
-        headerContentForRender,
-        footerContentForRender,
-        firstPageHeaderForRender,
-        firstPageFooterForRender,
-        hasTitlePg,
-        watermark,
-        headerDistancePx,
-        footerDistancePx,
-        pageBorders,
-        footnotesByPage,
-      } = computeLayout({
-        state,
-        document: document.value,
-        pageSize,
-        margins,
-        columns,
-        finalPageSize,
-        finalMargins,
-        finalColumns,
-        pageGap,
-        contentWidth,
-        theme,
-        styles,
-        sectionProperties: initialSp,
-        finalSectionProperties: finalSp,
-        headerContent: header,
-        footerContent: footer,
-        firstPageHeaderContent: firstHeader,
-        firstPageFooterContent: firstFooter,
-        measureBlocks,
-        getHfPmDoc: (hf) => getHfPmView(hf)?.state.doc ?? null,
-      });
-
+      return { header, footer, firstHeader, firstFooter };
+    },
+    getPageGap: () => pageGap,
+    getResolvedCommentIds: () => undefined,
+    getHfPmDoc: (hf) => getHfPmView(hf)?.state.doc ?? null,
+    measureBlocks,
+    getSyncCoordinator: () => syncCoordinator,
+    getPagesContainer: () => pagesContainer.value,
+    // The Vue pages container scrolls itself (overflowY is set to auto on
+    // every paint), so it is its own scroll parent.
+    getScrollContainer: () => pagesContainer.value,
+    onLayout: (newLayout) => {
       layout.value = newLayout;
-
-      // Step 6: Build block lookup and paint
-      const blockLookup = buildBlockLookup(blocks, measures);
-
-      const pageOptions: RenderPageOptions & {
-        pageGap?: number;
-        pageBackground?: string;
-        showShadow?: boolean;
-        blockLookup?: BlockLookup;
-        footnotesByPage?: Map<number, FootnoteRenderItem[]>;
-      } = {
-        pageGap,
-        showShadow: true,
-        pageBackground: 'var(--doc-page-bg, #ffffff)',
-        blockLookup,
-        theme,
-        headerContent: headerContentForRender,
-        footerContent: footerContentForRender,
-        firstPageHeaderContent: firstPageHeaderForRender,
-        firstPageFooterContent: firstPageFooterForRender,
-        titlePg: hasTitlePg,
-        headerDistance: headerDistancePx,
-        footerDistance: footerDistancePx,
-        pageBorders,
-        watermark,
-        footnotesByPage,
-      };
-      renderPages(newLayout.pages, container, pageOptions);
-
+    },
+    onPaintContainer: () => {
+      const container = pagesContainer.value;
+      if (!container) return;
       // renderPages sets display:flex on the container — fix scrolling
       container.style.overflowY = 'auto';
       container.style.minHeight = '0';
@@ -427,18 +362,34 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       for (const child of Array.from(container.children)) {
         (child as HTMLElement).style.flexShrink = '0';
       }
-      // Keep a content control's boundary visible while the caret is inside it
-      // (Word-style focus); re-applied here so it survives every re-paint.
-      applySdtFocus(
-        container,
-        enclosingSdtGroupIds(state.doc, state.selection.from, state.selection.to)
-      );
-    } catch (err) {
-      console.error('[useDocxEditor] Layout pipeline error:', err);
-      onError?.(err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      syncCoordinator?.onLayoutComplete(layoutSeq);
-    }
+    },
+    // Vue applies scroll-restore synchronously post-paint (no post-commit
+    // effect like React's useLayoutEffect) and the engine drops its copy.
+    onScrollRestore: (pending) => {
+      const container = pagesContainer.value;
+      if (!container) return false;
+      applyScrollRestore(pending, container, container);
+      return true;
+    },
+    onError: (error) => {
+      console.error('[useDocxEditor] Layout pipeline error:', error);
+      onError?.(error instanceof Error ? error : new Error(String(error)));
+    },
+    scheduleFrame: (cb) => requestAnimationFrame(cb),
+  };
+  const engine = new DocxEditorEngine(engineHost);
+
+  function runLayoutPipeline(state: EditorState) {
+    const container = pagesContainer.value;
+    if (!container || !document.value) return;
+    const computation = engine.run(state);
+    if (!computation) return;
+    // Keep a content control's boundary visible while the caret is inside it
+    // (Word-style focus); re-applied here so it survives every re-paint.
+    applySdtFocus(
+      container,
+      enclosingSdtGroupIds(state.doc, state.selection.from, state.selection.to)
+    );
   }
 
   // rAF-coalescing layout scheduler (shared with React via core). Body

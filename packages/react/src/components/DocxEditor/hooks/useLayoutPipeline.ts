@@ -1,34 +1,30 @@
 /**
  * Layout pipeline hook for PagedEditor.
  *
- * Owns the 4-step layout pass (PM doc → flow blocks → measure → layout →
- * paint), its rAF-coalesced scheduler, and the scroll-restore state that
- * keeps the user's scroll position locked across re-paints.
+ * Thin React wrapper around `DocxEditorEngine` (issue #696 Tier 2): the
+ * engine owns compute + paint + scroll-restore orchestration, this hook
+ * supplies the host (React state setters, refs, DOM targets) and keeps
+ * the React-owned pieces — useState/refs, the post-commit scroll-restore
+ * `useLayoutEffect`, the `painter:painted` listener contract, and the
+ * rAF-coalesced scheduler.
  *
- * Extraction note: every line of `runLayoutPipeline` moves in here
- * verbatim. The FlowBlock invariant (`assertExhaustiveFlowBlock` in the
- * `toFlowBlocks` chain via `measureBlock.ts`) depends on this site staying
- * stable — if a new FlowBlock variant is added, the three measureBlock
- * switches still need updates per the CLAUDE.md invariant.
+ * Timing rule: output hooks fire inside `engine.run`, but scroll-restore
+ * is deferred — the engine keeps its pending copy and this hook's
+ * post-commit effect consumes it via `consumePendingScrollRestore`, so
+ * restoration lands at the same lifecycle point it always has.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { EditorState } from 'prosemirror-state';
 
 import type { FlowBlock, Layout, Measure } from '@xcrong/docx-editor-core/layout-engine';
-import { getMargins, getPageSize, getColumns } from '@xcrong/docx-editor-core/layout-bridge';
 import type { Node as PMNode } from 'prosemirror-model';
 import {
-  LayoutPainter,
-  renderPages,
-  buildBlockLookup,
-  type BlockLookup,
-  type FootnoteRenderItem,
-  type RenderPageOptions,
-} from '@xcrong/docx-editor-core/layout-painter';
-import {
-  computeLayout,
+  DocxEditorEngine,
+  applyScrollRestore,
   createLayoutScheduler,
+  resolveLayoutGeometry,
+  type EngineHost,
   type LayoutScheduler,
 } from '@xcrong/docx-editor-core/editor';
 import { findVerticalScrollParentOrRoot } from '@xcrong/docx-editor-core/utils/findVerticalScrollParent';
@@ -47,13 +43,6 @@ import { measureBlocks } from '../internals/measureBlock';
 import { createRenderedDomContext } from '../../../plugin-api/RenderedDomContext';
 import type { RenderedDomContext } from '../../../plugin-api/types';
 import { viewportMinHeightPx } from '../internals/scrollUtils';
-import {
-  applyScrollRestore,
-  buildPendingScrollRestore,
-  captureScrollAnchor,
-  reclampIncrementalSnapshot,
-  type PendingScrollRestore,
-} from '../internals/scrollRestore';
 
 export interface UseLayoutPipelineOptions {
   document: Document | null;
@@ -133,9 +122,9 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
   const [decorationSyncToken, setDecorationSyncToken] = useState(0);
   const notifyDecorationLayer = useCallback(() => setDecorationSyncToken((v) => v + 1), []);
 
-  // Callback refs — parent may hand in a fresh closure every render. Mirroring
-  // these in refs keeps `runLayoutPipeline`'s dep array stable; otherwise
-  // every parent re-render would invalidate the rAF-coalesced scheduler.
+  // Callback refs — parent may hand in a fresh closure every render.
+  // Reading through refs keeps the engine host stable; otherwise every
+  // parent re-render would rebuild the host.
   const onTotalPagesChangeRef = useRef(onTotalPagesChange);
   const onAnchorPositionsChangeRef = useRef(onAnchorPositionsChange);
   const onRenderedDomContextReadyRef = useRef(onRenderedDomContextReady);
@@ -146,6 +135,8 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
   getHfPmDocRef.current = getHfPmDoc;
 
   // Total-pages notifier — fires only when count changes (including N → 0).
+  // Deliberately post-commit (not the engine's `onTotalPages` hook) so the
+  // callback fires at the same lifecycle point it always has.
   const lastTotalPagesRef = useRef<number>(0);
   useEffect(() => {
     const total = layout?.pages.length ?? 0;
@@ -154,318 +145,194 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     onTotalPagesChangeRef.current?.(total);
   }, [layout]);
 
-  // Page geometry derived from section properties.
-  const pageSize = useMemo(() => getPageSize(sectionProperties), [sectionProperties]);
-  const margins = useMemo(() => getMargins(sectionProperties), [sectionProperties]);
-  const columns = useMemo(() => getColumns(sectionProperties), [sectionProperties]);
-  const { finalPageSize, finalMargins, finalColumns } = useMemo(() => {
-    const props = finalSectionProperties ?? sectionProperties;
-    return {
-      finalPageSize: getPageSize(props),
-      finalMargins: getMargins(props),
-      finalColumns: getColumns(props),
-    };
-  }, [finalSectionProperties, sectionProperties]);
-  const contentWidth = pageSize.w - margins.left - margins.right;
-
-  // Painter: shared singleton scoped to this hook instance.
-  const painter = useMemo(
-    () =>
-      new LayoutPainter({
-        pageGap,
-        showShadow: true,
-        pageBackground: 'var(--doc-page-bg, #ffffff)',
-      }),
-    [pageGap]
+  // Page geometry comes from the same core helper the engine uses, so the
+  // render-phase `contentWidth` (hidden-editor width) cannot drift from
+  // the geometry the engine derives per run.
+  const { contentWidth } = useMemo(
+    () => resolveLayoutGeometry(sectionProperties, finalSectionProperties),
+    [sectionProperties, finalSectionProperties]
   );
-  const painterRef = useRef<LayoutPainter | null>(null);
-  painterRef.current = painter;
 
-  // Scroll-restore plumbing. `pendingScrollRestoreRef` is read by both the
-  // pipeline and the post-commit useLayoutEffect below.
-  const pendingScrollRestoreRef = useRef<PendingScrollRestore | null>(null);
-  const pendingIncrementalScrollSnapshotWrittenAtRef = useRef(0);
+  // Latest-input snapshot the stable engine host reads through. Refreshed
+  // every render so `engine.run` always sees current props without the
+  // host (or `runLayoutPipeline`) changing identity.
+  const hostInputsRef = useRef({
+    document,
+    styles,
+    theme,
+    sectionProperties,
+    finalSectionProperties,
+    headerContent,
+    footerContent,
+    firstPageHeaderContent,
+    firstPageFooterContent,
+    pageGap,
+    zoom,
+    resolvedCommentIds,
+    syncCoordinator,
+    getScrollContainer,
+  });
+  hostInputsRef.current = {
+    document,
+    styles,
+    theme,
+    sectionProperties,
+    finalSectionProperties,
+    headerContent,
+    footerContent,
+    firstPageHeaderContent,
+    firstPageFooterContent,
+    pageGap,
+    zoom,
+    resolvedCommentIds,
+    syncCoordinator,
+    getScrollContainer,
+  };
 
-  // =========================================================================
-  // Layout Pipeline
-  // =========================================================================
-
-  const runLayoutPipeline = useCallback(
-    (state: EditorState) => {
-      const pipelineStart = performance.now();
-
-      const currentEpoch = syncCoordinator.getStateSeq();
-      syncCoordinator.onLayoutStart();
-
-      const applyPendingIncrementalScrollSnapshot = (onlyIfSnapshotJustWritten: boolean) => {
-        const pe0 = pagesContainerRef.current;
-        const sp0 = pe0 ? (getScrollContainer() ?? findVerticalScrollParentOrRoot(pe0)) : null;
-        const age = performance.now() - pendingIncrementalScrollSnapshotWrittenAtRef.current;
-        reclampIncrementalSnapshot(
-          pendingScrollRestoreRef.current,
-          sp0,
-          age,
-          onlyIfSnapshotJustWritten
-        );
-      };
-      applyPendingIncrementalScrollSnapshot(true);
-
-      try {
-        // Steps 1-3 (PM doc → blocks → measure → HF resolve → margin extend →
-        // layout → footnote items) are the shared compute pass, lifted to
-        // `@xcrong/docx-editor-core/editor`. Paint + scroll/events stay here.
-        const {
-          blocks: newBlocks,
-          measures: newMeasures,
-          layout: newLayout,
-          headerContentForRender,
-          footerContentForRender,
-          firstPageHeaderForRender,
-          firstPageFooterForRender,
-          hasTitlePg,
-          watermark,
-          headerDistancePx,
-          footerDistancePx,
-          pageBorders,
-          footnotesByPage,
-        } = computeLayout({
-          state,
-          document,
-          pageSize,
-          margins,
-          columns,
-          finalPageSize,
-          finalMargins,
-          finalColumns,
-          pageGap,
-          contentWidth,
-          theme,
-          styles,
-          sectionProperties,
-          finalSectionProperties,
-          headerContent,
-          footerContent,
-          firstPageHeaderContent,
-          firstPageFooterContent,
-          measureBlocks,
-          getHfPmDoc: (hf) => getHfPmDocRef.current?.(hf) ?? null,
-        });
+  const engineRef = useRef<DocxEditorEngine | null>(null);
+  if (!engineRef.current) {
+    const host: EngineHost = {
+      getDocument: () => hostInputsRef.current.document,
+      getStyles: () => hostInputsRef.current.styles,
+      getTheme: () => hostInputsRef.current.theme,
+      getSectionProperties: () => hostInputsRef.current.sectionProperties,
+      getFinalSectionProperties: () => hostInputsRef.current.finalSectionProperties,
+      getHeaderFooter: () => ({
+        header: hostInputsRef.current.headerContent,
+        footer: hostInputsRef.current.footerContent,
+        firstHeader: hostInputsRef.current.firstPageHeaderContent,
+        firstFooter: hostInputsRef.current.firstPageFooterContent,
+      }),
+      getPageGap: () => hostInputsRef.current.pageGap,
+      getResolvedCommentIds: () => hostInputsRef.current.resolvedCommentIds,
+      getHfPmDoc: (hf) => getHfPmDocRef.current?.(hf) ?? null,
+      measureBlocks,
+      getSyncCoordinator: () => hostInputsRef.current.syncCoordinator,
+      getPagesContainer: () => pagesContainerRef.current,
+      getScrollContainer: () => hostInputsRef.current.getScrollContainer(),
+      onLayout: (newLayout, newBlocks, newMeasures) => {
         setBlocks(newBlocks);
         setMeasures(newMeasures);
         setLayout(newLayout);
-
-        // Step 4: Paint to DOM
-        if (pagesContainerRef.current && painterRef.current) {
-          pendingScrollRestoreRef.current = null;
-          pendingIncrementalScrollSnapshotWrittenAtRef.current = 0;
-
-          const pagesEl = pagesContainerRef.current;
-          const scrollParent = getScrollContainer() ?? findVerticalScrollParentOrRoot(pagesEl);
-          const anchor = scrollParent?.isConnected
-            ? captureScrollAnchor(pagesEl, scrollParent, state.selection.head)
-            : null;
-
-          const blockLookup = buildBlockLookup(newBlocks, newMeasures);
-          painterRef.current.setBlockLookup(blockLookup);
-
-          const pageOptions: RenderPageOptions & {
-            pageGap?: number;
-            pageBackground?: string;
-            showShadow?: boolean;
-            blockLookup?: BlockLookup;
-            footnotesByPage?: Map<number, FootnoteRenderItem[]>;
-            resolvedCommentIds?: Set<number>;
-          } = {
-            pageGap,
-            showShadow: true,
-            pageBackground: 'var(--doc-page-bg, #ffffff)',
-            blockLookup,
-            headerContent: headerContentForRender,
-            footerContent: footerContentForRender,
-            firstPageHeaderContent: firstPageHeaderForRender,
-            firstPageFooterContent: firstPageFooterForRender,
-            titlePg: hasTitlePg,
-            headerDistance: headerDistancePx,
-            footerDistance: footerDistancePx,
-            pageBorders,
-            theme,
-            watermark,
-            footnotesByPage,
-            resolvedCommentIds,
-          };
-          const renderPagesKind = renderPages(
-            newLayout.pages,
-            pagesContainerRef.current,
-            pageOptions
-          );
-
-          const vp = viewportLayoutRef.current;
-          if (vp) {
-            const mh = viewportMinHeightPx(newLayout, pageGap);
-            vp.style.minHeight = `${mh}px`;
-            if (zoom !== 1) {
-              vp.style.marginBottom = `${mh * (zoom - 1)}px`;
-            } else {
-              vp.style.marginBottom = '';
-            }
+      },
+      onPaintContainer: (newLayout) => {
+        const vp = viewportLayoutRef.current;
+        if (vp) {
+          const mh = viewportMinHeightPx(newLayout, hostInputsRef.current.pageGap);
+          vp.style.minHeight = `${mh}px`;
+          const currentZoom = hostInputsRef.current.zoom;
+          if (currentZoom !== 1) {
+            vp.style.marginBottom = `${mh * (currentZoom - 1)}px`;
+          } else {
+            vp.style.marginBottom = '';
           }
-
-          if (scrollParent?.isConnected && anchor) {
-            const pending = buildPendingScrollRestore(renderPagesKind, scrollParent, anchor);
-            pendingScrollRestoreRef.current = pending;
-            if (pending.renderKind === 'incremental' && pending.scrollTopSnapshot != null) {
-              pendingIncrementalScrollSnapshotWrittenAtRef.current = performance.now();
-            }
-          }
-
-          // Deterministic "painter is done writing" signal. HF caret +
-          // selection-rect resolvers wait on this instead of `requestAnimationFrame`
-          // chains — the rAF approach raced the painter and stale
-          // `data-pm-start` spans showed up on the first frame after engage
-          // (`computeHfCaretRectFromView` had to retry through a second rAF).
-          // Bubbling CustomEvent so any ancestor (DocxEditorPagedArea) can
-          // listen via `pagesContainerRef.current?.addEventListener(...)`.
-          pagesContainerRef.current?.dispatchEvent(
-            new CustomEvent('painter:painted', { bubbles: true })
-          );
-
-          if (onRenderedDomContextReadyRef.current) {
-            const domContext = createRenderedDomContext(pagesContainerRef.current, zoom);
-            onRenderedDomContextReadyRef.current(domContext);
-          }
-        } else {
-          pendingScrollRestoreRef.current = null;
-          pendingIncrementalScrollSnapshotWrittenAtRef.current = 0;
         }
-
-        if (onAnchorPositionsChangeRef.current) {
-          const positions = computeAnchorPositions(
-            hiddenPMRef.current?.getView() ?? null,
-            newLayout,
-            newBlocks,
-            newMeasures,
-            pageGap
+      },
+      // Deferred: the post-commit `useLayoutEffect` below consumes the
+      // engine's pending copy (same lifecycle point as before).
+      onPainted: () => {
+        if (onRenderedDomContextReadyRef.current && pagesContainerRef.current) {
+          const domContext = createRenderedDomContext(
+            pagesContainerRef.current,
+            hostInputsRef.current.zoom
           );
+          onRenderedDomContextReadyRef.current(domContext);
+        }
+      },
+      computeAnchorPositions: (newLayout, newBlocks, newMeasures) => {
+        const positions = computeAnchorPositions(
+          hiddenPMRef.current?.getView() ?? null,
+          newLayout,
+          newBlocks,
+          newMeasures,
+          hostInputsRef.current.pageGap
+        );
 
-          const pagesEl = pagesContainerRef.current;
-          if (pagesEl) {
-            const hfContainers = pagesEl.querySelectorAll(
-              '.layout-page-header, .layout-page-footer'
-            );
-            if (hfContainers.length > 0) {
-              const pagesElRect = pagesEl.getBoundingClientRect();
-              const currentZoom = zoom || 1;
-              for (let i = 0; i < hfContainers.length; i++) {
-                const hf = hfContainers[i] as HTMLElement;
-                // Query insertions
-                const insertions = hf.querySelectorAll('.docx-insertion[data-revision-id]');
-                for (let j = 0; j < insertions.length; j++) {
-                  const el = insertions[j] as HTMLElement;
-                  const rId = el.getAttribute('data-revision-id');
-                  if (rId && !positions.has(`revision-${rId}`)) {
-                    const rect = el.getBoundingClientRect();
-                    const y = (rect.top - pagesElRect.top + pagesEl.scrollTop) / currentZoom;
-                    positions.set(`revision-${rId}`, y);
-                  }
+        const pagesEl = pagesContainerRef.current;
+        if (pagesEl) {
+          const hfContainers = pagesEl.querySelectorAll(
+            '.layout-page-header, .layout-page-footer'
+          );
+          if (hfContainers.length > 0) {
+            const pagesElRect = pagesEl.getBoundingClientRect();
+            const currentZoom = hostInputsRef.current.zoom || 1;
+            for (let i = 0; i < hfContainers.length; i++) {
+              const hf = hfContainers[i] as HTMLElement;
+              // Query insertions
+              const insertions = hf.querySelectorAll('.docx-insertion[data-revision-id]');
+              for (let j = 0; j < insertions.length; j++) {
+                const el = insertions[j] as HTMLElement;
+                const rId = el.getAttribute('data-revision-id');
+                if (rId && !positions.has(`revision-${rId}`)) {
+                  const rect = el.getBoundingClientRect();
+                  const y = (rect.top - pagesElRect.top + pagesEl.scrollTop) / currentZoom;
+                  positions.set(`revision-${rId}`, y);
                 }
-                // Query deletions
-                const deletions = hf.querySelectorAll('.docx-deletion[data-revision-id]');
-                for (let j = 0; j < deletions.length; j++) {
-                  const el = deletions[j] as HTMLElement;
-                  const rId = el.getAttribute('data-revision-id');
-                  if (rId && !positions.has(`revision-${rId}`)) {
-                    const rect = el.getBoundingClientRect();
-                    const y = (rect.top - pagesElRect.top + pagesEl.scrollTop) / currentZoom;
-                    positions.set(`revision-${rId}`, y);
-                  }
+              }
+              // Query deletions
+              const deletions = hf.querySelectorAll('.docx-deletion[data-revision-id]');
+              for (let j = 0; j < deletions.length; j++) {
+                const el = deletions[j] as HTMLElement;
+                const rId = el.getAttribute('data-revision-id');
+                if (rId && !positions.has(`revision-${rId}`)) {
+                  const rect = el.getBoundingClientRect();
+                  const y = (rect.top - pagesElRect.top + pagesEl.scrollTop) / currentZoom;
+                  positions.set(`revision-${rId}`, y);
                 }
-                // Query comments
-                const comments = hf.querySelectorAll('[data-comment-id]');
-                for (let j = 0; j < comments.length; j++) {
-                  const el = comments[j] as HTMLElement;
-                  const commentId = el.getAttribute('data-comment-id');
-                  if (commentId && !positions.has(`comment-${commentId}`)) {
-                    const rect = el.getBoundingClientRect();
-                    const y = (rect.top - pagesElRect.top + pagesEl.scrollTop) / currentZoom;
-                    positions.set(`comment-${commentId}`, y);
-                  }
+              }
+              // Query comments
+              const comments = hf.querySelectorAll('[data-comment-id]');
+              for (let j = 0; j < comments.length; j++) {
+                const el = comments[j] as HTMLElement;
+                const commentId = el.getAttribute('data-comment-id');
+                if (commentId && !positions.has(`comment-${commentId}`)) {
+                  const rect = el.getBoundingClientRect();
+                  const y = (rect.top - pagesElRect.top + pagesEl.scrollTop) / currentZoom;
+                  positions.set(`comment-${commentId}`, y);
                 }
-                // Query structural revisions
-                const structural = hf.querySelectorAll(
-                  '.ep-revision-table[data-revision-id], ' +
-                    '.ep-revision-row[data-revision-id], ' +
-                    '.ep-revision-cell[data-revision-id], ' +
-                    '.layout-revision-pmark[data-revision-id]'
-                );
-                for (let j = 0; j < structural.length; j++) {
-                  const el = structural[j] as HTMLElement;
-                  const rId = el.getAttribute('data-revision-id');
-                  if (rId && !positions.has(`revision-${rId}`)) {
-                    const rect = el.getBoundingClientRect();
-                    const y = (rect.top - pagesElRect.top + pagesEl.scrollTop) / currentZoom;
-                    positions.set(`revision-${rId}`, y);
-                  }
+              }
+              // Query structural revisions
+              const structural = hf.querySelectorAll(
+                '.ep-revision-table[data-revision-id], ' +
+                  '.ep-revision-row[data-revision-id], ' +
+                  '.ep-revision-cell[data-revision-id], ' +
+                  '.layout-revision-pmark[data-revision-id]'
+              );
+              for (let j = 0; j < structural.length; j++) {
+                const el = structural[j] as HTMLElement;
+                const rId = el.getAttribute('data-revision-id');
+                if (rId && !positions.has(`revision-${rId}`)) {
+                  const rect = el.getBoundingClientRect();
+                  const y = (rect.top - pagesElRect.top + pagesEl.scrollTop) / currentZoom;
+                  positions.set(`revision-${rId}`, y);
                 }
               }
             }
           }
-
-          onAnchorPositionsChangeRef.current(positions);
         }
 
-        applyPendingIncrementalScrollSnapshot(false);
-
-        const totalTime = performance.now() - pipelineStart;
-        if (totalTime > 2000) {
-          console.warn(
-            `[PagedEditor] Layout pipeline took ${Math.round(totalTime)}ms total ` +
-              `(${newBlocks.length} blocks, ${newMeasures.length} measures)`
-          );
-        }
-      } catch (error) {
+        return positions;
+      },
+      onAnchorPositions: (positions) => {
+        onAnchorPositionsChangeRef.current?.(positions);
+      },
+      onError: (error) => {
         console.error('[PagedEditor] Layout pipeline error:', error);
-      }
+      },
+      scheduleFrame: (cb) => requestAnimationFrame(cb),
+    };
+    engineRef.current = new DocxEditorEngine(host);
+  }
 
-      syncCoordinator.onLayoutComplete(currentEpoch);
-      applyPendingIncrementalScrollSnapshot(false);
-    },
-    [
-      contentWidth,
-      columns,
-      pageSize,
-      margins,
-      finalPageSize,
-      finalMargins,
-      finalColumns,
-      pageGap,
-      zoom,
-      syncCoordinator,
-      headerContent,
-      footerContent,
-      firstPageHeaderContent,
-      firstPageFooterContent,
-      // `getHfPmDoc` is read through a ref in the pipeline so identity
-      // changes don't re-trigger the layout effect every render.
-      sectionProperties,
-      finalSectionProperties,
-      document,
-      resolvedCommentIds,
-      getScrollContainer,
-      hiddenPMRef,
-      pagesContainerRef,
-      styles,
-      theme,
-      viewportLayoutRef,
-    ]
-  );
+  const runLayoutPipeline = useCallback((state: EditorState) => {
+    engineRef.current!.run(state);
+  }, []);
 
   // After `setLayout`, React still commits `totalHeight` / margin on the viewport wrapper.
   // Restoring scroll here (plus one rAF) matches the committed DOM scrollHeight.
   useLayoutEffect(() => {
-    const pending = pendingScrollRestoreRef.current;
+    const pending = engineRef.current!.consumePendingScrollRestore();
     if (!pending) return;
-    pendingScrollRestoreRef.current = null;
-    pendingIncrementalScrollSnapshotWrittenAtRef.current = 0;
 
     const pagesEl = pagesContainerRef.current;
     const scrollParent =
