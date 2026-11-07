@@ -4,7 +4,7 @@
 
 ```ts
 
-// @public (undocumented)
+// @public
 export function clampZoom(value: number, min: number, max: number): number;
 
 // @public
