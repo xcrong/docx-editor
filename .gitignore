@@ -84,3 +84,6 @@ examples/vite/public/DC_Template_Descricao_Cargo_Controlado_Enterprise.docx
 examples/vue/public/DC_Template_Descricao_Cargo_Controlado_Enterprise.docx
 .gstack/
 .pr-checklist.json
+
+# Never commit a stray node_modules symlink (trailing-slash rule misses symlinks)
+node_modules
