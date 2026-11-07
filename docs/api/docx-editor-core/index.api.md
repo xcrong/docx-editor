@@ -184,6 +184,25 @@ export interface CellCoordinates {
 }
 
 // @public
+export class ClipboardManager {
+    constructor(options?: ClipboardManagerOptions);
+    copy(selection: ClipboardSelection): Promise<boolean>;
+    cut(selection: ClipboardSelection): Promise<boolean>;
+    parsePasteEvent(event: ClipboardEvent): ParsedClipboardContent | null;
+    readClipboard(asPlainText?: boolean): Promise<ParsedClipboardContent | null>;
+    serializeForEvent(selection: ClipboardSelection): ClipboardContent;
+    setOptions(options: ClipboardManagerOptions): void;
+    writeEventData(event: ClipboardEvent, selection: ClipboardSelection): void;
+}
+
+// @public
+export interface ClipboardManagerOptions {
+    cleanWordFormatting?: boolean;
+    onError?: (error: Error) => void;
+    theme?: Theme | null;
+}
+
+// @public
 export interface ClipboardSelection {
     // (undocumented)
     endOffset: number;

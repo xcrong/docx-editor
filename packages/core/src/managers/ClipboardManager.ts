@@ -10,7 +10,15 @@
  * - Clipboard read/write operations
  */
 
-import type { Run } from '../types/document';
+import type { Run, Theme } from '../types/document';
+import {
+  INTERNAL_CLIPBOARD_TYPE,
+  copyRuns,
+  handlePasteEvent,
+  parseClipboardHtml,
+  runsToClipboardContent,
+} from '../utils/clipboard';
+import type { ClipboardContent, ParsedClipboardContent } from '../utils/clipboard';
 
 // ============================================================================
 // TYPES
@@ -242,3 +250,109 @@ export function createSelectionFromDOM(): ClipboardSelection | null {
 
 // Backwards-compatible alias
 export const rgbToHex = cssColorToHex;
+
+// ============================================================================
+// CLIPBOARD MANAGER
+// ============================================================================
+
+/** Options for {@link ClipboardManager}. Mirrors the hook-level options. */
+export interface ClipboardManagerOptions {
+  /** Whether to clean Word-specific formatting on paste. Default true. */
+  cleanWordFormatting?: boolean;
+  /** Callback for handling clipboard errors. */
+  onError?: (error: Error) => void;
+  /** Document theme — used to resolve themed colors in the HTML clipboard payload. */
+  theme?: Theme | null;
+}
+
+/**
+ * ClipboardManager
+ *
+ * Framework-agnostic owner of clipboard I/O for the editor. Thin framework
+ * adapters (React `useClipboard`, Vue `useClipboard`) delegate to this class
+ * and only add framework glue (processing flags, callbacks, event wiring).
+ *
+ * Primitives (`copyRuns`, `runsToClipboardContent`, `handlePasteEvent`,
+ * `parseClipboardHtml`) live in `utils/clipboard`; this class orchestrates
+ * them (copy/cut/read/event serialize + parse) so adapters stay in lockstep.
+ */
+export class ClipboardManager {
+  private cleanWordFormatting = true;
+  private onError?: (error: Error) => void;
+  private theme?: Theme | null;
+
+  constructor(options: ClipboardManagerOptions = {}) {
+    this.setOptions(options);
+  }
+
+  /** Refresh options (call when adapter props change). */
+  setOptions(options: ClipboardManagerOptions): void {
+    if (options.cleanWordFormatting !== undefined) {
+      this.cleanWordFormatting = options.cleanWordFormatting;
+    }
+    if (options.onError !== undefined) {
+      this.onError = options.onError;
+    }
+    if (options.theme !== undefined) {
+      this.theme = options.theme;
+    }
+  }
+
+  /** Copy a DOM-derived selection to the clipboard. */
+  async copy(selection: ClipboardSelection): Promise<boolean> {
+    return copyRuns(selection.runs, { onError: this.onError, theme: this.theme });
+  }
+
+  /** Cut is copy-then-delete; the manager owns the clipboard half. */
+  async cut(selection: ClipboardSelection): Promise<boolean> {
+    return copyRuns(selection.runs, { onError: this.onError, theme: this.theme });
+  }
+
+  /**
+   * Read the clipboard via `navigator.clipboard.read()` and parse it.
+   * Returns null when the API is unavailable (callers fall back to events).
+   */
+  async readClipboard(asPlainText = false): Promise<ParsedClipboardContent | null> {
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard?.read) return null;
+      const items = await navigator.clipboard.read();
+      let html = '';
+      let plainText = '';
+      for (const item of items) {
+        if (item.types.includes('text/html')) {
+          html = await (await item.getType('text/html')).text();
+        }
+        if (item.types.includes('text/plain')) {
+          plainText = await (await item.getType('text/plain')).text();
+        }
+      }
+      if (asPlainText) html = '';
+      return parseClipboardHtml(html, plainText, this.cleanWordFormatting);
+    } catch (error) {
+      this.onError?.(error instanceof Error ? error : new Error(String(error)));
+      return null;
+    }
+  }
+
+  /** Serialize a selection for a copy/cut DOM event. */
+  serializeForEvent(selection: ClipboardSelection): ClipboardContent {
+    return runsToClipboardContent(selection.runs, true, this.theme ?? null);
+  }
+
+  /** Write a serialized selection onto a copy/cut DOM event. */
+  writeEventData(event: ClipboardEvent, selection: ClipboardSelection): void {
+    const content = this.serializeForEvent(selection);
+    if (event.clipboardData) {
+      event.clipboardData.setData('text/plain', content.plainText);
+      event.clipboardData.setData('text/html', content.html);
+      if (content.internal) {
+        event.clipboardData.setData(INTERNAL_CLIPBOARD_TYPE, content.internal);
+      }
+    }
+  }
+
+  /** Parse a paste DOM event. */
+  parsePasteEvent(event: ClipboardEvent): ParsedClipboardContent | null {
+    return handlePasteEvent(event, { cleanWordFormatting: this.cleanWordFormatting });
+  }
+}

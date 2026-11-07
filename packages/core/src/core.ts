@@ -303,6 +303,7 @@ export {
   // Manager classes
   AutoSaveManager,
   TableSelectionManager,
+  ClipboardManager,
   ErrorManager,
   PluginLifecycleManager,
   // AutoSave utilities
@@ -349,6 +350,7 @@ export type {
   PluginLifecycleSnapshot,
   // Clipboard types
   ClipboardSelection,
+  ClipboardManagerOptions,
   // LayoutCoordinator types
   SelectionRect,
   CaretPosition,
