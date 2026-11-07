@@ -165,10 +165,16 @@ export interface EngineHost {
   onDocumentChanged?(newState: EditorState): void;
   /**
    * Fired for selection-only body transactions (no relayout). React
-   * refreshes its selection overlay; Vue re-applies content-control focus
-   * and notifies its selection listener.
+   * refreshes its selection overlay; Vue re-applies content-control focus.
    */
   onSelectionTransaction?(newState: EditorState): void;
+  /**
+   * Fired after every body transaction, once the layout is scheduled and
+   * the render requested (React leaves this undefined — its overlay syncs
+   * through the separate selection-change path; Vue notifies its selection
+   * listener here).
+   */
+  onSelectionChanged?(newState: EditorState): void;
   /** Current body EditorState, for scheduling a relayout after HF edits. */
   getBodyState?(): EditorState | null;
   /**
@@ -239,6 +245,7 @@ export class DocxEditorEngine {
     }
 
     gate?.requestRender();
+    this.host.onSelectionChanged?.(newState);
 
     if (!tr.docChanged) {
       this.host.onSelectionTransaction?.(newState);
@@ -252,13 +259,13 @@ export class DocxEditorEngine {
    * notify. The caller applies the transaction first; the post-apply
    * `view.state` is read here.
    */
-  handleHfTransaction(rId: string, view: EditorView, tr: Transaction): void {
-    if (tr.docChanged) {
+  handleHfTransaction(rId: string, view: EditorView, docChanged: boolean): void {
+    if (docChanged) {
       this.host.onHfDocumentChanged?.(rId, view.state);
       const bodyState = this.host.getBodyState?.();
       if (bodyState) this.scheduleLayout(bodyState);
     }
-    this.host.onHfTransaction?.(rId, view, tr.docChanged);
+    this.host.onHfTransaction?.(rId, view, docChanged);
   }
 
   /**

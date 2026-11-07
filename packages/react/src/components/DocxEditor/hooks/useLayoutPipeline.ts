@@ -15,7 +15,8 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { EditorState } from 'prosemirror-state';
+import type { EditorState, Transaction } from 'prosemirror-state';
+import type { EditorView } from 'prosemirror-view';
 
 import type { FlowBlock, Layout, Measure } from '@xcrong/docx-editor-core/layout-engine';
 import type { Node as PMNode } from 'prosemirror-model';
@@ -73,6 +74,12 @@ export interface UseLayoutPipelineOptions {
   onTotalPagesChange?: (totalPages: number) => void;
   onAnchorPositionsChange?: (positions: Map<string, number>) => void;
   onRenderedDomContextReady?: (context: RenderedDomContext) => void;
+  /** Document writeback listener for doc-changing body transactions. */
+  onDocumentChange?: (doc: Document) => void;
+  /** Selection-only body transactions (no relayout): overlay refresh. */
+  onSelectionOnlyTransaction?: (state: EditorState) => void;
+  /** HF transaction notifications (caret overlays, toolbar sync). */
+  onHfTransaction?: (rId: string, view: EditorView, docChanged: boolean) => void;
 }
 
 export interface UseLayoutPipelineReturn {
@@ -84,7 +91,10 @@ export interface UseLayoutPipelineReturn {
   contentWidth: number;
   runLayoutPipeline: (state: EditorState) => void;
   scheduleLayout: (state: EditorState) => void;
+  handleTransaction: (transaction: Transaction, newState: EditorState) => void;
+  handleHfTransaction: (rId: string, view: EditorView, docChanged: boolean) => void;
 }
+
 
 export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipelineReturn {
   const {
@@ -109,6 +119,9 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     onTotalPagesChange,
     onAnchorPositionsChange,
     onRenderedDomContextReady,
+    onDocumentChange,
+    onSelectionOnlyTransaction,
+    onHfTransaction,
   } = opts;
 
   const [layout, setLayout] = useState<Layout | null>(null);
@@ -128,10 +141,16 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
   const onAnchorPositionsChangeRef = useRef(onAnchorPositionsChange);
   const onRenderedDomContextReadyRef = useRef(onRenderedDomContextReady);
   const getHfPmDocRef = useRef(getHfPmDoc);
+  const onDocumentChangeRef = useRef(onDocumentChange);
+  const onSelectionOnlyTransactionRef = useRef(onSelectionOnlyTransaction);
+  const onHfTransactionRef = useRef(onHfTransaction);
   onTotalPagesChangeRef.current = onTotalPagesChange;
   onAnchorPositionsChangeRef.current = onAnchorPositionsChange;
   onRenderedDomContextReadyRef.current = onRenderedDomContextReady;
   getHfPmDocRef.current = getHfPmDoc;
+  onDocumentChangeRef.current = onDocumentChange;
+  onSelectionOnlyTransactionRef.current = onSelectionOnlyTransaction;
+  onHfTransactionRef.current = onHfTransaction;
 
   // Total-pages notifier — fires only when count changes (including N → 0).
   // Deliberately post-commit (not the engine's `onTotalPages` hook) so the
@@ -322,6 +341,20 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
       onError: (error) => {
         console.error('[PagedEditor] Layout pipeline error:', error);
       },
+      onDecorationsChanged: () => {
+        notifyDecorationLayer();
+      },
+      onDocumentChanged: () => {
+        const newDoc = hiddenPMRef.current?.getDocument();
+        if (newDoc) onDocumentChangeRef.current?.(newDoc);
+      },
+      onSelectionTransaction: (newState) => {
+        onSelectionOnlyTransactionRef.current?.(newState);
+      },
+      getBodyState: () => hiddenPMRef.current?.getState() ?? null,
+      onHfTransaction: (rId, view, docChanged) => {
+        onHfTransactionRef.current?.(rId, view, docChanged);
+      },
       scheduleFrame: frameScheduler.scheduleFrame,
       cancelFrame: frameScheduler.cancelFrame,
     };
@@ -367,6 +400,22 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     engineRef.current!.scheduleLayout(state);
   }, []);
 
+  // Transaction → repaint loop (step 3): thin delegation into the engine,
+  // which notifies decorations, schedules doc changes, and refreshes the
+  // overlay for selection-only transactions.
+  const handleTransaction = useCallback(
+    (transaction: Transaction, newState: EditorState) => {
+      engineRef.current!.handleTransaction(transaction, newState);
+    },
+    []
+  );
+  const handleHfTransaction = useCallback(
+    (rId: string, view: EditorView, docChanged: boolean) => {
+      engineRef.current!.handleHfTransaction(rId, view, docChanged);
+    },
+    []
+  );
+
   // Clean up pending rAF on unmount
   useEffect(() => {
     const engine = engineRef.current;
@@ -382,5 +431,7 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     contentWidth,
     runLayoutPipeline,
     scheduleLayout,
+    handleTransaction,
+    handleHfTransaction,
   };
 }

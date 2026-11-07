@@ -317,6 +317,7 @@ describe('DocxEditorEngine.handleTransaction', () => {
       onDecorationsChanged: () => calls.push('decorations'),
       onDocumentChanged: (s) => calls.push(`doc:${(s.doc.textContent ?? '').length}`),
       onSelectionTransaction: () => calls.push('selection'),
+      onSelectionChanged: () => calls.push('sel-changed'),
     };
     const engine = new DocxEditorEngine(hooked);
     const state = stateFor(paraNode('A1', 'hello'));
@@ -325,7 +326,7 @@ describe('DocxEditorEngine.handleTransaction', () => {
 
     engine.handleTransaction(tr(true), state);
 
-    expect(calls).toEqual(['decorations', 'doc:5']);
+    expect(calls).toEqual(['decorations', 'doc:5', 'sel-changed']);
     expect(gate.getStateSeq()).toBe(seqBefore + 1);
     expect(captured.layouts.length).toBe(1);
   });
@@ -338,18 +339,18 @@ describe('DocxEditorEngine.handleTransaction', () => {
       onDecorationsChanged: () => calls.push('decorations'),
       onDocumentChanged: () => calls.push('doc'),
       onSelectionTransaction: () => calls.push('selection'),
+      onSelectionChanged: () => calls.push('sel-changed'),
     };
     const engine = new DocxEditorEngine(hooked);
 
     engine.handleTransaction(tr(false), stateFor(paraNode('A1', 'hello')));
 
-    expect(calls).toEqual(['decorations', 'selection']);
+    expect(calls).toEqual(['decorations', 'sel-changed', 'selection']);
     expect(captured.layouts.length).toBe(0);
   });
 });
 
 describe('DocxEditorEngine.handleHfTransaction', () => {
-  const tr = (docChanged: boolean): Transaction => ({ docChanged }) as Transaction;
   const viewFor = (state: EditorState): EditorView => ({ state }) as EditorView;
 
   test('docChanged writes back, schedules the body, and notifies', () => {
@@ -364,7 +365,7 @@ describe('DocxEditorEngine.handleHfTransaction', () => {
     };
     const engine = new DocxEditorEngine(hooked);
 
-    engine.handleHfTransaction('rId9', viewFor(stateFor(paraNode('H1', 'hf'))), tr(true));
+    engine.handleHfTransaction('rId9', viewFor(stateFor(paraNode('H1', 'hf'))), true);
 
     expect(calls).toEqual(['writeback:rId9', 'notify:rId9:true']);
     expect(captured.layouts.length).toBe(1);
@@ -381,7 +382,7 @@ describe('DocxEditorEngine.handleHfTransaction', () => {
     };
     const engine = new DocxEditorEngine(hooked);
 
-    engine.handleHfTransaction('rId9', viewFor(stateFor(paraNode('H1', 'hf'))), tr(false));
+    engine.handleHfTransaction('rId9', viewFor(stateFor(paraNode('H1', 'hf'))), false);
 
     expect(calls).toEqual(['notify:rId9:false']);
     expect(captured.layouts.length).toBe(0);

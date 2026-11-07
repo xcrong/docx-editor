@@ -377,6 +377,54 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       console.error('[useDocxEditor] Layout pipeline error:', error);
       onError?.(error instanceof Error ? error : new Error(String(error)));
     },
+    // Transaction loop (step 3): the engine sequences, schedules, and
+    // renders; these hooks keep Vue-owned writeback + chrome in place.
+    onDocumentChanged: (newState) => {
+      // Snapshot marks at cursor for reactive toolbar state. Re-layout on
+      // doc changes — coalesced so a burst of keystrokes lays out once per
+      // frame (the selection overlay waits via `syncCoordinator`).
+      try {
+        if (document.value) {
+          const updatedDoc = fromProseDoc(newState.doc, document.value);
+          document.value = updatedDoc;
+          onChange?.(updatedDoc);
+        }
+      } catch (err) {
+        console.error('[useDocxEditor] fromProseDoc error:', err);
+      }
+    },
+    onSelectionTransaction: (newState) => {
+      // Selection-only moves don't relayout, so update content-control
+      // focus here too; relayouts re-apply it from runLayoutPipeline.
+      const pagesEl = pagesContainer.value;
+      if (pagesEl) {
+        applySdtFocus(
+          pagesEl,
+          enclosingSdtGroupIds(newState.doc, newState.selection.from, newState.selection.to)
+        );
+      }
+    },
+    onSelectionChanged: () => {
+      onSelectionUpdate?.();
+    },
+    getBodyState: () => editorState.value,
+    onHfDocumentChanged: (rId, hfState) => {
+      // Writeback: sync the HF view's doc back into
+      // `Document.package.headers[rId].content` (or `.footers[rId].content`)
+      // so `save()` reads the latest HF content.
+      const pkg = document.value?.package;
+      if (!pkg) return;
+      const isHeader = pkg.headers?.has(rId) ?? false;
+      const bag = isHeader ? pkg.headers : pkg.footers;
+      const hf = bag?.get(rId);
+      if (hf) {
+        hf.content = proseDocToBlocks(hfState.doc);
+        hf.verbatimXml = undefined;
+      }
+    },
+    onHfTransaction: (rId, view, docChanged) => {
+      onHfTransactionRef.value?.(rId, view, docChanged);
+    },
     scheduleFrame: frameScheduler.scheduleFrame,
     cancelFrame: frameScheduler.cancelFrame,
   };
@@ -474,40 +522,10 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
         view.updateState(newState);
         editorState.value = newState;
 
-        // Snapshot marks at cursor for reactive toolbar state.
-        // Re-layout on doc changes — coalesced through the shared core
-        // scheduler so a burst of keystrokes lays out once per frame (the
-        // selection overlay waits via `syncCoordinator`, matching React).
-        if (transaction.docChanged) {
-          syncCoordinator?.incrementStateSeq();
-          engine.scheduleLayout(newState);
-          // Notify parent about document change
-          try {
-            if (document.value) {
-              const updatedDoc = fromProseDoc(newState.doc, document.value);
-              document.value = updatedDoc;
-              onChange?.(updatedDoc);
-            }
-          } catch (err) {
-            console.error('[useDocxEditor] fromProseDoc error:', err);
-          }
-        }
-
-        // Notify about selection changes (for highlight overlay)
-        syncCoordinator?.requestRender();
-        onSelectionUpdate?.();
-
-        // Selection-only moves don't relayout, so update content-control focus
-        // here too; relayouts re-apply it from runLayoutPipeline.
-        if (!transaction.docChanged) {
-          const pagesEl = pagesContainer.value;
-          if (pagesEl) {
-            applySdtFocus(
-              pagesEl,
-              enclosingSdtGroupIds(newState.doc, newState.selection.from, newState.selection.to)
-            );
-          }
-        }
+        // Transaction → repaint loop lives in the engine (step 3): seq bump,
+        // coalesced schedule, document writeback, render request, and
+        // selection handling ride through the host hooks above.
+        engine.handleTransaction(transaction, newState);
       },
     });
 
@@ -676,29 +694,16 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
           hfDocumentContextPlugin,
         ],
       });
-      const slotKind = kind;
       const view: EditorView = new EditorView(node, {
         state,
         dispatchTransaction(tr) {
           const newState = view.state.apply(tr);
           view.updateState(newState);
-          // Writeback: sync `view.state.doc` into
-          // `Document.package.headers[rId].content` (or `.footers[rId].content`)
-          // so `save()` reads the latest HF content. Without this the
-          // persistent PM holds edits the saved DOCX doesn't.
-          if (tr.docChanged) {
-            const pkg = document.value?.package;
-            const bag = slotKind === 'header' ? pkg?.headers : pkg?.footers;
-            const hf = bag?.get(rId);
-            if (hf) {
-              hf.content = proseDocToBlocks(newState.doc);
-              hf.verbatimXml = undefined;
-            }
-          }
-          // Only re-layout when the HF doc actually changed — selection-only
-          // transactions don't move text so the painter has nothing new.
-          if (tr.docChanged && editorState.value) engine.scheduleLayout(editorState.value);
-          onHfTransactionRef.value?.(rId, view, tr.docChanged);
+          // Transaction → repaint loop lives in the engine (step 3):
+          // writeback, body schedule on doc changes, and notify ride
+          // through the host hooks. Selection-only moves skip the
+          // schedule — the painter has nothing new to paint.
+          engine.handleHfTransaction(rId, view, tr.docChanged);
         },
       });
       hfViews.set(rId, view);

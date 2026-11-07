@@ -435,19 +435,24 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       [document]
     );
 
+    // Forwarded to the engine host before `useSelectionOverlay` below
+    // initializes; assigned right after. Engine calls happen post-mount,
+    // after assignment — never in the TDZ window.
+    const updateSelectionOverlayRef = useRef<((state: EditorState) => void) | null>(null);
     // Layout pipeline — owns layout/blocks/measures state, the rAF-coalesced
     // scheduler, scroll-restore plumbing, the painter, and the page-count
-    // notifier. Returns `notifyDecorationLayer` for the DecorationLayer
-    // resync that handleTransaction triggers on every PM transaction.
+    // notifier. `handleTransaction`/`handleHfTransaction` are the engine's
+    // transaction→repaint loop (step 3); the document/selection callbacks
+    // below keep PagedEditor-owned behavior at the same points.
     const {
       layout,
       blocks,
       measures,
       decorationSyncToken,
-      notifyDecorationLayer,
       contentWidth,
       runLayoutPipeline,
-      scheduleLayout,
+      handleTransaction,
+      handleHfTransaction,
     } = useLayoutPipeline({
       document,
       styles,
@@ -470,6 +475,9 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       onTotalPagesChange,
       onAnchorPositionsChange,
       onRenderedDomContextReady,
+      onDocumentChange: (doc) => onDocumentChangeRef.current?.(doc),
+      onSelectionOnlyTransaction: (state) => updateSelectionOverlayRef.current?.(state),
+      onHfTransaction,
     });
 
     // Selection overlay — caret, range rects, image overlay info, plus the
@@ -496,49 +504,11 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       isImageInteractingRef,
       onSelectionChangeRef,
     });
+    updateSelectionOverlayRef.current = updateSelectionOverlay;
 
     // =========================================================================
     // Event Handlers
     // =========================================================================
-
-    /**
-     * Handle PM transaction - re-layout on content/selection change.
-     */
-    const handleTransaction = useCallback(
-      (transaction: Transaction, newState: EditorState) => {
-        // Bump on every transaction (including selection-only and meta-only
-        // ones) so DecorationLayer re-syncs — yCursorPlugin awareness updates
-        // arrive as meta transactions with no doc change.
-        notifyDecorationLayer();
-
-        if (transaction.docChanged) {
-          // Increment state sequence to signal document changed
-          syncCoordinator.incrementStateSeq();
-
-          // Content changed - schedule layout (coalesced via rAF)
-          scheduleLayout(newState);
-
-          // Notify document change - use ref to avoid infinite loops
-          const newDoc = hiddenPMRef.current?.getDocument();
-          if (newDoc) {
-            onDocumentChangeRef.current?.(newDoc);
-          }
-        }
-
-        // Request selection update (will only execute when layout is current)
-        syncCoordinator.requestRender();
-
-        // Only update selection overlay immediately for non-doc-changing transactions
-        // (e.g. arrow keys, clicks). For doc changes, the overlay will be updated
-        // after layout completes via the useEffect([layout]) hook, avoiding cursor
-        // flicker from stale DOM positions.
-        if (!transaction.docChanged) {
-          updateSelectionOverlay(newState);
-        }
-      },
-      [scheduleLayout, updateSelectionOverlay, syncCoordinator, notifyDecorationLayer]
-      // NOTE: onDocumentChange removed from dependencies - accessed via ref to prevent infinite loops
-    );
 
     // Scroll API exposed via the PagedEditorRef. Owns the AbortController
     // chain that lets a fresh scroll supersede an in-flight paint-settle.
@@ -851,13 +821,10 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
           author={author}
           defaultTabStopTwips={document?.package?.settings?.defaultTabStop ?? null}
           onTransaction={(rId, view, docChanged) => {
-            // Only re-layout when the HF doc actually changed — selection-only
-            // transactions (arrow keys, click-to-position) don't move text, so
-            // the painter has nothing new to paint.
-            if (docChanged) {
-              const bodyState = hiddenPMRef.current?.getState();
-              if (bodyState) runLayoutPipeline(bodyState);
-            }
+            // Writeback lives in the HF dispatch; the engine schedules the
+            // body pass (coalesced) and notifies. Selection-only moves skip
+            // the schedule — the painter has nothing new to paint.
+            handleHfTransaction(rId, view, docChanged);
             onHfTransaction?.(rId, view, docChanged);
           }}
         />
