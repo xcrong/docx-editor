@@ -12,7 +12,46 @@
 
 import type { Comment, Paragraph, Run } from '../../types/content';
 import { escapeXml, OOXML_NAMESPACES, MC_IGNORABLE } from './xmlUtils';
-import { generateHexId } from '../../utils/hexId';
+import { generateHexId, isValidLongHexId } from '../../utils/hexId';
+
+/**
+ * Mint a fresh unique hex id within this serialization pass.
+ */
+function freshHexId(used: Set<string>): string {
+  let id = generateHexId().toUpperCase();
+  while (used.has(id) || !isValidLongHexId(id)) id = generateHexId().toUpperCase();
+  return id;
+}
+
+/**
+ * Deterministic `w16cid:durableId` derived from the comment's paraId.
+ *
+ * The `serializeCommentsIds` docstring already claims the durableId is
+ * "derived from its paraId" — making that literally true (FNV-1a hash,
+ * masked into the valid `ST_LongHexNumber` range) keeps saves byte-stable:
+ * the same model serializes to the same bytes, which the demo showcase
+ * guard relies on. A `#` suffix breaks the (astronomically unlikely) hash
+ * collision within one pass, and the result is forced to differ from the
+ * paraId itself.
+ */
+function deriveDurableId(paraId: string, paraInfos: CommentParaInfo[]): string {
+  const used = new Set(paraInfos.map((p) => p.durableId));
+  let seed = paraId;
+  for (;;) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < seed.length; i++) {
+      h ^= seed.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    // Mask into the valid ST_LongHexNumber range (< 0x7FFFFFFF), never zero.
+    const id = (h & 0x3fffffff || 1).toString(16).toUpperCase().padStart(8, '0');
+    if (id === paraId || used.has(id)) {
+      seed += '#';
+      continue;
+    }
+    return id;
+  }
+}
 
 function serializeRunContent(run: Run): string {
   let xml = '<w:r>';
@@ -68,8 +107,23 @@ interface CommentParaInfo {
   done?: boolean;
 }
 
-function serializeComment(comment: Comment, paraInfos: CommentParaInfo[]): string {
-  const commentParaId = generateHexId();
+function serializeComment(
+  comment: Comment,
+  paraInfos: CommentParaInfo[],
+  usedParaIds: Set<string>
+): string {
+  // Reuse the model's last-paragraph paraId when it is valid and unused, so
+  // re-saving a parsed document keeps comment identity (threading, UTC dates,
+  // byte-stable output) instead of minting fresh random ids on every save.
+  const modelParaId =
+    comment.content.length > 0
+      ? comment.content[comment.content.length - 1].paraId?.toUpperCase()
+      : undefined;
+  const commentParaId =
+    modelParaId && isValidLongHexId(modelParaId) && !usedParaIds.has(modelParaId)
+      ? modelParaId
+      : freshHexId(usedParaIds);
+  usedParaIds.add(commentParaId);
 
   const attrs: string[] = [`w:id="${comment.id}"`];
   if (comment.author) attrs.push(`w:author="${escapeXml(comment.author)}"`);
@@ -106,7 +160,7 @@ function serializeComment(comment: Comment, paraInfos: CommentParaInfo[]): strin
   paraInfos.push({
     commentId: comment.id,
     lastParaId: commentParaId,
-    durableId: generateHexId(),
+    durableId: deriveDurableId(commentParaId, paraInfos),
     parentId: comment.parentId,
     done: comment.done,
   });
@@ -132,6 +186,7 @@ export function serializeCommentsWithInfo(comments: Comment[]): {
   }
 
   const paraInfos: CommentParaInfo[] = [];
+  const usedParaIds = new Set<string>();
 
   let xml =
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
@@ -139,10 +194,10 @@ export function serializeCommentsWithInfo(comments: Comment[]): {
 
   // Serialize top-level comments first, then replies
   for (const comment of topLevel) {
-    xml += serializeComment(comment, paraInfos);
+    xml += serializeComment(comment, paraInfos, usedParaIds);
   }
   for (const reply of replies) {
-    xml += serializeComment(reply, paraInfos);
+    xml += serializeComment(reply, paraInfos, usedParaIds);
   }
 
   xml += '</w:comments>';

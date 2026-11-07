@@ -477,6 +477,17 @@ export function parseParagraphContents(
           trackedContext === 'deletion' ? normalizeDeletionContentElement(child) : child;
         const run = parseRun(runElement, styles, theme, rels, media);
 
+        // `w:commentReference` runs are serializer artifacts: the serializer
+        // re-emits one after every `w:commentRangeEnd`, so keeping the parsed
+        // (content-less) run would duplicate it on each save. The anchor
+        // itself is captured by the `commentRangeEnd` marker, which is
+        // emitted from the paragraph-level case below — not from this run.
+        if (
+          run.content.length === 0 &&
+          getChildElements(runElement).some((el) => getLocalName(el.name) === 'commentReference')
+        ) {
+          break;
+        }
         // Look for field characters
         let hasFieldBegin = false;
         let hasFieldSeparate = false;

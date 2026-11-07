@@ -9,6 +9,9 @@
 import type {
   BlockContent,
   BlockSdt,
+  Comment,
+  CommentRangeEnd,
+  CommentRangeStart,
   Hyperlink,
   InlineSdt,
   Insertion,
@@ -104,6 +107,44 @@ export function del(author: string, id: number, date: string, text: string): Del
 
 export function ins(author: string, id: number, date: string, text: string): Insertion {
   return { type: 'insertion', info: { id, author, date }, content: [run(text)] };
+}
+/** Tracked insertion of arbitrary runs (e.g. a drawing run for `images.tracked`). */
+export function insContent(
+  author: string,
+  id: number,
+  date: string,
+  content: Array<Run | Hyperlink>
+): Insertion {
+  return { type: 'insertion', info: { id, author, date }, content };
+}
+
+/** Comment range anchors (`w:commentRangeStart` / `w:commentRangeEnd` + `w:commentReference`). */
+export function commentStart(id: number): CommentRangeStart {
+  return { type: 'commentRangeStart', id };
+}
+
+export function commentEnd(id: number): CommentRangeEnd {
+  return { type: 'commentRangeEnd', id };
+}
+
+/** Review comment entity (`w:comment`); threading via `parentId`, resolved state via `done`. */
+export function reviewComment(
+  id: number,
+  author: string,
+  date: string,
+  text: string,
+  opts?: { initials?: string; parentId?: number; done?: boolean; paraId?: string }
+): Comment {
+  const body = para(text);
+  return {
+    id,
+    author,
+    ...(opts?.initials ? { initials: opts.initials } : {}),
+    date,
+    content: [opts?.paraId ? { ...body, paraId: opts.paraId } : body],
+    ...(opts?.parentId != null ? { parentId: opts.parentId } : {}),
+    ...(opts?.done != null ? { done: opts.done } : {}),
+  };
 }
 
 /** Table cell holding paragraphs and/or nested tables. */

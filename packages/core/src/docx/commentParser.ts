@@ -21,6 +21,22 @@ import { parseXml, findChild, getChildElements, getAttribute } from './xmlParser
 import { parseParagraph } from './paragraphParser';
 
 /**
+ * Drop the serializer-emitted `w:annotationRef` placeholder run.
+ *
+ * Both Word and our own serializer (`commentSerializer`) prepend every
+ * comment's first paragraph with a zero-width
+ * `<w:r><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:annotationRef/></w:r>`
+ * anchor. The shared run parser has no `annotationRef` run-content variant,
+ * so it arrives here as a run with empty content. Keeping it would make each
+ * save prepend one more anchor (parse keeps N, serialize emits N+1) — the
+ * model must not carry serialization artifacts.
+ */
+function stripAnnotationRefPlaceholder(paragraph: Paragraph): void {
+  const first = paragraph.content[0];
+  if (first?.type === 'run' && first.content.length === 0) paragraph.content.shift();
+}
+
+/**
  * Build a lookup from paraId → dateUtc from commentsExtensible.xml
  *
  * Two shapes exist in the wild:
@@ -209,6 +225,7 @@ export function parseComments(
       const contentName = contentChild.name?.replace(/^.*:/, '') ?? '';
       if (contentName === 'p') {
         const paragraph = parseParagraph(contentChild, styles, theme, null, rels, media);
+        stripAnnotationRefPlaceholder(paragraph);
         paragraphs.push(paragraph);
         // Get w14:paraId from the paragraph element
         const pParaId =
