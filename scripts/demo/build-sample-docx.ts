@@ -16,6 +16,7 @@ import {
 } from '../../packages/core/src/headless.ts';
 import { loadBrand } from './brand.ts';
 import { collectSections } from './sections/index.ts';
+import { applyStructureExtras } from './sections/05-structure.ts';
 import { title, para } from './builders.ts';
 
 const DEMO_DIR = import.meta.dir;
@@ -89,7 +90,7 @@ export async function buildSampleDocxBuffer(): Promise<Buffer> {
   ];
   if (numbering) doc.package.numbering = numbering;
 
-  const fresh = await createDocx(doc);
+  const fresh = await createDocx(applyStructureExtras(doc));
   const stylesXml = readFileSync(resolve(DEMO_DIR, 'styles.xml'), 'utf8');
   const finalBuf = await updateMultipleFiles(
     fresh,

@@ -179,17 +179,26 @@ async function main() {
     for (const m of ct.matchAll(/<Override\b[^>]*?\bPartName="([^"]+)"/g)) {
       overrides.add(m[1].replace(/^\//, ''));
     }
+    // ECMA-376: a <Default Extension="…"> covers every part with that
+    // extension (Word itself emits these for png/jpeg). A part is typed
+    // iff it has an Override OR its extension has a Default.
+    const defaults = new Set();
+    for (const m of ct.matchAll(/<Default\b[^>]*?\bExtension="([^"]+)"/g)) {
+      defaults.add(m[1].toLowerCase());
+    }
+    const extOf = (p) => (p.includes('.') ? p.split('.').pop().toLowerCase() : '');
     const contentParts = Object.keys(zip.files).filter(
       (n) => !n.endsWith('/') && n !== '[Content_Types].xml' && !n.endsWith('.rels'),
     );
     for (const p of contentParts) {
-      if (!overrides.has(p)) problems.push(`[Content_Types].xml 缺少 Override：/${p}`);
+      if (!overrides.has(p) && !defaults.has(extOf(p)))
+        problems.push(`[Content_Types].xml 缺少 Override/Default：/${p}`);
     }
     for (const o of overrides) {
       if (!contentParts.includes(o)) problems.push(`[Content_Types].xml 悬空 Override：/${o}`);
     }
     if (problems.length > 0) fail('references', problems.join('；'));
-    else pass('references', `${contentParts.length} 部件，rels 与 Override 一致`);
+    else pass('references', `${contentParts.length} 部件，rels 与类型声明一致`);
   } catch (err) {
     fail('references', `解包失败：${err.message}`);
   }

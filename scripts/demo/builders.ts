@@ -8,7 +8,9 @@
  */
 import type {
   BlockContent,
+  BlockSdt,
   Hyperlink,
+  InlineSdt,
   Insertion,
   Deletion,
   Image,
@@ -18,6 +20,8 @@ import type {
   ParagraphContent,
   Run,
   RunContent,
+  SdtProperties,
+  Shape,
   Table,
   TableCell,
   TableRow,
@@ -125,6 +129,20 @@ export function gridBorders(): TableFormatting['borders'] {
   return { top: side, left: side, bottom: side, right: side, insideH: side, insideV: side };
 }
 
+/** Block-level content control (`w:sdt` wrapping block content). */
+export function blockSdt(properties: SdtProperties, content: BlockContent[]): BlockSdt {
+  return { type: 'blockSdt', properties, content };
+}
+
+/** Inline content control (`w:sdt` inside a paragraph). */
+export function inlineSdt(properties: SdtProperties, content: InlineSdt['content']): InlineSdt {
+  return { type: 'inlineSdt', properties, content };
+}
+
+/** Run carrying a DrawingML shape / text box (`w:drawing` with `wps:wsp`). */
+export function shapeRun(shape: Shape): Run {
+  return { type: 'run', content: [{ type: 'shape', shape }] };
+}
 /** EMUs per inch (ECMA-376 DrawingML extent unit). */
 export const EMU_PER_INCH = 914400;
 
