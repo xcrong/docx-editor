@@ -9,7 +9,7 @@ import type { Ref } from 'vue';
 import type { EditorView } from 'prosemirror-view';
 import type { Document } from '@xcrong/docx-editor-core/types/document';
 import { applyStyle } from '@xcrong/docx-editor-core/prosemirror/commands/paragraph';
-import { createStyleResolver } from '@xcrong/docx-editor-core/prosemirror/styles';
+import { getSharedStyleResolver } from '@xcrong/docx-editor-core/prosemirror/styles';
 import { getCachedNumberingMap } from '@xcrong/docx-editor-core/docx';
 import { clearFormatting } from '@xcrong/docx-editor-core/prosemirror/commands/formatting';
 import { insertPageBreak } from '@xcrong/docx-editor-core/prosemirror/commands/pageBreak';
@@ -56,7 +56,7 @@ export function useFormattingActions(opts: UseFormattingActionsOptions) {
     const doc = opts.getDocument();
     const styles = doc?.package?.styles;
     if (styles) {
-      const resolver = createStyleResolver(styles);
+      const resolver = getSharedStyleResolver(styles);
       const resolved = resolver.resolveParagraphStyle(styleId);
       applyStyle(styleId, {
         paragraphFormatting: resolved.paragraphFormatting,
@@ -109,7 +109,7 @@ export function useFormattingActions(opts: UseFormattingActionsOptions) {
     const view = opts.editorView.value;
     if (!view) return false;
     const doc = opts.getDocument();
-    const styleResolver = doc?.package?.styles ? createStyleResolver(doc.package.styles) : null;
+    const styleResolver = doc?.package?.styles ? getSharedStyleResolver(doc.package.styles) : null;
     const numbering = doc?.package?.numbering ? getCachedNumberingMap(doc.package.numbering) : null;
     return setParagraphStyleCore(view, options, { styleResolver, numbering });
   }

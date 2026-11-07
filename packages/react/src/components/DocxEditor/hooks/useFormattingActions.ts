@@ -23,8 +23,7 @@ import {
   decreaseListLevel,
   clearFormatting,
   applyStyle,
-  getHyperlinkAttrs,
-  getSelectedText,
+  resolveLinkDialogTarget,
   setRtl,
   setLtr,
   insertPageBreak,
@@ -118,16 +117,15 @@ export function useFormattingActions({
       if (action === 'setRtl') return void setRtl(view.state, view.dispatch);
       if (action === 'setLtr') return void setLtr(view.state, view.dispatch);
       if (action === 'insertLink') {
-        const selectedText = getSelectedText(view.state);
-        const existingLink = getHyperlinkAttrs(view.state);
-        if (existingLink) {
+        const target = resolveLinkDialogTarget(view.state);
+        if (target.mode === 'edit') {
           hyperlinkDialog.openEdit({
-            url: existingLink.href,
-            displayText: selectedText,
-            tooltip: existingLink.tooltip,
+            url: target.href,
+            displayText: target.displayText,
+            tooltip: target.tooltip,
           });
         } else {
-          hyperlinkDialog.openInsert(selectedText);
+          hyperlinkDialog.openInsert(target.displayText);
         }
         return;
       }

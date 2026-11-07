@@ -9,6 +9,11 @@
 
 /** Default per-notch step; both adapters use 0.1. */
 export const DEFAULT_ZOOM_STEP = 0.1;
+/**
+ * Pure clamp — does NOT round. Unlike React's legacy `clampZoom` wrapper
+ * (clamp+round, i.e. `normalizeZoomLevel`), so pair with `roundZoom` /
+ * `normalizeZoomLevel` when the rounded stored value is wanted.
+ */
 export function clampZoom(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }

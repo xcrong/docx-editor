@@ -19,6 +19,8 @@ import {
   formatZoomPercent,
   parseZoomPercent,
   isZoomPresetLevel,
+  zoomToPercent,
+  zoomToFitLevel,
   DEFAULT_ZOOM_STEP,
 } from '@xcrong/docx-editor-core/utils/zoom';
 
@@ -173,10 +175,8 @@ export function useWheelZoom(options: UseWheelZoomOptions = {}): UseWheelZoomRet
    */
   const zoomToFit = useCallback(
     (containerWidth: number, contentWidth: number) => {
-      if (contentWidth > 0) {
-        const fitZoom = containerWidth / contentWidth;
-        setZoom(fitZoom);
-      }
+      const fitZoom = zoomToFitLevel(containerWidth, contentWidth);
+      if (fitZoom !== null) setZoom(fitZoom);
     },
     [setZoom]
   );
@@ -283,7 +283,7 @@ export function useWheelZoom(options: UseWheelZoomOptions = {}): UseWheelZoomRet
     zoomToFit,
     isMinZoom: zoom <= minZoom,
     isMaxZoom: zoom >= maxZoom,
-    zoomPercent: Math.round(zoom * 100),
+    zoomPercent: zoomToPercent(zoom),
     handleWheel,
     handleKeyDown,
   };
