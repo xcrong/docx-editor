@@ -24,7 +24,8 @@ const REPO_ROOT = resolve(DEMO_DIR, '..', '..');
 /** Fixed package timestamp so builds are content-deterministic. */
 const FIXED_DATE = '2025-01-01T00:00:00Z';
 
-const TARGETS = [
+/** Distribution targets — the same buffer is written to all 7 (md5-identical). */
+export const TARGETS = [
   'examples/shared/sample.docx',
   'examples/vite/public/sample.docx',
   'examples/vue/public/sample.docx',
@@ -71,7 +72,12 @@ function distinct(hay: string, re: RegExp): string[] {
   return [...out].sort();
 }
 
-async function main(): Promise<void> {
+/**
+ * Rebuild the showcase buffer in memory. Exported for the T25-03 guard
+ * (`check-sample-docx.mjs`), which compares its content digest against the
+ * committed product to detect staleness without touching the filesystem.
+ */
+export async function buildSampleDocxBuffer(): Promise<Buffer> {
   const brand = loadBrand();
   const { blocks, numbering } = await collectSections(brand);
 
@@ -94,7 +100,11 @@ async function main(): Promise<void> {
     ])
   );
 
-  const bytes = Buffer.from(finalBuf);
+  return Buffer.from(finalBuf);
+}
+
+async function main(): Promise<void> {
+  const bytes = await buildSampleDocxBuffer();
   const zip = await JSZip.loadAsync(bytes);
   const names = Object.keys(zip.files);
   const read = async (p: string): Promise<string> =>
@@ -154,7 +164,7 @@ async function main(): Promise<void> {
     writeFileSync(abs, bytes);
     console.log(`${rel} ${bytes.byteLength}B`);
   }
+  const { numbering } = await collectSections(loadBrand());
   console.log(JSON.stringify({ bytes: bytes.byteLength, features, numbering: Boolean(numbering) }));
 }
-
-await main();
+if (import.meta.main) await main();
