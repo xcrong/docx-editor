@@ -1,5 +1,38 @@
 # @xcrong/docx-editor-vue
 
+## 1.11.0
+
+### Minor Changes
+
+- b574dec: Port the built-in template plugin to the Vue adapter using only core's plugin contract: new `templatePlugin` / `createPlugin` in `@xcrong/docx-editor-vue/plugin-api` (same PM state, sidebar items, and overlay semantics as React, rendered via `h()`), `VueSidebarItem` + `getSidebarItems` on the plugin type, and pixel-identical chip/highlight CSS. Adds a `?template=1` parity smoke spec covering tag detection on both adapters.
+
+### Patch Changes
+
+- Updated dependencies [fe7f2ed]
+- Updated dependencies [d35cda4]
+- Updated dependencies [81b7241]
+- Updated dependencies [ac78b76]
+- Updated dependencies [6ce42a9]
+- Updated dependencies [f2740e7]
+- Updated dependencies [efbe24b]
+- Updated dependencies [ea943d8]
+- Updated dependencies [2c91422]
+- Updated dependencies [7ed722d]
+- Updated dependencies [e8f00e6]
+- Updated dependencies [b0e03d2]
+- Updated dependencies [ac0988c]
+- Updated dependencies [5a0dbeb]
+- Updated dependencies [e1d2499]
+- Updated dependencies [6318fd0]
+- Updated dependencies [6406222]
+- Updated dependencies [8ad9fdd]
+- Updated dependencies [869d622]
+- Updated dependencies [321c4bf]
+- Updated dependencies [1e7c2b5]
+  - @xcrong/docx-editor-core@1.11.0
+  - @xcrong/docx-editor-agents@1.11.0
+  - @xcrong/docx-editor-i18n@1.11.0
+
 ## 1.10.3
 
 ### Patch Changes
