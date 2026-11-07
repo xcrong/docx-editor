@@ -11,6 +11,9 @@ import type {
   Hyperlink,
   Insertion,
   Deletion,
+  Image,
+  ImagePosition,
+  ImageWrap,
   Paragraph,
   ParagraphContent,
   Run,
@@ -120,6 +123,74 @@ export function tbl(rows: TableRow[], columnWidths: number[], formatting?: Table
 export function gridBorders(): TableFormatting['borders'] {
   const side = { style: 'single' as const, size: 4, space: 0, color: { rgb: '999999' } };
   return { top: side, left: side, bottom: side, right: side, insideH: side, insideV: side };
+}
+
+/** EMUs per inch (ECMA-376 DrawingML extent unit). */
+export const EMU_PER_INCH = 914400;
+
+function baseImage(
+  src: string,
+  width: number,
+  height: number,
+  alt: string,
+  filename: string,
+  wrap: ImageWrap,
+  position?: ImagePosition
+): Image {
+  return {
+    type: 'image',
+    rId: '',
+    src,
+    mimeType: 'image/png',
+    filename,
+    alt,
+    title: alt,
+    size: { width, height },
+    wrap,
+    ...(position ? { position } : {}),
+  };
+}
+
+/**
+ * Inline picture run (`wp:inline`, flows in the line). `src` is a PNG data
+ * URL; the rezip pass writes it to `word/media/` and binds `r:embed` on
+ * save, so `rId` starts empty. Size in EMUs; serializer reuses it for both
+ * `wp:extent` and `a:ext`, keeping them consistent.
+ */
+export function inlinePic(
+  src: string,
+  width: number,
+  height: number,
+  alt: string,
+  filename: string
+): Run {
+  return {
+    type: 'run',
+    content: [
+      { type: 'drawing', image: baseImage(src, width, height, alt, filename, { type: 'inline' }) },
+    ],
+  };
+}
+
+/**
+ * Floating picture run (`wp:anchor` + `wp:wrap*`). Position uses
+ * `wp:align` when an alignment is given, else absolute `wp:posOffset` EMUs.
+ */
+export function anchoredPic(
+  src: string,
+  width: number,
+  height: number,
+  wrap: ImageWrap,
+  position: ImagePosition,
+  alt: string,
+  filename: string
+): Run {
+  return {
+    type: 'run',
+    content: [
+      { type: 'drawing', image: baseImage(src, width, height, alt, filename, wrap, position) },
+    ],
+  };
 }
 
 /** Re-exported so sections share one BlockContent import surface. */
