@@ -41,6 +41,8 @@ import type { Document } from '../types/document';
 import { serializeDocument } from './serializer/documentSerializer';
 import { type RawDocxContent } from './unzip';
 import { escapeXml } from './serializer/xmlUtils';
+import { serializeNumberingXml } from './serializer/numberingSerializer';
+import { reconcileNumberingDefinitions } from './numberingReconcile';
 
 import { collectParts, findMaxRId } from './rezip/parts';
 import {
@@ -154,9 +156,20 @@ export async function repackDocx(doc: Document, options: RepackOptions = {}): Pr
 
   await ensureHeaderFooterParts(exportDocument, newZip, compressionLevel);
 
+  // Backfill numbering definitions for editor-added lists before the part is
+  // written: without this, toggled lists reference numIds with no backing
+  // w:num and Word repairs the file on open ("Lists 1").
+  const numberingGrew = reconcileNumberingDefinitions(exportDocument);
   // Synthesize word/numbering.xml for documents that reference list numIds but
   // have no original numbering part to preserve (e.g. createDocx()).
   await ensureNumberingPart(exportDocument, newZip, compressionLevel);
+  if (numberingGrew && exportDocument.package.numbering) {
+    // A preserved part exists but lacks the backfilled definitions — rewrite it.
+    newZip.file('word/numbering.xml', serializeNumberingXml(exportDocument.package.numbering), {
+      compression: 'DEFLATE',
+      compressionOptions: { level: compressionLevel },
+    });
+  }
 
   // Serialize comments
   await serializeCommentsToZip(exportDocument, newZip, compressionLevel);
@@ -252,9 +265,17 @@ export async function repackDocxFromRaw(
 
   await ensureHeaderFooterParts(exportDocument, newZip, compressionLevel);
 
+  // Backfill numbering definitions for editor-added lists (see repackDocx).
+  const numberingGrew = reconcileNumberingDefinitions(exportDocument);
   // Synthesize word/numbering.xml for documents that reference list numIds but
   // have no original numbering part to preserve (e.g. createDocx()).
   await ensureNumberingPart(exportDocument, newZip, compressionLevel);
+  if (numberingGrew && exportDocument.package.numbering) {
+    newZip.file('word/numbering.xml', serializeNumberingXml(exportDocument.package.numbering), {
+      compression: 'DEFLATE',
+      compressionOptions: { level: compressionLevel },
+    });
+  }
 
   // Serialize comments
   await serializeCommentsToZip(exportDocument, newZip, compressionLevel);
