@@ -1,5 +1,11 @@
 # @xcrong/docx-editor-agents
 
+## 1.11.0
+
+### Minor Changes
+
+- e8f00e6: Add spec-named `createReviewBridge` live-editor bridge export from `@xcrong/docx-editor-agents/bridge`.
+
 ## 1.10.3
 
 ## 1.10.2

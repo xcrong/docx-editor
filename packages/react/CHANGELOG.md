@@ -1,5 +1,35 @@
 # @xcrong/docx-js-editor
 
+## 1.11.0
+
+### Patch Changes
+
+- 952dce7: Fix demo preview banner and page metadata: the banner no longer references the upstream release domain and links the fork repository, brand links point at the upstream GitHub repo, and the license is correctly stated as Apache-2.0. Fixes #43. Fixes #44.
+- Updated dependencies [fe7f2ed]
+- Updated dependencies [d35cda4]
+- Updated dependencies [81b7241]
+- Updated dependencies [ac78b76]
+- Updated dependencies [6ce42a9]
+- Updated dependencies [f2740e7]
+- Updated dependencies [efbe24b]
+- Updated dependencies [ea943d8]
+- Updated dependencies [2c91422]
+- Updated dependencies [7ed722d]
+- Updated dependencies [e8f00e6]
+- Updated dependencies [b0e03d2]
+- Updated dependencies [ac0988c]
+- Updated dependencies [5a0dbeb]
+- Updated dependencies [e1d2499]
+- Updated dependencies [6318fd0]
+- Updated dependencies [6406222]
+- Updated dependencies [8ad9fdd]
+- Updated dependencies [869d622]
+- Updated dependencies [321c4bf]
+- Updated dependencies [1e7c2b5]
+  - @xcrong/docx-editor-core@1.11.0
+  - @xcrong/docx-editor-agents@1.11.0
+  - @xcrong/docx-editor-i18n@1.11.0
+
 ## 1.10.3
 
 ### Patch Changes
