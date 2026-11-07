@@ -51,6 +51,7 @@ import {
 import { processNewHyperlinks } from './rezip/hyperlinks';
 import {
   ensureHeaderFooterParts,
+  ensureNotesParts,
   ensureNumberingPart,
   serializeCommentsToZip,
   serializeHeadersFootersToZip,
@@ -163,6 +164,7 @@ export async function repackDocx(doc: Document, options: RepackOptions = {}): Pr
   // Serialize footnotes/endnotes (note-body edits + tracked changes)
   serializeFootnotesToZip(exportDocument, newZip, compressionLevel);
   serializeEndnotesToZip(exportDocument, newZip, compressionLevel);
+  await ensureNotesParts(exportDocument, newZip, compressionLevel);
 
   // Optionally update modification date in docProps/core.xml
   if (updateModifiedDate) {
@@ -260,6 +262,7 @@ export async function repackDocxFromRaw(
   // Serialize footnotes/endnotes (note-body edits + tracked changes)
   serializeFootnotesToZip(exportDocument, newZip, compressionLevel);
   serializeEndnotesToZip(exportDocument, newZip, compressionLevel);
+  await ensureNotesParts(exportDocument, newZip, compressionLevel);
 
   // Optionally update core properties
   if (updateModifiedDate && rawContent.corePropsXml) {

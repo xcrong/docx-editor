@@ -311,8 +311,7 @@ export async function serializeCommentsToZip(
  * Re-emits separator notes (kept in `footnoteSeparators`) ahead of the normal
  * notes, mirroring Word's ordering. Only writes when the document actually has
  * footnotes; otherwise the original part is left untouched. Content-type / rels
- * registration is skipped on purpose — a document that carries footnotes
- * already declares the part, and notes-from-scratch is out of scope here.
+ * registration for from-scratch parts is handled by {@link ensureNotesParts}.
  */
 export function serializeFootnotesToZip(doc: Document, zip: JSZip, compressionLevel: number): void {
   const normal = doc.package.footnotes ?? [];
@@ -324,6 +323,88 @@ export function serializeFootnotesToZip(doc: Document, zip: JSZip, compressionLe
     compression: 'DEFLATE',
     compressionOptions: { level: compressionLevel },
   });
+}
+
+/**
+ * Ensure content types and relationships exist for footnote/endnote parts
+ * created from scratch (e.g. `createDocx()` on a notes-free template, T25-07).
+ *
+ * A `word/footnotes.xml` without a `.../relationships/footnotes` entry in
+ * `word/_rels/document.xml.rels` is invisible to Word (it resolves note parts
+ * through relationships, not part names), and a missing Override leaves the
+ * part on the generic `Default Extension="xml"` mapping. Documents that
+ * already declare the parts are untouched — only missing entries are added.
+ */
+export async function ensureNotesParts(
+  doc: Document,
+  zip: JSZip,
+  compressionLevel: number
+): Promise<void> {
+  const jobs: Array<{
+    has: boolean;
+    partName: string;
+    contentType: string;
+    target: string;
+    relType: string;
+  }> = [
+    {
+      has: (doc.package.footnotes?.length ?? 0) + (doc.package.footnoteSeparators?.length ?? 0) > 0,
+      partName: '/word/footnotes.xml',
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml',
+      target: 'footnotes.xml',
+      relType: RELATIONSHIP_TYPES.footnotes,
+    },
+    {
+      has: (doc.package.endnotes?.length ?? 0) + (doc.package.endnoteSeparators?.length ?? 0) > 0,
+      partName: '/word/endnotes.xml',
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml',
+      target: 'endnotes.xml',
+      relType: RELATIONSHIP_TYPES.endnotes,
+    },
+  ];
+  const active = jobs.filter((j) => j.has);
+  if (active.length === 0) return;
+
+  const ctFile = zip.file('[Content_Types].xml');
+  if (ctFile) {
+    let ctXml = await ctFile.async('text');
+    let changed = false;
+    for (const { partName, contentType } of active) {
+      if (!ctXml.includes(`PartName="${partName}"`)) {
+        ctXml = ctXml.replace(
+          '</Types>',
+          `<Override PartName="${partName}" ContentType="${contentType}"/></Types>`
+        );
+        changed = true;
+      }
+    }
+    if (changed) {
+      zip.file('[Content_Types].xml', ctXml, {
+        compression: 'DEFLATE',
+        compressionOptions: { level: compressionLevel },
+      });
+    }
+  }
+
+  const relsPath = 'word/_rels/document.xml.rels';
+  let relsXml = await readRelsOrStub(zip, relsPath);
+  let relsChanged = false;
+  for (const { target, relType } of active) {
+    if (!relsXml.includes(`Target="${target}"`)) {
+      const newRId = `rId${findMaxRId(relsXml) + 1}`;
+      relsXml = relsXml.replace(
+        '</Relationships>',
+        `<Relationship Id="${newRId}" Type="${relType}" Target="${target}"/></Relationships>`
+      );
+      relsChanged = true;
+    }
+  }
+  if (relsChanged) {
+    zip.file(relsPath, relsXml, {
+      compression: 'DEFLATE',
+      compressionOptions: { level: compressionLevel },
+    });
+  }
 }
 
 /**
