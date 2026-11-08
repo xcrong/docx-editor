@@ -29,6 +29,7 @@ import {
 import type { HiddenProseMirrorRef } from '../HiddenProseMirror';
 import type { HiddenHeaderFooterPMsRef } from '../HiddenHeaderFooterPMs';
 import type { PagedEditorRef } from '../PagedEditor';
+import type { DocxEditorEngine } from '@xcrong/docx-editor-core/editor';
 
 interface RefApiInputs {
   hiddenPMRef: React.RefObject<HiddenProseMirrorRef | null>;
@@ -38,9 +39,10 @@ interface RefApiInputs {
   layout: Layout | null;
   runLayoutPipeline: (state: EditorState) => void;
   scrollToPositionImpl: (pmPos: number, forParaIdScroll?: boolean) => void;
-  scrollToParaIdImpl: (paraId: string, options?: ScrollToParaIdOptions) => boolean;
+  scrollToParaIdImpl: (paraId: string, options: ScrollToParaIdOptions) => boolean;
   scrollToPageImpl: (pageNumber: number) => void;
   setIsFocused: React.Dispatch<React.SetStateAction<boolean>>;
+  engine: DocxEditorEngine;
 }
 
 /**
@@ -77,6 +79,7 @@ function buildRefApi(inputs: RefApiInputs): PagedEditorRef {
     scrollToParaIdImpl,
     scrollToPageImpl,
     setIsFocused,
+    engine,
   } = inputs;
   return {
     getDocument: () => hiddenPMRef.current?.getDocument() ?? null,
@@ -158,6 +161,7 @@ function buildRefApi(inputs: RefApiInputs): PagedEditorRef {
     getHfPmViews: (): Map<string, EditorView> => {
       return hiddenHfPMsRef.current?.getViews() ?? new Map();
     },
+    getEngine: () => engine,
   };
 }
 
@@ -178,6 +182,7 @@ export function usePagedEditorRefApi(opts: UsePagedEditorRefApiOptions): void {
     scrollToParaIdImpl,
     scrollToPageImpl,
     setIsFocused,
+    engine,
     onReadyRef,
   } = opts;
 
@@ -194,8 +199,9 @@ export function usePagedEditorRefApi(opts: UsePagedEditorRefApiOptions): void {
         scrollToParaIdImpl,
         scrollToPageImpl,
         setIsFocused,
+        engine,
       }),
-    [layout, runLayoutPipeline, scrollToPositionImpl, scrollToParaIdImpl, scrollToPageImpl]
+    [layout, runLayoutPipeline, scrollToPositionImpl, scrollToParaIdImpl, scrollToPageImpl, engine]
   );
 
   // onReady mirror — dep array intentionally omits `scrollToPositionImpl`
@@ -214,9 +220,10 @@ export function usePagedEditorRefApi(opts: UsePagedEditorRefApiOptions): void {
           scrollToParaIdImpl,
           scrollToPageImpl,
           setIsFocused,
+          engine,
         })
       );
     }
-  }, [layout, runLayoutPipeline, scrollToParaIdImpl, scrollToPageImpl]);
+  }, [layout, runLayoutPipeline, scrollToParaIdImpl, scrollToPageImpl, engine]);
   // NOTE: onReady removed from deps — accessed via ref to prevent infinite loops.
 }

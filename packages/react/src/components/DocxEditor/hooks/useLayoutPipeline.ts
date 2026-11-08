@@ -38,6 +38,8 @@ import type {
 
 import { proseDocToBlocks } from '@xcrong/docx-editor-core/prosemirror/conversion';
 import type { ExtensionManager } from '@xcrong/docx-editor-core/prosemirror/extensions';
+import type { DocumentAgent } from '@xcrong/docx-editor-core/agent';
+import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import type { HiddenProseMirrorRef } from '../HiddenProseMirror';
 import type { LayoutSelectionGate } from '../internals/LayoutSelectionGate';
 import { computeAnchorPositions } from '../internals/sidebarAnchorPositions';
@@ -100,6 +102,10 @@ export interface UseLayoutPipelineOptions {
   author?: string;
   /** Off-screen container owning all HF mount nodes. */
   hfHostRef?: React.RefObject<HTMLDivElement | null>;
+  /** Live agent wrapping the loaded document (engine.save reads via host.getAgent). */
+  agentRef?: React.RefObject<DocumentAgent | null>;
+  /** Adapter-owned comment list (engine.save reads via host.getComments). */
+  comments?: Comment[];
 }
 
 export interface UseLayoutPipelineReturn {
@@ -152,6 +158,8 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     isSuggesting,
     author,
     hfHostRef,
+    agentRef,
+    comments,
   } = opts;
 
   const [layout, setLayout] = useState<Layout | null>(null);
@@ -230,6 +238,8 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     isReadOnly,
     isSuggesting,
     author,
+    agentRef,
+    comments,
   });
   hostInputsRef.current = {
     document,
@@ -251,6 +261,8 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     isReadOnly,
     isSuggesting,
     author,
+    agentRef,
+    comments,
   };
 
   const engineRef = useRef<DocxEditorEngine | null>(null);
@@ -475,6 +487,8 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
         active: hostInputsRef.current.isSuggesting ?? false,
         author: hostInputsRef.current.author ?? 'User',
       }),
+      getAgent: () => hostInputsRef.current.agentRef?.current ?? null,
+      getComments: () => hostInputsRef.current.comments ?? [],
       scheduleFrame: frameScheduler.scheduleFrame,
       cancelFrame: frameScheduler.cancelFrame,
     };
@@ -530,10 +544,13 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     engineRef.current!.handleHfTransaction(rId, view, docChanged);
   }, []);
 
-  // Clean up pending rAF on unmount
+  // Clean up pending rAF + in-flight loads on unmount
   useEffect(() => {
     const engine = engineRef.current;
-    return () => engine?.cancelScheduledLayout();
+    return () => {
+      engine?.cancelScheduledLayout();
+      engine?.cancelLoads();
+    };
   }, []);
 
   return {

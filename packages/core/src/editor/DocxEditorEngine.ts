@@ -62,6 +62,14 @@ import {
   type HfPartKind,
 } from './viewLifecycle';
 import type { ExtensionManager } from '../prosemirror/extensions';
+import { parseDocx } from '../docx/parser';
+import type { DocxInput } from '../utils/docxInput';
+import type { DocumentAgent } from '../agent';
+import type { Comment } from '../types/content';
+import { fromProseDoc } from '../prosemirror/conversion/fromProseDoc';
+import { injectReplyRangeMarkers, injectTCReplyRangeMarkers } from '../docx';
+import { clearTrackedChanges } from '../prosemirror/extensions';
+import { LoadGeneration, decideSelectiveSave } from './session';
 
 export type { LayoutComputation, PendingScrollRestore };
 export type { HfPartKind };
@@ -220,6 +228,15 @@ export interface EngineHost {
   onBodyViewDestroy?(): void;
   /** HF knobs (React props; Vue editorMode/author). */
   getSuggestionState?(): { active: boolean; author: string };
+
+  // -- session seam (step 5) -------------------------------------------
+  /** The live agent wrapping the loaded document; null before load. */
+  getAgent?(): DocumentAgent | null;
+  /**
+   * Adapter-owned comment list (React state / Vue provider). Falls back
+   * to the agent document's model comments when undefined.
+   */
+  getComments?(): Comment[];
 
   // -- scheduler seam (consumed by `scheduleLayout` from step 2 on) -----
   scheduleFrame(cb: () => void): number;
@@ -476,6 +493,66 @@ export class DocxEditorEngine {
       mounted.manager.destroy();
     }
     this.hfViews.clear();
+  }
+
+  // -- session seam (step 5): load race guard + save orchestration ----
+  private loadGeneration = new LoadGeneration();
+
+  /**
+   * Parse `buffer` into a `Document` with the load race guard (step 5,
+   * lifted from React's `useDocumentLoader`). Returns null when a newer
+   * load started while parsing — the caller keeps its current document.
+   * Parse errors throw so adapters surface them through their own
+   * error path (same as today).
+   */
+  async load(buffer: DocxInput): Promise<Document | null> {
+    const generation = this.loadGeneration.begin();
+    const document = await parseDocx(buffer);
+    if (!this.loadGeneration.isCurrent(generation)) return null;
+    return document;
+  }
+
+  /** Force-stale every in-flight load (teardown). */
+  cancelLoads(): void {
+    this.loadGeneration.invalidate();
+  }
+
+  /**
+   * Serialize the current document to a DOCX buffer (step 5, lifted from
+   * React's `useFileIO.handleSave`). Reads the latest body content off
+   * the live view, syncs `comments` back into the agent document,
+   * injects reply range markers, then writes via the agent (selective
+   * when the tracker state allows it). Clears the change tracker on the
+   * live view after a successful save. Returns null with no agent.
+   */
+  async save(options?: { selective?: boolean; comments?: Comment[] }): Promise<ArrayBuffer | null> {
+    const agent = this.host.getAgent?.() ?? null;
+    if (!agent) return null;
+    const agentDoc = agent.getDocument();
+    const view = this.getBodyView();
+    const base = this.host.getDocument();
+    if (view && base) {
+      const pmDoc = fromProseDoc(view.state.doc, base);
+      if (pmDoc.package?.document) {
+        agentDoc.package.document.content = pmDoc.package.document.content;
+      }
+    }
+    const comments =
+      options?.comments ?? this.host.getComments?.() ?? agentDoc.package.document?.comments ?? [];
+    if (agentDoc.package.document) agentDoc.package.document.comments = comments;
+    const content = agentDoc.package.document?.content;
+    if (content) {
+      injectReplyRangeMarkers(content, comments);
+      injectTCReplyRangeMarkers(content, comments);
+    }
+    const decision = decideSelectiveSave(
+      view?.state ?? null,
+      comments,
+      options?.selective !== false
+    );
+    const buffer = await agent.toBuffer(decision ? { selective: decision.selective } : undefined);
+    if (view) view.dispatch(clearTrackedChanges(view.state));
+    return buffer;
   }
 
   /**

@@ -9,7 +9,6 @@ afterAll(() => GlobalRegistrator.unregister());
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { useRef } from 'react';
-import type { DocumentAgent } from '@xcrong/docx-editor-core/agent';
 import type { DocxInput } from '@xcrong/docx-editor-core/utils';
 import { useFileIO } from './hooks/useFileIO';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -37,11 +36,9 @@ function FileIOHarness({
   onError?: (error: Error) => void;
   onDocumentNameChange?: (name: string) => void;
 }) {
-  const agentRef = useRef<DocumentAgent | null>(null);
   const pagedEditorRef = useRef<PagedEditorRef | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const fileIO = useFileIO({
-    agentRef,
     pagedEditorRef,
     containerRef,
     comments: [],

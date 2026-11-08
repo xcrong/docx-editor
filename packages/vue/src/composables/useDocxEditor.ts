@@ -19,7 +19,6 @@ import { EditorState, type Transaction, type Plugin } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 
 // Core imports — these all resolve through Vite aliases to packages/core/src/
-import { parseDocx } from '@xcrong/docx-editor-core/docx/parser';
 import {
   getRenderableDocumentFonts,
   getEmbeddedFontFamilies,
@@ -28,6 +27,8 @@ import type { FontOption } from '@xcrong/docx-editor-core/utils/fontOptions';
 import { proseDocToBlocks } from '@xcrong/docx-editor-core/prosemirror/conversion';
 import { fromProseDoc } from '@xcrong/docx-editor-core/prosemirror/conversion/fromProseDoc';
 import { singletonManager } from '@xcrong/docx-editor-core/prosemirror/schema';
+import { DocumentAgent } from '@xcrong/docx-editor-core/agent';
+import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import {
   createSuggestionModePlugin,
   setSuggestionMode,
@@ -253,6 +254,11 @@ export interface UseDocxEditorReturn {
   ) => void;
   /** Publish a fresh Document object (used by HF materialisation). */
   setDocument: (doc: Document) => void;
+  /**
+   * Provide the adapter-owned comment list for `save()`. Falls back to
+   * the document model when unset.
+   */
+  setSaveCommentsProvider: (provider: (() => Comment[]) | null) => void;
 }
 
 export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorReturn {
@@ -308,6 +314,10 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   }
   // rAF frame source for the engine's coalescer (step 2).
   const frameScheduler = createRafFrameScheduler();
+
+  // Adapter-owned comment list provider (set by DocxEditor.vue from its
+  // `comments` ref). Falls back to the document model's comments.
+  let saveCommentsProvider: (() => Comment[]) | null = null;
 
   const engineHost: EngineHost = {
     getDocument: () => document.value,
@@ -368,6 +378,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
         if (document.value) {
           const updatedDoc = fromProseDoc(newState.doc, document.value);
           document.value = updatedDoc;
+          agentRef.current = DocumentAgent.fromDocument(updatedDoc);
           onChange?.(updatedDoc);
         }
       } catch (err) {
@@ -468,8 +479,16 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       active: unref(editorMode) === 'suggesting',
       author: unref(author) ?? 'User',
     }),
+    getAgent: () => agentRef.current,
+    getComments: () =>
+      saveCommentsProvider?.() ?? document.value?.package?.document?.comments ?? [],
   };
   const engine = new DocxEditorEngine(engineHost);
+
+  const agentRef: { current: DocumentAgent | null } = { current: null };
+  function syncAgent() {
+    agentRef.current = document.value ? DocumentAgent.fromDocument(document.value) : null;
+  }
 
   function runLayoutPipeline(state: EditorState) {
     const container = pagesContainer.value;
@@ -642,19 +661,8 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     isReady.value = false;
 
     try {
-      let arrayBuf: ArrayBuffer;
-      if (buffer instanceof Blob || buffer instanceof File) {
-        arrayBuf = await buffer.arrayBuffer();
-      } else if (buffer instanceof Uint8Array) {
-        arrayBuf = buffer.buffer.slice(
-          buffer.byteOffset,
-          buffer.byteOffset + buffer.byteLength
-        ) as ArrayBuffer;
-      } else {
-        arrayBuf = buffer;
-      }
-
-      const doc = await parseDocx(arrayBuf);
+      const doc = await engine.load(buffer);
+      if (!doc) return; // stale: a newer load started while parsing
       document.value = doc;
       updateDocumentFonts(doc);
 
@@ -663,6 +671,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       destroyHfPMs();
       createEditorView();
       syncHfPMs();
+      syncAgent();
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       parseError.value = error.message;
@@ -678,6 +687,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     destroyHfPMs();
     createEditorView();
     syncHfPMs();
+    syncAgent();
   }
 
   // Surface the document's own renderable fonts (embedded faces loaded by
@@ -693,29 +703,8 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   // ========================================================================
 
   async function save(): Promise<Blob | null> {
-    if (!editorView.value || !document.value) return null;
-
-    const { repackDocx, createDocx } = await import('@xcrong/docx-editor-core/docx/rezip');
-    const { injectReplyRangeMarkers, injectTCReplyRangeMarkers } =
-      await import('@xcrong/docx-editor-core/docx');
-
-    const updatedDoc = fromProseDoc(editorView.value.state.doc, document.value);
-    // Word/Pages need parallel `commentRangeStart`/`End` markers for
-    // every reply (regular comment replies AND tracked-change replies)
-    // in document.xml. Without them the saved doc loses replies. Same
-    // step React runs in its `handleSave` (DocxEditor.tsx).
-    const comments = updatedDoc.package.document?.comments ?? [];
-    if (updatedDoc.package.document?.content && comments.length > 0) {
-      injectReplyRangeMarkers(updatedDoc.package.document.content, comments);
-      injectTCReplyRangeMarkers(updatedDoc.package.document.content, comments);
-    }
-
-    let buffer: ArrayBuffer;
-    if (updatedDoc.originalBuffer) {
-      buffer = await repackDocx(updatedDoc);
-    } else {
-      buffer = await createDocx(updatedDoc);
-    }
+    const buffer = await engine.save({ selective: true });
+    if (!buffer) return null;
     return new Blob([buffer], {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     });
@@ -728,6 +717,8 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   function destroy() {
     destroyEditorView(); // cancels the layout scheduler
     destroyHfPMs();
+    engine.cancelLoads();
+    agentRef.current = null;
     document.value = null;
   }
 
@@ -782,6 +773,13 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
      */
     setDocument(doc: Document) {
       document.value = doc;
+    },
+    /**
+     * Provide the adapter-owned comment list for `save()` (the SFC's
+     * `comments` ref). Falls back to the document model when unset.
+     */
+    setSaveCommentsProvider(provider: (() => Comment[]) | null) {
+      saveCommentsProvider = provider;
     },
   };
 }

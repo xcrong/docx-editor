@@ -52,6 +52,9 @@ import type {
   HeaderFooter,
 } from '@xcrong/docx-editor-core/types/document';
 import type { WrapType } from '@xcrong/docx-editor-core/docx/wrapTypes';
+import type { DocumentAgent } from '@xcrong/docx-editor-core/agent';
+import type { Comment } from '@xcrong/docx-editor-core/types/content';
+import type { DocxEditorEngine } from '@xcrong/docx-editor-core/editor';
 import type { RenderedDomContext } from '../../plugin-api/types';
 import {
   DEFAULT_PAGE_WIDTH,
@@ -194,6 +197,10 @@ export interface PagedEditorProps {
   isSuggesting?: boolean;
   /** Active author for suggestion mode */
   author?: string;
+  /** Live agent wrapping the loaded document (engine.save reads via host). */
+  agentRef?: React.RefObject<DocumentAgent | null>;
+  /** Adapter-owned comment list (engine.save reads via host). */
+  comments?: Comment[];
 }
 
 export interface PagedEditorRef {
@@ -269,6 +276,8 @@ export interface PagedEditorRef {
   getHfPmView(hf: HeaderFooter): EditorView | null;
   /** Get all active header/footer EditorViews mapped by rId. */
   getHfPmViews(): Map<string, EditorView>;
+  /** Live engine (load/save session seam). */
+  getEngine(): DocxEditorEngine;
 }
 
 // =============================================================================
@@ -327,6 +336,8 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       onHyperlinkPopupClose,
       isSuggesting = false,
       author = 'User',
+      agentRef,
+      comments,
     } = props;
 
     // Resolve the scroll container: prefer parent-provided ref, fallback to own container
@@ -496,6 +507,8 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       isSuggesting,
       author,
       hfHostRef,
+      agentRef,
+      comments,
     });
 
     // Selection overlay — caret, range rects, image overlay info, plus the
@@ -784,6 +797,7 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       scrollToParaIdImpl,
       scrollToPageImpl,
       setIsFocused,
+      engine,
       onReadyRef,
     });
 
