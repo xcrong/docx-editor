@@ -134,20 +134,12 @@
             :style="rulerRowStyle"
           >
             <HorizontalRuler
-              :section-props="currentSectionProps"
-              :zoom="zoom"
-              :editable="!readOnly"
-              :indent-left="rulerIndents.indentLeft"
-              :indent-right="rulerIndents.indentRight"
-              :first-line-indent="rulerIndents.firstLineIndent"
-              :hanging-indent="rulerIndents.hangingIndent"
-              :tab-stops="rulerIndents.tabStops"
-              @left-margin-change="handleLeftMarginChange"
-              @right-margin-change="handleRightMarginChange"
-              @indent-left-change="handleIndentLeftChange"
-              @indent-right-change="handleIndentRightChange"
-              @first-line-indent-change="handleFirstLineIndentChange"
-              @tab-stop-remove="handleTabStopRemove"
+              :section-props="currentSectionProps" :zoom="zoom" :editable="!readOnly"
+              :indent-left="rulerIndents.indentLeft" :indent-right="rulerIndents.indentRight"
+              :first-line-indent="rulerIndents.firstLineIndent" :hanging-indent="rulerIndents.hangingIndent" :tab-stops="rulerIndents.tabStops"
+              @left-margin-change="handleLeftMarginChange" @right-margin-change="handleRightMarginChange"
+              @indent-left-change="handleIndentLeftChange" @indent-right-change="handleIndentRightChange"
+              @first-line-indent-change="handleFirstLineIndentChange" @tab-stop-remove="handleTabStopRemove"
             />
           </div>
 
@@ -164,11 +156,8 @@
           >
             <div v-if="showRuler && currentSectionProps" class="docx-editor-vue__vertical-ruler">
               <VerticalRuler
-                :section-props="currentSectionProps"
-                :zoom="zoom"
-                :editable="!readOnly"
-                @top-margin-change="handleTopMarginChange"
-                @bottom-margin-change="handleBottomMarginChange"
+                :section-props="currentSectionProps" :zoom="zoom" :editable="!readOnly"
+                @top-margin-change="handleTopMarginChange" @bottom-margin-change="handleBottomMarginChange"
               />
             </div>
             <div
@@ -807,9 +796,7 @@ const { minLayoutWidth, pagesContainerStyle, rulerRowStyle, pageWidthPx } = useS
   currentSectionPageWidthTwips: computed(() => currentSectionProps.value?.pageWidth),
 });
 
-const resolvedCommentIds = computed(
-  () => new Set(comments.value.filter((c) => c.parentId == null && c.done).map((c) => c.id))
-);
+const resolvedCommentIds = computed(() => new Set(comments.value.filter(c => c.parentId == null && c.done).map(c => c.id)));
 
 const bookmarkOptions = computed(() => {
   void stateTick.value;

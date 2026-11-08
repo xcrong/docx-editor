@@ -450,6 +450,11 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
     // initializes; assigned right after. Engine calls happen post-mount,
     // after assignment — never in the TDZ window.
     const updateSelectionOverlayRef = useRef<((state: EditorState) => void) | null>(null);
+
+    // Forwarded to the engine host alongside the overlay updater; assigned
+    // right after `useSelectionOverlay` below. Engine calls happen post-mount,
+    // after assignment — never in the TDZ window.
+    const handleSelectionChangeRef = useRef<((state: EditorState) => void) | null>(null);
     // Forwarded to the engine host before `handleEditorViewReady` below is
     // defined; assigned right after. Engine calls happen post-mount, after
     // assignment — never in the TDZ window.
@@ -492,15 +497,18 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       onAnchorPositionsChange,
       onRenderedDomContextReady,
       onDocumentChange: (doc) => onDocumentChangeRef.current?.(doc),
-      onSelectionOnlyTransaction: (state) => updateSelectionOverlayRef.current?.(state),
+      onSelectionOnlyTransaction: (state) => handleSelectionChangeRef.current?.(state),
       onHfTransaction,
       extensionManager,
       externalPlugins,
       isReadOnly: readOnly || !!hfEditMode,
-      // Selection-only moves refresh the overlay without laying out; the
-      // null-tr swap path (external document load) also resyncs it.
+      // Selection-only moves refresh the overlay through the gated
+      // `handleSelectionChange` funnel (image-suppression + layout gate);
+      // the null-tr swap path (external document load) also resyncs it.
+      // Doc changes skip the sync pass — the post-layout effect recomputes
+      // against painted DOM (no stale-DOM flash).
       onBodyState: (newState, tr) => {
-        if (!tr || tr.selectionSet || tr.docChanged) updateSelectionOverlayRef.current?.(newState);
+        if (!tr) updateSelectionOverlayRef.current?.(newState);
       },
       onBodyViewReady: (view) => handleEditorViewReadyRef.current?.(view),
       onBodyKeyDown: (view, event) => handlePMKeyDown(view, event),
@@ -522,6 +530,7 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       setSelectedImageInfo,
       buildImageSelectionInfo,
       updateSelectionOverlay,
+      handleSelectionChange,
     } = useSelectionOverlay({
       layout,
       blocks,
@@ -535,6 +544,7 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       onSelectionChangeRef,
     });
     updateSelectionOverlayRef.current = updateSelectionOverlay;
+    handleSelectionChangeRef.current = handleSelectionChange;
 
     // =========================================================================
     // Event Handlers
