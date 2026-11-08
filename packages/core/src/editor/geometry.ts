@@ -12,11 +12,7 @@
  * the values cannot drift.
  */
 
-import {
-  getColumns,
-  getMargins,
-  getPageSize,
-} from '../layout-bridge/sectionGeometry';
+import { getColumns, getMargins, getPageSize } from '../layout-bridge/sectionGeometry';
 import type { ColumnLayout, PageMargins } from '../layout-engine';
 import type { SectionProperties } from '../types/document';
 

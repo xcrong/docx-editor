@@ -32,9 +32,7 @@ import type {
 } from '../layout-painter';
 import { buildBlockLookup, renderPages } from '../layout-painter';
 import type { FloatPageGeometry } from '../layout-bridge';
-import {
-  findVerticalScrollParentOrRoot,
-} from '../utils/findVerticalScrollParent';
+import { findVerticalScrollParentOrRoot } from '../utils/findVerticalScrollParent';
 import type { LayoutSelectionGate } from '../prosemirror/utils/LayoutSelectionGate';
 import type {
   Document,
@@ -45,10 +43,7 @@ import type {
 } from '../types/document';
 import type { FlowBlock, Layout, Measure } from '../layout-engine';
 
-import {
-  computeLayout,
-  type LayoutComputation,
-} from './computeLayout';
+import { computeLayout, type LayoutComputation } from './computeLayout';
 import { resolveLayoutGeometry } from './geometry';
 import {
   buildPendingScrollRestore,
@@ -58,10 +53,7 @@ import {
 } from './scrollRestore';
 import { createLayoutScheduler, type LayoutScheduler } from './layoutScheduler';
 
-export type {
-  LayoutComputation,
-  PendingScrollRestore,
-};
+export type { LayoutComputation, PendingScrollRestore };
 
 /** Resolved header/footer content for the active section (adapter-resolved). */
 export interface EngineHeaderFooter {
@@ -100,7 +92,11 @@ export interface EngineHost {
   /** The persistent hidden PM doc for an HF, or null when unmounted. */
   getHfPmDoc(hf: HeaderFooter): PMNode | null | undefined;
   /** Adapter block measurer (React's is caching). */
-  measureBlocks(blocks: FlowBlock[], contentWidth: number | number[], pageGeometry?: FloatPageGeometry): Measure[];
+  measureBlocks(
+    blocks: FlowBlock[],
+    contentWidth: number | number[],
+    pageGeometry?: FloatPageGeometry
+  ): Measure[];
   /** Layout/selection gate both adapters share; undefined in headless use. */
   getSyncCoordinator(): LayoutSelectionGate | undefined;
   /** Visible pages target; null skips paint but still computes + emits. */
@@ -114,12 +110,7 @@ export interface EngineHost {
    * setState today). `lookup` is the block lookup the engine painted
    * with — reuse it for click routing instead of rebuilding.
    */
-  onLayout(
-    layout: Layout,
-    blocks: FlowBlock[],
-    measures: Measure[],
-    lookup: BlockLookup
-  ): void;
+  onLayout(layout: Layout, blocks: FlowBlock[], measures: Measure[], lookup: BlockLookup): void;
   /**
    * Adapter DOM chrome applied between `renderPages` and scroll-restore
    * bookkeeping (React sizes its viewport wrapper here; Vue styles its
@@ -338,8 +329,7 @@ export class DocxEditorEngine {
         footerContent: hf.footer,
         firstPageHeaderContent: hf.firstHeader,
         firstPageFooterContent: hf.firstFooter,
-        measureBlocks: (blocks, widths, geometry) =>
-          host.measureBlocks(blocks, widths, geometry),
+        measureBlocks: (blocks, widths, geometry) => host.measureBlocks(blocks, widths, geometry),
         getHfPmDoc: (h) => host.getHfPmDoc(h) ?? null,
       });
 
@@ -367,12 +357,10 @@ export class DocxEditorEngine {
         this.pendingScrollRestore = null;
         this.pendingIncrementalScrollSnapshotWrittenAt = 0;
 
-        const scrollParent =
-          host.getScrollContainer() ?? findVerticalScrollParentOrRoot(pagesEl);
-        const anchor =
-          scrollParent?.isConnected
-            ? captureScrollAnchor(pagesEl, scrollParent, state.selection.head)
-            : null;
+        const scrollParent = host.getScrollContainer() ?? findVerticalScrollParentOrRoot(pagesEl);
+        const anchor = scrollParent?.isConnected
+          ? captureScrollAnchor(pagesEl, scrollParent, state.selection.head)
+          : null;
 
         const resolvedCommentIds = host.getResolvedCommentIds();
         const pageOptions: RenderPageOptions & {
@@ -472,8 +460,7 @@ export class DocxEditorEngine {
     onlyIfSnapshotJustWritten: boolean,
     pagesEl: HTMLElement
   ): void {
-    const scrollParent =
-      this.host.getScrollContainer() ?? findVerticalScrollParentOrRoot(pagesEl);
+    const scrollParent = this.host.getScrollContainer() ?? findVerticalScrollParentOrRoot(pagesEl);
     reclampIncrementalSnapshot(
       this.pendingScrollRestore,
       scrollParent,

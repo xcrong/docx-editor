@@ -53,10 +53,7 @@ import type {
   FloatingImageZone,
   FloatPageGeometry,
 } from '@xcrong/docx-editor-core/layout-bridge/measuring';
-import {
-  measureTableBlock,
-  resolveHeaderFooter,
-} from '@xcrong/docx-editor-core/layout-bridge';
+import { measureTableBlock, resolveHeaderFooter } from '@xcrong/docx-editor-core/layout-bridge';
 import {
   applyScrollRestore,
   createRafFrameScheduler,
@@ -78,10 +75,7 @@ import type {
   ImageBlock,
   TextBoxBlock,
 } from '@xcrong/docx-editor-core/layout-engine/types';
-import {
-  enclosingSdtGroupIds,
-  applySdtFocus,
-} from '@xcrong/docx-editor-core/layout-painter';
+import { enclosingSdtGroupIds, applySdtFocus } from '@xcrong/docx-editor-core/layout-painter';
 import type { Document } from '@xcrong/docx-editor-core/types/document';
 import type { LayoutSelectionGate } from '@xcrong/docx-editor-core/prosemirror';
 

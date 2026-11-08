@@ -11,11 +11,7 @@ import { EditorState, type Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { singletonManager } from '../../prosemirror/schema';
 import { LayoutSelectionGate } from '../../prosemirror/utils/LayoutSelectionGate';
-import type {
-  Document,
-  Paragraph,
-  SectionProperties,
-} from '../../types/document';
+import type { Document, Paragraph, SectionProperties } from '../../types/document';
 import type { FlowBlock, Measure } from '../../layout-engine';
 import type { BlockLookup } from '../../layout-painter';
 import { DocxEditorEngine, type EngineHost } from '../DocxEditorEngine';
@@ -79,7 +75,10 @@ interface Captured {
 }
 
 /** Headless host: no pages container, so `run` is compute + `onLayout` only. */
-function makeHost(doc: Document | null, sp: SectionProperties | null = null): {
+function makeHost(
+  doc: Document | null,
+  sp: SectionProperties | null = null
+): {
   host: EngineHost;
   captured: Captured;
 } {

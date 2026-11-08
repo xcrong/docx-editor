@@ -7,15 +7,8 @@
  */
 
 export { computeLayout } from './computeLayout';
-export type {
-  ComputeLayoutInputs,
-  LayoutComputation,
-  MeasureBlocksFn,
-} from './computeLayout';
-export {
-  createLayoutScheduler,
-  createRafFrameScheduler,
-} from './layoutScheduler';
+export type { ComputeLayoutInputs, LayoutComputation, MeasureBlocksFn } from './computeLayout';
+export { createLayoutScheduler, createRafFrameScheduler } from './layoutScheduler';
 export type { FrameScheduler, LayoutScheduler } from './layoutScheduler';
 export { stripScrollFlag } from './scrollFlag';
 export { resolveLayoutGeometry } from './geometry';
@@ -29,8 +22,4 @@ export {
 } from './scrollRestore';
 export type { PendingScrollRestore, ScrollAnchor } from './scrollRestore';
 export { DocxEditorEngine } from './DocxEditorEngine';
-export type {
-  EngineHeaderFooter,
-  EngineHost,
-  EnginePaintedInfo,
-} from './DocxEditorEngine';
+export type { EngineHeaderFooter, EngineHost, EnginePaintedInfo } from './DocxEditorEngine';

@@ -23,10 +23,7 @@
  * share it. DOM-only, no framework imports.
  */
 
-import {
-  findBodyPmAnchor,
-  findBodyPmAnchors,
-} from '../layout-bridge';
+import { findBodyPmAnchor, findBodyPmAnchors } from '../layout-bridge';
 import type { RenderPagesUpdateKind } from '../layout-painter';
 
 export interface PendingScrollRestore {
@@ -51,10 +48,7 @@ export interface ScrollAnchor {
  * restore when `renderPages` rebuilds the DOM. Header/footer anchors are skipped
  * because their PM positions live in a separate document and would mis-resolve.
  */
-export function findPaintedPmStartAtOrBefore(
-  pages: HTMLElement,
-  pmPos: number
-): number | null {
+export function findPaintedPmStartAtOrBefore(pages: HTMLElement, pmPos: number): number | null {
   let best: number | null = null;
   const list = findBodyPmAnchors(pages);
   for (let i = 0; i < list.length; i++) {

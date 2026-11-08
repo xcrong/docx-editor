@@ -95,7 +95,6 @@ export interface UseLayoutPipelineReturn {
   handleHfTransaction: (rId: string, view: EditorView, docChanged: boolean) => void;
 }
 
-
 export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipelineReturn {
   const {
     document,
@@ -272,9 +271,7 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
 
         const pagesEl = pagesContainerRef.current;
         if (pagesEl) {
-          const hfContainers = pagesEl.querySelectorAll(
-            '.layout-page-header, .layout-page-footer'
-          );
+          const hfContainers = pagesEl.querySelectorAll('.layout-page-header, .layout-page-footer');
           if (hfContainers.length > 0) {
             const pagesElRect = pagesEl.getBoundingClientRect();
             const currentZoom = hostInputsRef.current.zoom || 1;
@@ -403,18 +400,12 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
   // Transaction → repaint loop (step 3): thin delegation into the engine,
   // which notifies decorations, schedules doc changes, and refreshes the
   // overlay for selection-only transactions.
-  const handleTransaction = useCallback(
-    (transaction: Transaction, newState: EditorState) => {
-      engineRef.current!.handleTransaction(transaction, newState);
-    },
-    []
-  );
-  const handleHfTransaction = useCallback(
-    (rId: string, view: EditorView, docChanged: boolean) => {
-      engineRef.current!.handleHfTransaction(rId, view, docChanged);
-    },
-    []
-  );
+  const handleTransaction = useCallback((transaction: Transaction, newState: EditorState) => {
+    engineRef.current!.handleTransaction(transaction, newState);
+  }, []);
+  const handleHfTransaction = useCallback((rId: string, view: EditorView, docChanged: boolean) => {
+    engineRef.current!.handleHfTransaction(rId, view, docChanged);
+  }, []);
 
   // Clean up pending rAF on unmount
   useEffect(() => {
