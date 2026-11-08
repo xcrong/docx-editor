@@ -20,7 +20,7 @@
  * transaction loop, view lifecycle, and session seam follow.
  */
 
-import type { EditorState, Transaction } from 'prosemirror-state';
+import type { EditorState, Plugin, Transaction } from 'prosemirror-state';
 import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 
@@ -52,8 +52,19 @@ import {
   type PendingScrollRestore,
 } from './scrollRestore';
 import { createLayoutScheduler, type LayoutScheduler } from './layoutScheduler';
+import { stripScrollFlag } from './scrollFlag';
+import {
+  createBodyEditorState,
+  createHfEditorState,
+  createHfExtensionManager,
+  enumerateHfSlots,
+  getDocumentId,
+  type HfPartKind,
+} from './viewLifecycle';
+import type { ExtensionManager } from '../prosemirror/extensions';
 
 export type { LayoutComputation, PendingScrollRestore };
+export type { HfPartKind };
 
 /** Resolved header/footer content for the active section (adapter-resolved). */
 export interface EngineHeaderFooter {
@@ -177,6 +188,39 @@ export interface EngineHost {
   /** Fired after every HF transaction (caret overlays, toolbar sync). */
   onHfTransaction?(rId: string, view: EditorView, docChanged: boolean): void;
 
+  // -- view lifecycle (step 4) -----------------------------------------
+  /**
+   * Framework-specific EditorView construction; the engine owns the
+   * lifecycle (when to mount/teardown) and the dispatch routing.
+   * `dispatch` carries the constructing view for transactions fired
+   * during construction (plugins that dispatch in their `view()` hook).
+   * `kind` lets the host apply body-only chrome (editable, key handlers).
+   */
+  mountView(
+    hostEl: HTMLElement,
+    state: EditorState,
+    dispatch: (tr: Transaction, view?: EditorView) => void,
+    kind: 'body' | 'hf'
+  ): EditorView;
+  destroyView(view: EditorView): void;
+  /** Off-screen container owning all HF mount nodes; null skips HF sync. */
+  getHfHostEl(): HTMLElement | null;
+  /** Body state knobs (React prop manager / Vue singleton; prefix plugins). */
+  getBodyExtensionManager?(): ExtensionManager | undefined;
+  getBodyPrefixPlugins?(): Plugin[];
+  isReadOnly?(): boolean;
+  onBodyKeyDown?(view: EditorView, event: KeyboardEvent): boolean;
+  /**
+   * Fired with every post-apply body state. `tr` is null for external
+   * document swaps (no transaction). React gates selection-only inside;
+   * Vue stores the state.
+   */
+  onBodyState?(newState: EditorState, tr: Transaction | null): void;
+  onBodyViewReady?(view: EditorView): void;
+  onBodyViewDestroy?(): void;
+  /** HF knobs (React props; Vue editorMode/author). */
+  getSuggestionState?(): { active: boolean; author: string };
+
   // -- scheduler seam (consumed by `scheduleLayout` from step 2 on) -----
   scheduleFrame(cb: () => void): number;
   cancelFrame?(handle: number): void;
@@ -186,6 +230,14 @@ export class DocxEditorEngine {
   private pendingScrollRestore: PendingScrollRestore | null = null;
   private pendingIncrementalScrollSnapshotWrittenAt = 0;
   private layoutScheduler: LayoutScheduler | null = null;
+  // -- view lifecycle (step 4): the persistent body view + per-rId HF map.
+  private bodyView: EditorView | null = null;
+  private bodyDocumentId: string | null = null;
+  private bodyViewInitialized = false;
+  private hfViews = new Map<
+    string,
+    { view: EditorView; manager: ExtensionManager; kind: HfPartKind; mountNode: HTMLElement }
+  >();
 
   constructor(private readonly host: EngineHost) {}
 
@@ -222,8 +274,8 @@ export class DocxEditorEngine {
    * `PagedEditor.handleTransaction`). Decoration-notify on every
    * transaction; doc changes bump the state seq, schedule a coalesced
    * layout, and notify the document listener; selection-only updates
-   * refresh the overlay without laying out. Scroll-flag stripping stays
-   * in the adapter `dispatchTransaction` (it must run pre-apply).
+   * refresh the overlay without laying out. Scroll-flag stripping runs
+   * in the engine-owned `dispatchBodyTransaction` pre-apply.
    */
   handleTransaction(tr: Transaction, newState: EditorState): void {
     this.host.onDecorationsChanged?.();
@@ -257,6 +309,173 @@ export class DocxEditorEngine {
       if (bodyState) this.scheduleLayout(bodyState);
     }
     this.host.onHfTransaction?.(rId, view, docChanged);
+  }
+  /**
+   * Build + mount the body view for `document` (step 4, lifted from
+   * React's `HiddenProseMirror.createView`). Owns the dispatch: strips
+   * the PM scroll flag pre-apply (the paginated layer owns scroll),
+   * applies, notifies `onBodyState`, then runs the transaction loop.
+   * Stores + returns the view.
+   */
+  mountBodyView(hostEl: HTMLElement, document: Document | null): EditorView {
+    const state = createBodyEditorState({
+      document,
+      styles: this.host.getStyles(),
+      manager: this.host.getBodyExtensionManager?.(),
+      prefixPlugins: this.host.getBodyPrefixPlugins?.() ?? [],
+    });
+    const view = this.host.mountView(
+      hostEl,
+      state,
+      (tr, v) => this.dispatchBodyTransaction(tr, v),
+      'body'
+    );
+    this.bodyView = view;
+    this.bodyViewInitialized = true;
+    this.bodyDocumentId = getDocumentId(document);
+    this.host.onBodyViewReady?.(view);
+    return view;
+  }
+
+  private dispatchBodyTransaction(tr: Transaction, view?: EditorView): void {
+    const target = view ?? this.bodyView;
+    if (!target) return;
+    stripScrollFlag(tr, target.state.tr);
+    const newState = target.state.apply(tr);
+    target.updateState(newState);
+    this.host.onBodyState?.(newState, tr);
+    this.handleTransaction(tr, newState);
+  }
+
+  /**
+   * External-document swap path (file load; lifted from React's
+   * document-change effect). Skips same-identity updates so internal
+   * edits passed back through props never reset IME/selection.
+   */
+  updateBodyViewForDocument(document: Document | null): void {
+    if (!this.bodyView) return;
+    const id = getDocumentId(document);
+    if (this.bodyViewInitialized && id === this.bodyDocumentId) return;
+    this.bodyViewInitialized = true;
+    this.bodyDocumentId = id;
+    const newState = createBodyEditorState({
+      document,
+      styles: this.host.getStyles(),
+      manager: this.host.getBodyExtensionManager?.(),
+      prefixPlugins: this.host.getBodyPrefixPlugins?.() ?? [],
+    });
+    this.bodyView.updateState(newState);
+    this.host.onBodyState?.(newState, null);
+  }
+
+  /** Tear down the body view (drops any pending coalesced frame too). */
+  destroyBodyView(): void {
+    this.cancelScheduledLayout();
+    if (this.bodyView) {
+      this.host.onBodyViewDestroy?.();
+      this.host.destroyView(this.bodyView);
+      this.bodyView = null;
+    }
+    this.bodyViewInitialized = false;
+    this.bodyDocumentId = null;
+  }
+
+  getBodyView(): EditorView | null {
+    return this.bodyView;
+  }
+
+  /**
+   * Diff-mount/teardown the per-rId HF views for `document` (step 4,
+   * lifted from React's `HiddenHeaderFooterPMs` slot effect). Each rId
+   * gets its own `ExtensionManager`; writeback rides through the
+   * existing `onHfDocumentChanged` hook and the body schedule through
+   * `handleHfTransaction`. The trigger stays adapter-side.
+   */
+  syncHfViews(document: Document | null): void {
+    const hostEl = this.host.getHfHostEl();
+    if (!hostEl) return;
+    const slots = enumerateHfSlots(document);
+    const want = new Map(slots.map((s) => [s.rId, s]));
+
+    // Tear down any rIds no longer present.
+    for (const [rId, mounted] of this.hfViews) {
+      if (!want.has(rId)) {
+        this.host.destroyView(mounted.view);
+        mounted.mountNode.remove();
+        mounted.manager.destroy();
+        this.hfViews.delete(rId);
+      }
+    }
+
+    if (!document?.package) return;
+    const pkg = document.package;
+    // Host getters first (React `styles`/`theme` props may override the
+    // package values), package second — same precedence as today.
+    const styles = this.host.getStyles() ?? pkg.styles ?? null;
+    const theme = this.host.getTheme() ?? pkg.theme ?? null;
+    const defaultTabStopTwips = pkg.settings?.defaultTabStop ?? null;
+    const defaultTableStyleId = pkg.settings?.defaultTableStyle ?? null;
+    const sugg = this.host.getSuggestionState?.() ?? { active: false, author: 'User' };
+
+    // Bring up any rIds we don't yet have.
+    for (const slot of slots) {
+      if (this.hfViews.has(slot.rId)) continue;
+      const hf = pkg.headers?.get(slot.rId) ?? pkg.footers?.get(slot.rId);
+      if (!hf) continue;
+
+      const manager = createHfExtensionManager();
+      // `document` in this scope is the DOCX model, not the DOM document —
+      // create the mount node via the host's owner document.
+      const node = hostEl.ownerDocument.createElement('div');
+      node.dataset.hfRId = slot.rId;
+      node.dataset.hfKind = slot.kind;
+      hostEl.appendChild(node);
+
+      const state = createHfEditorState({
+        hf,
+        styles,
+        theme,
+        defaultTabStopTwips,
+        defaultTableStyleId,
+        manager,
+        suggesting: sugg.active,
+        author: sugg.author,
+      });
+      const rId = slot.rId;
+      const view = this.host.mountView(
+        node,
+        state,
+        (tr, v) => {
+          const target = v ?? this.hfViews.get(rId)?.view;
+          if (!target) return;
+          const newState = target.state.apply(tr);
+          target.updateState(newState);
+          this.handleHfTransaction(rId, target, tr.docChanged);
+        },
+        'hf'
+      );
+      this.hfViews.set(slot.rId, { view, manager, kind: slot.kind, mountNode: node });
+    }
+  }
+
+  getHfView(rId: string): EditorView | null {
+    return this.hfViews.get(rId)?.view ?? null;
+  }
+
+  getHfViews(): Map<string, EditorView> {
+    const map = new Map<string, EditorView>();
+    for (const [rId, mounted] of this.hfViews) map.set(rId, mounted.view);
+    return map;
+  }
+
+  /** Tear down every HF view + manager (unmount). */
+  destroyHfViews(): void {
+    for (const mounted of this.hfViews.values()) {
+      this.host.destroyView(mounted.view);
+      mounted.mountNode.remove();
+      mounted.manager.destroy();
+    }
+    this.hfViews.clear();
   }
 
   /**

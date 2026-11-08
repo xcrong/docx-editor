@@ -439,11 +439,17 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
     // initializes; assigned right after. Engine calls happen post-mount,
     // after assignment — never in the TDZ window.
     const updateSelectionOverlayRef = useRef<((state: EditorState) => void) | null>(null);
+    // Forwarded to the engine host before `handleEditorViewReady` below is
+    // defined; assigned right after. Engine calls happen post-mount, after
+    // assignment — never in the TDZ window.
+    const handleEditorViewReadyRef = useRef<((view: EditorView) => void) | null>(null);
+    // Shared off-screen host owning all HF mount nodes (rendered by
+    // `HiddenHeaderFooterPMs`, read by the engine host).
+    const hfHostRef = useRef<HTMLDivElement | null>(null);
     // Layout pipeline — owns layout/blocks/measures state, the rAF-coalesced
-    // scheduler, scroll-restore plumbing, the painter, and the page-count
-    // notifier. `handleTransaction`/`handleHfTransaction` are the engine's
-    // transaction→repaint loop (step 3); the document/selection callbacks
-    // below keep PagedEditor-owned behavior at the same points.
+    // scheduler, scroll-restore plumbing, the painter, the page-count
+    // notifier, and (step 4) the PM view lifecycle. The document/selection
+    // callbacks below keep PagedEditor-owned behavior at the same points.
     const {
       layout,
       blocks,
@@ -451,8 +457,7 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       decorationSyncToken,
       contentWidth,
       runLayoutPipeline,
-      handleTransaction,
-      handleHfTransaction,
+      engine,
     } = useLayoutPipeline({
       document,
       styles,
@@ -478,6 +483,19 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       onDocumentChange: (doc) => onDocumentChangeRef.current?.(doc),
       onSelectionOnlyTransaction: (state) => updateSelectionOverlayRef.current?.(state),
       onHfTransaction,
+      extensionManager,
+      externalPlugins,
+      isReadOnly: readOnly || !!hfEditMode,
+      // Selection-only moves refresh the overlay without laying out; the
+      // null-tr swap path (external document load) also resyncs it.
+      onBodyState: (newState, tr) => {
+        if (!tr || tr.selectionSet || tr.docChanged) updateSelectionOverlayRef.current?.(newState);
+      },
+      onBodyViewReady: (view) => handleEditorViewReadyRef.current?.(view),
+      onBodyKeyDown: (view, event) => handlePMKeyDown(view, event),
+      isSuggesting,
+      author,
+      hfHostRef,
     });
 
     // Selection overlay — caret, range rects, image overlay info, plus the
@@ -491,7 +509,6 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       setSelectedImageInfo,
       buildImageSelectionInfo,
       updateSelectionOverlay,
-      handleSelectionChange,
     } = useSelectionOverlay({
       layout,
       blocks,
@@ -742,6 +759,7 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       },
       [runLayoutPipeline, updateSelectionOverlay, readOnly]
     );
+    handleEditorViewReadyRef.current = handleEditorViewReady;
 
     // Re-layout triggers: web-font load complete + header/footer content changes.
     useLayoutTriggers({
@@ -793,40 +811,22 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
         onKeyDown={handleKeyDown}
         onMouseDown={handleContainerMouseDown}
       >
-        {/* Hidden ProseMirror for keyboard input */}
+        {/* Hidden ProseMirror for keyboard input (engine-owned view) */}
         <HiddenProseMirror
           ref={hiddenPMRef}
           document={document}
-          styles={styles}
           widthPx={contentWidth}
-          // When HF mode is active, the body PM is functionally retired —
-          // marking it readOnly stops keystrokes / input events from being
-          // applied to the body doc even if focus briefly slips to it.
-          readOnly={readOnly || !!hfEditMode}
-          onTransaction={handleTransaction}
-          onSelectionChange={handleSelectionChange}
-          externalPlugins={externalPlugins}
-          extensionManager={extensionManager}
-          onEditorViewReady={handleEditorViewReady}
-          onKeyDown={handlePMKeyDown}
+          engine={engine}
         />
 
-        {/* Persistent hidden HF PMs — one per distinct rId */}
+        {/* Persistent hidden HF PMs — one per distinct rId (engine-owned) */}
         <HiddenHeaderFooterPMs
           ref={hiddenHfPMsRef}
           document={document}
-          styles={styles}
-          theme={_theme}
+          engine={engine}
+          hostRef={hfHostRef}
           isSuggesting={isSuggesting}
           author={author}
-          defaultTabStopTwips={document?.package?.settings?.defaultTabStop ?? null}
-          onTransaction={(rId, view, docChanged) => {
-            // Writeback lives in the HF dispatch; the engine schedules the
-            // body pass (coalesced) and notifies. Selection-only moves skip
-            // the schedule — the painter has nothing new to paint.
-            handleHfTransaction(rId, view, docChanged);
-            onHfTransaction?.(rId, view, docChanged);
-          }}
         />
 
         {/* Viewport for visible pages */}

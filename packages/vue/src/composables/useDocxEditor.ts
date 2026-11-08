@@ -25,26 +25,13 @@ import {
   getEmbeddedFontFamilies,
 } from '@xcrong/docx-editor-core/utils';
 import type { FontOption } from '@xcrong/docx-editor-core/utils/fontOptions';
-import {
-  toProseDoc,
-  createEmptyDoc,
-  headerFooterToProseDoc,
-  proseDocToBlocks,
-} from '@xcrong/docx-editor-core/prosemirror/conversion';
+import { proseDocToBlocks } from '@xcrong/docx-editor-core/prosemirror/conversion';
 import { fromProseDoc } from '@xcrong/docx-editor-core/prosemirror/conversion/fromProseDoc';
-import { schema, ensureParaIdsInState } from '@xcrong/docx-editor-core/prosemirror';
 import { singletonManager } from '@xcrong/docx-editor-core/prosemirror/schema';
 import {
   createSuggestionModePlugin,
   setSuggestionMode,
-  createDocumentStylesPlugin,
-  createDocumentContextPlugin,
 } from '@xcrong/docx-editor-core/prosemirror/plugins';
-import {
-  ExtensionManager,
-  createStarterKit,
-} from '@xcrong/docx-editor-core/prosemirror/extensions';
-import type { CommandMap } from '@xcrong/docx-editor-core/prosemirror/extensions/types';
 import {
   measureBlocksWithFloats,
   measureParagraph,
@@ -58,9 +45,9 @@ import {
   applyScrollRestore,
   createRafFrameScheduler,
   DocxEditorEngine,
-  stripScrollFlag,
 } from '@xcrong/docx-editor-core/editor';
 import type { EngineHost } from '@xcrong/docx-editor-core/editor';
+import type { CommandMap } from '@xcrong/docx-editor-core/prosemirror/extensions/types';
 import {
   DEFAULT_TEXTBOX_MARGINS,
   DEFAULT_TEXTBOX_WIDTH,
@@ -76,7 +63,7 @@ import type {
   TextBoxBlock,
 } from '@xcrong/docx-editor-core/layout-engine/types';
 import { enclosingSdtGroupIds, applySdtFocus } from '@xcrong/docx-editor-core/layout-painter';
-import type { Document } from '@xcrong/docx-editor-core/types/document';
+import type { Document, HeaderFooter } from '@xcrong/docx-editor-core/types/document';
 import type { LayoutSelectionGate } from '@xcrong/docx-editor-core/prosemirror';
 
 // ProseMirror CSS — must be imported for the hidden editor to work
@@ -421,6 +408,66 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     },
     scheduleFrame: frameScheduler.scheduleFrame,
     cancelFrame: frameScheduler.cancelFrame,
+    // -- view lifecycle (step 4): the engine owns mount/teardown +
+    // dispatch routing; this host supplies framework-specific
+    // construction (body chrome) and the off-screen HF container.
+    mountView: (hostEl, state, dispatch, kind) => {
+      if (kind === 'body') {
+        return new EditorView(hostEl, {
+          state,
+          editable: () => !unref(readOnly),
+          // Keeps `overflow-anchor` on the PM root across outer-deco sync.
+          attributes: { style: 'overflow-anchor: none' },
+          dispatchTransaction(this: EditorView, transaction: Transaction) {
+            dispatch(transaction, this);
+          },
+          // Paginated layer owns scroll; never let PM scroll ancestors.
+          handleScrollToSelection: () => true,
+          // Prevent focus handling from interfering with visual layer.
+          handleDOMEvents: { focus: () => false, blur: () => false },
+        });
+      }
+      return new EditorView(hostEl, {
+        state,
+        dispatchTransaction(this: EditorView, transaction: Transaction) {
+          dispatch(transaction, this);
+        },
+      });
+    },
+    destroyView: (view) => {
+      view.destroy();
+    },
+    getHfHostEl: () => ensureHfHost(),
+    getBodyExtensionManager: () => mgr,
+    getBodyPrefixPlugins: () => [
+      createSuggestionModePlugin(unref(editorMode) === 'suggesting', unref(author) ?? 'User'),
+      ...externalPlugins,
+    ],
+    isReadOnly: () => !!unref(readOnly),
+    onBodyState: (newState) => {
+      editorState.value = newState;
+    },
+    onBodyViewReady: (view) => {
+      editorState.value = view.state;
+      isReady.value = true;
+      // Initial layout + first paint request, mirroring the old
+      // createEditorView tail. Runs synchronously inside mountBodyView,
+      // the same point the old code laid out (pre-await, post-mount).
+      runLayoutPipeline(view.state);
+      syncCoordinator?.requestRender();
+      // Auto-focus the hidden ProseMirror so the user can start typing
+      // immediately, without first clicking into the page. Mirrors React's
+      // PagedEditor.handleEditorViewReady. rAF ensures the DOM is painted.
+      if (!unref(readOnly)) {
+        requestAnimationFrame(() => {
+          view.focus();
+        });
+      }
+    },
+    getSuggestionState: () => ({
+      active: unref(editorMode) === 'suggesting',
+      author: unref(author) ?? 'User',
+    }),
   };
   const engine = new DocxEditorEngine(engineHost);
 
@@ -448,45 +495,12 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   function createEditorView() {
     const host = hiddenContainer.value;
     if (!host) return;
-
-    const docStyles = document.value?.package?.styles;
-    const doc = document.value
-      ? toProseDoc(document.value, { styles: docStyles ?? undefined })
-      : createEmptyDoc();
-
-    // Suggestion-mode plugin is registered inactive; `setSuggestionMode()`
-    // toggles its `active` state via PluginKey meta. Mirrors React's
-    // mount-once-and-toggle pattern (DocxEditor.tsx createSuggestionModePlugin).
-    const suggestionPlugin = createSuggestionModePlugin(false);
-    // Expose the document's styles to style-aware commands (e.g. the Enter
-    // handler's `w:next` switch from heading to body text). Mirrors React's
-    // HiddenProseMirror createInitialState.
-    const styleResolverPlugin = createDocumentStylesPlugin(docStyles);
-    // Document context (theme + settings `w:defaultTableStyle`) for the
-    // table-insert command's default-table-style adoption.
-    const documentContextPlugin = createDocumentContextPlugin({
-      theme: document.value?.package?.theme ?? null,
-      defaultTableStyleId: document.value?.package?.settings?.defaultTableStyle ?? null,
-    });
-    const plugins: Plugin[] = [
-      suggestionPlugin,
-      ...externalPlugins,
-      ...(mgr.getPlugins() ?? []),
-      styleResolverPlugin,
-      documentContextPlugin,
-    ];
-
-    // Give every paragraph a paraId up front (docs without `w14:paraId` ship
-    // none), so block ids / agent scope work before the first edit — the
-    // allocator plugin's appendTransaction never fires on create (#738).
-    const state = ensureParaIdsInState(
-      EditorState.create({
-        doc,
-        schema: mgr.getSchema(),
-        plugins,
-      })
-    );
-    editorState.value = state;
+    // State construction, view construction, and dispatch routing live in
+    // the engine (step 4); initial layout + autofocus ride through
+    // `onBodyViewReady`, which fires synchronously inside the mount.
+    const view = engine.mountBodyView(host, document.value);
+    editorView.value = view;
+    editorState.value = view.state;
 
     // Sync the cached host Document with the just-allocated paraIds so
     // getDocument() exposes them before the first edit (#746). The allocation
@@ -498,56 +512,18 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     // comment ops rely on.
     if (document.value) {
       try {
-        document.value = fromProseDoc(state.doc, document.value);
+        document.value = fromProseDoc(view.state.doc, document.value);
       } catch (err) {
         console.error('[useDocxEditor] paraId cache sync error:', err);
       }
     }
-
-    const view = new EditorView(host, {
-      state,
-      editable: () => !unref(readOnly),
-      dispatchTransaction(transaction: Transaction) {
-        if (!view) return;
-        // Paginated painter owns scroll; strip PM's scroll flag so updateState
-        // doesn't yank this hidden off-screen view's ancestors to the caret.
-        stripScrollFlag(transaction, view.state.tr);
-        const newState = view.state.apply(transaction);
-        view.updateState(newState);
-        editorState.value = newState;
-
-        // Transaction → repaint loop lives in the engine (step 3): seq bump,
-        // coalesced schedule, document writeback, render request, and
-        // selection handling ride through the host hooks above.
-        engine.handleTransaction(transaction, newState);
-      },
-    });
-
-    editorView.value = view;
-    isReady.value = true;
-
-    // Initial layout
-    runLayoutPipeline(state);
-    syncCoordinator?.requestRender();
-
-    // Auto-focus the hidden ProseMirror so the user can start typing
-    // immediately, without first clicking into the page. Mirrors React's
-    // PagedEditor.handleEditorViewReady. rAF ensures the DOM is painted.
-    if (!unref(readOnly)) {
-      requestAnimationFrame(() => {
-        view.focus();
-      });
-    }
   }
 
   function destroyEditorView() {
-    // Drop any pending coalesced layout frame so a reload (destroy → recreate)
-    // can't repaint the old document's state against the new document.
-    engine.cancelScheduledLayout();
-    if (editorView.value) {
-      editorView.value.destroy();
-      editorView.value = null;
-    }
+    // Drops the pending coalesced frame too, so a reload (destroy →
+    // recreate) can't repaint the old document's state against the new one.
+    engine.destroyBodyView();
+    editorView.value = null;
     editorState.value = null;
     isReady.value = false;
   }
@@ -562,10 +538,6 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
 
   /** Off-screen host that owns all HF EditorView DOM. */
   const hfHostRef: { current: HTMLDivElement | null } = { current: null };
-  /** rId → mounted EditorView. */
-  const hfViews = new Map<string, EditorView>();
-  /** rId → ExtensionManager owning the view's plugins/commands. */
-  const hfManagers = new Map<string, ExtensionManager>();
 
   function ensureHfHost(): HTMLDivElement {
     if (hfHostRef.current && hfHostRef.current.isConnected) return hfHostRef.current;
@@ -586,9 +558,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
    * when the doc is unloaded or the HF isn't currently in the package
    * (e.g. just removed).
    */
-  function findHfRid(
-    hf: import('@xcrong/docx-editor-core/types/document').HeaderFooter
-  ): string | null {
+  function findHfRid(hf: HeaderFooter): string | null {
     const pkg = document.value?.package;
     if (!pkg) return null;
     if (pkg.headers) {
@@ -605,113 +575,25 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
    * persistent EditorView for the HF instance, or null when no PM is yet
    * mounted (cold boot, or the HF was just materialised at runtime).
    */
-  function getHfPmView(
-    hf: import('@xcrong/docx-editor-core/types/document').HeaderFooter
-  ): EditorView | null {
+  function getHfPmView(hf: HeaderFooter): EditorView | null {
     const rId = findHfRid(hf);
     if (!rId) return null;
-    return hfViews.get(rId) ?? null;
+    return engine.getHfView(rId);
   }
 
   /**
    * Mount missing HF EditorViews and tear down stale ones to match the
-   * current `Document.package.headers/footers`. Called on every document
-   * load + after the inline overlay's save (`package.headers` swap).
+   * current `Document.package.headers/footers`. Construction + dispatch
+   * live in the engine (step 4); the trigger stays adapter-side. Called
+   * on every document load + after the inline overlay's save
+   * (`package.headers` swap).
    */
   function syncHfPMs() {
-    const pkg = document.value?.package;
-    const host = ensureHfHost();
-    const wantRIds = new Set<string>();
-    if (pkg?.headers) for (const rId of pkg.headers.keys()) wantRIds.add(rId);
-    if (pkg?.footers) for (const rId of pkg.footers.keys()) wantRIds.add(rId);
-
-    // Tear down rIds no longer present (e.g. user removed a header).
-    for (const [rId, view] of hfViews) {
-      if (!wantRIds.has(rId)) {
-        view.destroy();
-        view.dom.parentElement?.remove();
-        hfManagers.get(rId)?.destroy();
-        hfManagers.delete(rId);
-        hfViews.delete(rId);
-      }
-    }
-
-    // Bring up new ones. Each gets its own ExtensionManager — history /
-    // input rules plugins are per-EditorView and can't be shared.
-    if (!pkg) return;
-    const styles = pkg.styles ?? null;
-    const theme = pkg.theme ?? null;
-    // Read from package.settings (canonical) not editorState (race on first sync).
-    const defaultTabStopTwips = pkg.settings?.defaultTabStop ?? null;
-    const defaultTableStyleId = pkg.settings?.defaultTableStyle ?? null;
-    for (const rId of wantRIds) {
-      if (hfViews.has(rId)) continue;
-      const hf = pkg.headers?.get(rId) ?? pkg.footers?.get(rId);
-      if (!hf) continue;
-      const kind = pkg.headers?.has(rId) ? 'header' : 'footer';
-
-      const mgr = new ExtensionManager(createStarterKit());
-      mgr.buildSchema();
-      mgr.initializeRuntime();
-      hfManagers.set(rId, mgr);
-
-      const node = window.document.createElement('div');
-      node.dataset.hfRId = rId;
-      node.dataset.hfKind = kind;
-      host.appendChild(node);
-
-      const pmDoc = headerFooterToProseDoc(hf.content, {
-        styles: styles ?? undefined,
-        theme,
-        defaultTabStopTwips,
-      });
-      // Header/footer paragraphs share the document's style table, so they get
-      // the same style-aware behavior (e.g. Enter after a heading → body text).
-      const hfStyleResolverPlugin = createDocumentStylesPlugin(styles);
-      // Document context (theme + settings `w:defaultTableStyle`) so inserting a
-      // table in a header/footer adopts the default table style too.
-      const hfDocumentContextPlugin = createDocumentContextPlugin({
-        theme,
-        defaultTableStyleId,
-      });
-      const hfSuggestionPlugin = createSuggestionModePlugin(
-        unref(editorMode) === 'suggesting',
-        unref(author)
-      );
-      const state = EditorState.create({
-        doc: pmDoc,
-        schema,
-        plugins: [
-          hfSuggestionPlugin,
-          ...mgr.getPlugins(),
-          hfStyleResolverPlugin,
-          hfDocumentContextPlugin,
-        ],
-      });
-      const view: EditorView = new EditorView(node, {
-        state,
-        dispatchTransaction(tr) {
-          const newState = view.state.apply(tr);
-          view.updateState(newState);
-          // Transaction → repaint loop lives in the engine (step 3):
-          // writeback, body schedule on doc changes, and notify ride
-          // through the host hooks. Selection-only moves skip the
-          // schedule — the painter has nothing new to paint.
-          engine.handleHfTransaction(rId, view, tr.docChanged);
-        },
-      });
-      hfViews.set(rId, view);
-    }
+    engine.syncHfViews(document.value);
   }
 
   function destroyHfPMs() {
-    for (const view of hfViews.values()) {
-      view.destroy();
-      view.dom.parentElement?.remove();
-    }
-    hfViews.clear();
-    for (const mgr of hfManagers.values()) mgr.destroy();
-    hfManagers.clear();
+    engine.destroyHfViews();
     if (hfHostRef.current) {
       hfHostRef.current.remove();
       hfHostRef.current = null;
@@ -730,7 +612,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       if (view) {
         setSuggestionMode(active, view.state, view.dispatch, who);
       }
-      for (const hfView of hfViews.values()) {
+      for (const hfView of engine.getHfViews().values()) {
         setSuggestionMode(active, hfView.state, hfView.dispatch, who);
       }
     },
@@ -890,7 +772,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     // HF unification surface — phase 6 of openspec/changes/unify-hf-editing.
     getHfPmView,
     getHfPmViews(): Map<string, EditorView> {
-      return hfViews;
+      return engine.getHfViews();
     },
     syncHfPMs,
     setHfTransactionListener,

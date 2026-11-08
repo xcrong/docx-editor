@@ -15,8 +15,8 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { EditorState, Transaction } from 'prosemirror-state';
-import type { EditorView } from 'prosemirror-view';
+import type { EditorState, Plugin, Transaction } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
 
 import type { FlowBlock, Layout, Measure } from '@xcrong/docx-editor-core/layout-engine';
 import type { Node as PMNode } from 'prosemirror-model';
@@ -36,6 +36,8 @@ import type {
   Theme,
 } from '@xcrong/docx-editor-core/types/document';
 
+import { proseDocToBlocks } from '@xcrong/docx-editor-core/prosemirror/conversion';
+import type { ExtensionManager } from '@xcrong/docx-editor-core/prosemirror/extensions';
 import type { HiddenProseMirrorRef } from '../HiddenProseMirror';
 import type { LayoutSelectionGate } from '../internals/LayoutSelectionGate';
 import { computeAnchorPositions } from '../internals/sidebarAnchorPositions';
@@ -80,6 +82,24 @@ export interface UseLayoutPipelineOptions {
   onSelectionOnlyTransaction?: (state: EditorState) => void;
   /** HF transaction notifications (caret overlays, toolbar sync). */
   onHfTransaction?: (rId: string, view: EditorView, docChanged: boolean) => void;
+  // -- view lifecycle (step 4): engine-owned PM views read these through
+  /** Body state's extension manager (schema + plugins). */
+  extensionManager?: ExtensionManager | null;
+  /** Body prefix plugins (suggestion mode, external). */
+  externalPlugins?: Plugin[];
+  /** Body editable gate (readOnly || HF edit mode). */
+  isReadOnly?: boolean;
+  /** Every post-apply body state (overlay sync for selection-only moves). */
+  onBodyState?: (newState: EditorState, tr: Transaction | null) => void;
+  /** Body view (re)created (initial layout + autofocus live here). */
+  onBodyViewReady?: (view: EditorView) => void;
+  /** Body key interceptor (visual line navigation). */
+  onBodyKeyDown?: (view: EditorView, event: KeyboardEvent) => boolean;
+  /** HF suggestion-mode state for newly mounted HF views. */
+  isSuggesting?: boolean;
+  author?: string;
+  /** Off-screen container owning all HF mount nodes. */
+  hfHostRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export interface UseLayoutPipelineReturn {
@@ -93,6 +113,8 @@ export interface UseLayoutPipelineReturn {
   scheduleLayout: (state: EditorState) => void;
   handleTransaction: (transaction: Transaction, newState: EditorState) => void;
   handleHfTransaction: (rId: string, view: EditorView, docChanged: boolean) => void;
+  /** The engine (view lifecycle owner; passed to the thin PM components). */
+  engine: DocxEditorEngine;
 }
 
 export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipelineReturn {
@@ -121,6 +143,15 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     onDocumentChange,
     onSelectionOnlyTransaction,
     onHfTransaction,
+    extensionManager,
+    externalPlugins,
+    isReadOnly,
+    onBodyState,
+    onBodyViewReady,
+    onBodyKeyDown,
+    isSuggesting,
+    author,
+    hfHostRef,
   } = opts;
 
   const [layout, setLayout] = useState<Layout | null>(null);
@@ -143,6 +174,9 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
   const onDocumentChangeRef = useRef(onDocumentChange);
   const onSelectionOnlyTransactionRef = useRef(onSelectionOnlyTransaction);
   const onHfTransactionRef = useRef(onHfTransaction);
+  const onBodyStateRef = useRef(onBodyState);
+  const onBodyViewReadyRef = useRef(onBodyViewReady);
+  const onBodyKeyDownRef = useRef(onBodyKeyDown);
   onTotalPagesChangeRef.current = onTotalPagesChange;
   onAnchorPositionsChangeRef.current = onAnchorPositionsChange;
   onRenderedDomContextReadyRef.current = onRenderedDomContextReady;
@@ -150,6 +184,9 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
   onDocumentChangeRef.current = onDocumentChange;
   onSelectionOnlyTransactionRef.current = onSelectionOnlyTransaction;
   onHfTransactionRef.current = onHfTransaction;
+  onBodyStateRef.current = onBodyState;
+  onBodyViewReadyRef.current = onBodyViewReady;
+  onBodyKeyDownRef.current = onBodyKeyDown;
 
   // Total-pages notifier — fires only when count changes (including N → 0).
   // Deliberately post-commit (not the engine's `onTotalPages` hook) so the
@@ -188,6 +225,11 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     resolvedCommentIds,
     syncCoordinator,
     getScrollContainer,
+    extensionManager,
+    externalPlugins,
+    isReadOnly,
+    isSuggesting,
+    author,
   });
   hostInputsRef.current = {
     document,
@@ -204,6 +246,11 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     resolvedCommentIds,
     syncCoordinator,
     getScrollContainer,
+    extensionManager,
+    externalPlugins,
+    isReadOnly,
+    isSuggesting,
+    author,
   };
 
   const engineRef = useRef<DocxEditorEngine | null>(null);
@@ -349,9 +396,85 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
         onSelectionOnlyTransactionRef.current?.(newState);
       },
       getBodyState: () => hiddenPMRef.current?.getState() ?? null,
+      // Writeback: serialize the persistent HF PM's doc back into
+      // `Document.package.headers[rId].content` (or `.footers[rId].content`)
+      // so `save()` reads the latest HF content. Reads the latest document
+      // through the inputs snapshot (the map identity changes on load).
+      // `proseDocToBlocks` returns `(Paragraph | Table)[]`; assign in place —
+      // the bag Map is the canonical reference shared across sections.
+      onHfDocumentChanged: (rId, hfState) => {
+        const pkg = hostInputsRef.current.document?.package;
+        if (!pkg) return;
+        const isHeader = pkg.headers?.has(rId) ?? false;
+        const bag = isHeader ? pkg.headers : pkg.footers;
+        const hf = bag?.get(rId);
+        if (!hf) return;
+        hf.content = proseDocToBlocks(hfState.doc);
+        // First edit invalidates the captured original XML — serialize from
+        // the model from here on so the change lands in the export.
+        hf.verbatimXml = undefined;
+      },
       onHfTransaction: (rId, view, docChanged) => {
         onHfTransactionRef.current?.(rId, view, docChanged);
       },
+      // -- view lifecycle (step 4): the engine owns mount/teardown +
+      // dispatch routing; this host supplies framework-specific
+      // construction (body chrome) and the off-screen HF container.
+      mountView: (hostEl, state, dispatch, kind) => {
+        if (kind === 'body') {
+          return new EditorView(hostEl, {
+            state,
+            // Read through the inputs snapshot so readOnly changes
+            // propagate without re-mounting the view. PM calls
+            // `editable()` on every input check.
+            editable: () => !(hostInputsRef.current.isReadOnly ?? false),
+            // Keeps `overflow-anchor` on the PM root across outer-deco sync.
+            attributes: {
+              style: 'overflow-anchor: none',
+            },
+            // Bind the constructing view so construction-time dispatches
+            // (plugins dispatching in `view()`) still route.
+            dispatchTransaction(this: EditorView, tr: Transaction) {
+              dispatch(tr, this);
+            },
+            // Intercept key events before ProseMirror processes them.
+            handleKeyDown: (view: EditorView, event: KeyboardEvent): boolean => {
+              return onBodyKeyDownRef.current?.(view, event) ?? false;
+            },
+            // Paginated layer owns scroll; never let PM scroll ancestors.
+            handleScrollToSelection: () => true,
+            // Prevent focus handling from interfering with visual layer.
+            handleDOMEvents: {
+              focus: () => false,
+              blur: () => false,
+            },
+          });
+        }
+        return new EditorView(hostEl, {
+          state,
+          dispatchTransaction(this: EditorView, tr: Transaction) {
+            dispatch(tr, this);
+          },
+        });
+      },
+      destroyView: (view) => {
+        view.destroy();
+      },
+      getHfHostEl: () => hfHostRef?.current ?? null,
+      getBodyExtensionManager: () => hostInputsRef.current.extensionManager ?? undefined,
+      getBodyPrefixPlugins: () => hostInputsRef.current.externalPlugins ?? [],
+      isReadOnly: () => hostInputsRef.current.isReadOnly ?? false,
+      onBodyKeyDown: (view, event) => onBodyKeyDownRef.current?.(view, event) ?? false,
+      onBodyState: (newState, tr) => {
+        onBodyStateRef.current?.(newState, tr);
+      },
+      onBodyViewReady: (view) => {
+        onBodyViewReadyRef.current?.(view);
+      },
+      getSuggestionState: () => ({
+        active: hostInputsRef.current.isSuggesting ?? false,
+        author: hostInputsRef.current.author ?? 'User',
+      }),
       scheduleFrame: frameScheduler.scheduleFrame,
       cancelFrame: frameScheduler.cancelFrame,
     };
@@ -424,5 +547,6 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     scheduleLayout,
     handleTransaction,
     handleHfTransaction,
+    engine: engineRef.current!,
   };
 }

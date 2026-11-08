@@ -129,6 +129,11 @@ function makeHost(
     onError: (error) => {
       captured.errors.push(error);
     },
+    mountView: () => {
+      throw new Error('mountView: headless stub has no DOM');
+    },
+    destroyView: () => {},
+    getHfHostEl: () => null,
     scheduleFrame: (cb) => {
       cb();
       return 0;

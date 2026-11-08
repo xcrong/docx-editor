@@ -22,4 +22,19 @@ export {
 } from './scrollRestore';
 export type { PendingScrollRestore, ScrollAnchor } from './scrollRestore';
 export { DocxEditorEngine } from './DocxEditorEngine';
-export type { EngineHeaderFooter, EngineHost, EnginePaintedInfo } from './DocxEditorEngine';
+export type {
+  EngineHeaderFooter,
+  EngineHost,
+  EnginePaintedInfo,
+  HfPartKind,
+} from './DocxEditorEngine';
+export {
+  createBodyEditorState,
+  createHfEditorState,
+  createHfExtensionManager,
+  enumerateHfSlots,
+  getDocumentId,
+} from './viewLifecycle';
+export type { BodyStateOptions, HfSlot, HfStateOptions } from './viewLifecycle';
+export { LoadGeneration, decideSelectiveSave } from './session';
+export type { SelectiveSaveDecision } from './session';
