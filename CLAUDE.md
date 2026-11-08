@@ -43,16 +43,16 @@ Empty-doc specs (`formatting`, `text-editing`) use `editor.gotoEmpty()`. Demo-as
 
 **Two renderers. Know which one owns your bug.**
 
-- **HIDDEN ProseMirror** (`left: -9999px`) — editing state, undo/redo, keyboard. `components/DocxEditor/HiddenProseMirror.tsx` (body) + `HiddenHeaderFooterPMs.tsx` (one EditorView per HF `rId`).
+- **HIDDEN ProseMirror** (`left: -9999px`) — editing state, undo/redo, keyboard. View lifecycle is owned by the engine (`packages/core/src/editor/`); `components/DocxEditor/HiddenProseMirror.tsx` (body) + `HiddenHeaderFooterPMs.tsx` (one EditorView per HF `rId`) are thin wrappers.
 - **VISIBLE pages** — what user sees. Static DOM rebuilt from PM state. **NOT `toDOM`** — `src/layout-painter/renderPage.ts`. Fixing `toDOM` for a visual bug → user sees nothing.
 
 Data flow: DOCX → `unzip` → `parser` → `Document` → `toProseDoc` → PM → painter → pages. Save: PM → `fromProseDoc` → `Document` → `serializer` → `rezip`.
 
-Click flow: `usePagesPointer.handlePagesMouseDown` → `getPositionFromMouse` (body) or `clickToPositionDom` scoped to `.layout-page-header`/`.layout-page-footer` (HF) → PM setSelection → `PagedEditor.handleTransaction` → painter re-render.
+Click flow: `usePagesPointer.handlePagesMouseDown` → `getPositionFromMouse` (body) or `clickToPositionDom` scoped to `.layout-page-header`/`.layout-page-footer` (HF) → PM setSelection → `engine.handleTransaction` (`core/editor/DocxEditorEngine.ts`) → painter re-render.
 
 Header/footer editing follows the same model as the body: the persistent hidden HF PM is the sole editor; the painter is the sole visible renderer in both edit and non-edit modes. The `InlineHeaderFooterEditor` overlay is UI chrome only (separator bar, options menu, save-on-close) — it does NOT mount its own EditorView. There is no `.hf-editor-pm` CSS — those workarounds existed to make PM's `toDOM` tables match the painter's flex layout and are gone now that the painter is the sole renderer. See `openspec/changes/unify-hf-editing/` for the design.
 
-Vue host: `useDocxEditor()` in `packages/vue/src/composables/useDocxEditor.ts`. Dual-rendering rule applies to Vue too — the composable mounts the same per-`rId` persistent HF EditorView pattern (via `syncHfPMs` / `getHfPmView` / `setHfTransactionListener`) and routes HF rendering through `convertHeaderFooterPmDocToContent` in lockstep with React.
+Vue host: `useDocxEditor()` in `packages/vue/src/composables/useDocxEditor.ts` implements the `EngineHost` hooks and delegates orchestration — layout pass, transaction loop, PM view lifecycle, load/save session — to `core/editor/DocxEditorEngine`, keeping only framework glue (refs, lifecycle, scroll-restore effect). Dual-rendering rule applies to Vue too — the composable mounts the same per-`rId` persistent HF EditorView pattern (via engine `syncHfViews`) and routes HF rendering through `convertHeaderFooterPmDocToContent` in lockstep with React.
 
 ### React/Vue parity
 
@@ -110,7 +110,7 @@ Stable dataset attrs on painted DOM (CSS, queries, selection map depend on these
 | HF persistent PMs            | `components/DocxEditor/HiddenHeaderFooterPMs.tsx`               |
 | HF caret in painter          | `components/DocxEditor/DocxEditorPagedArea.tsx` (`hfCaretRect`) |
 | HF inline chrome             | `components/InlineHeaderFooterEditor.tsx`                       |
-| Layout pipeline              | `components/DocxEditor/hooks/useLayoutPipeline.ts`              |
+| Layout pipeline (engine.run)     | `core/editor/DocxEditorEngine.ts` (`EngineHost` hooks per adapter) |
 | Scroll API                   | `components/DocxEditor/hooks/usePagedScrollApi.ts`              |
 | Image resize/drag            | `components/DocxEditor/hooks/useImageInteractions.ts`           |
 | Font/HF reflow triggers      | `components/DocxEditor/hooks/useLayoutTriggers.ts`              |
@@ -122,7 +122,7 @@ Stable dataset attrs on painted DOM (CSS, queries, selection map depend on these
 | Document/PM CSS              | `prosemirror/editor.css`                                        |
 | UI chrome CSS + color tokens | `packages/core/src/styles/editor.css` (SINGLE SOURCE OF TRUTH)  |
 
-Shared React/Vue orchestration lives in core (issue #696, Tier 1) — adapters re-export or delegate, so grepping an adapter lands on a thin wrapper:
+Shared React/Vue orchestration lives in core (Tier 1; Tier 2 engine spine, issue #33) — adapters re-export or delegate, so grepping an adapter lands on a thin wrapper:
 
 | Shared op                           | Core module (in `@xcrong/docx-editor-core`) |
 | ----------------------------------- | ------------------------------------------- |
@@ -134,6 +134,11 @@ Shared React/Vue orchestration lives in core (issue #696, Tier 1) — adapters r
 | image resize/drag PM commits        | `prosemirror/imageCommit.ts`                |
 | cell-selection highlight            | `layout-bridge/cellSelectionHighlight.ts`   |
 | drag auto-scroll delta math         | `utils/autoScroll.ts`                       |
+| layout compute→paint→scroll pass    | `editor/DocxEditorEngine.run` (+ `editor/geometry.ts`) |
+| rAF-coalescing scheduler            | `editor/DocxEditorEngine.scheduleLayout` |
+| transaction→repaint loop            | `editor/DocxEditorEngine.handleTransaction` (+ `handleHfTransaction`) |
+| PM view lifecycle (body + HF map)   | `editor/viewLifecycle.ts` via engine view methods |
+| load/save session seam              | `editor/session.ts` via `engine.load` / `engine.save` |
 
 ### Extensions
 
