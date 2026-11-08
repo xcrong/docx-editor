@@ -267,6 +267,7 @@ export interface UseDocxEditorReturn {
     save: () => Promise<Blob | null>;
     setDocument: (doc: Document_2) => void;
     setHfTransactionListener: (cb: ((rId: string, view: EditorView, docChanged: boolean) => void) | null) => void;
+    setSaveCommentsProvider: (provider: (() => Comment_2[]) | null) => void;
     syncHfPMs: () => void;
 }
 
