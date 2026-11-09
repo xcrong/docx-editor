@@ -101,16 +101,25 @@ export async function openEditor(
  * only-on-failure screenshot). The output path embeds the test title —
  * which carries the `[react]` / `[vue]` tag — so a failing artifact is
  * always attributable to its adapter without opening the report.
+ *
+ * @param opts.fixmeAdapters quarantine these adapters via `test.fixme`
+ * (tracked cross-adapter gap — skip shows in reports, suite stays green,
+ * owning issue re-enables).
  */
 export function forEachAdapter(
   title: string,
-  body: (adapter: AdapterFixture, args: { page: Page }) => Promise<void>
+  body: (adapter: AdapterFixture, args: { page: Page }) => Promise<void>,
+  opts?: { fixmeAdapters?: string[]; fixmeReason?: string }
 ): void {
   for (const adapter of ADAPTERS) {
+    const quarantined = opts?.fixmeAdapters?.includes(adapter.name) ?? false;
+    const declareTest = quarantined ? test.fixme : test;
     // First arg must literally destructure for Playwright's fixture
     // detection: `(args) =>` would fail "First argument must use the
     // object destructuring pattern".
-    test(`${title} [${adapter.name}]`, async ({ page }, testInfo) => {
+    declareTest(`${title} [${adapter.name}]`, async ({ page }, testInfo) => {
+      if (quarantined && opts?.fixmeReason)
+        testInfo.annotations.push({ type: 'issue', description: opts.fixmeReason });
       try {
         await body(adapter, { page });
       } catch (error) {

@@ -21,15 +21,16 @@ import { PNG } from 'pngjs';
 import { ADAPTERS, openEditor, type AdapterFixture } from './parity-fixture';
 
 /**
- * Coarse v1 threshold. Measured cross-adapter baseline on the fixture
- * corpus is ~1.4%, all of it known rendering gaps owned by #85 (T28-02):
- * sub-pixel vertical text shift across every line, image-box height
- * differing by a few px, and a ±1px page-height flip between runs. This
- * gate locks the current level — missing runs, dropped images, or layout
- * collapse move the ratio by tens of percent and turn it red. Tighten
- * toward the 0.1% §10.5 target as #85 converges each gap.
+ * Coarse v1 threshold. Measured cross-adapter baseline is ~1.4% on macOS
+ * but 2.53% on CI (ubuntu font rasterization widens the same known gaps,
+ * owned by #85 (T28-02): sub-pixel vertical text shift across every line,
+ * image-box height differing by a few px, and a ±1px page-height flip
+ * between runs). Calibrated to CI + margin — missing runs, dropped images,
+ * or layout collapse move the ratio by tens of percent and still turn it
+ * red (blank-page injection demo). Tighten toward the 0.1% §10.5 target
+ * as #85 converges each gap.
  */
-const MAX_DIFF_RATIO = 0.02;
+const MAX_DIFF_RATIO = 0.03;
 /**
  * Shoot the first rendered page, not the canvas container: the demos wrap
  * the shared paged canvas in adapter-specific chrome (different toolbars,
