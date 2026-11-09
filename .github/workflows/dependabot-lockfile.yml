@@ -26,7 +26,7 @@ permissions:
 jobs:
   refresh-and-verify:
     if: github.actor == 'dependabot[bot]'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v6.0.3

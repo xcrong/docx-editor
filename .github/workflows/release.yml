@@ -35,7 +35,7 @@ concurrency:
 jobs:
   release:
     name: Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Default job timeout is 6h; a hung step (e.g. an apt prompt) otherwise burns
     # a runner for hours. A healthy run finishes in well under 10 min.
     timeout-minutes: 30
