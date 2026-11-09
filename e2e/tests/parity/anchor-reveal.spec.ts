@@ -11,34 +11,32 @@
 
 import { forEachAdapter, openEditor, expect } from './parity-fixture';
 
-// QUARANTINE (T28-02 #85): Vue anchors at `to` (off by one) — TextSelection.between
-// vs React setSelection. CI-deterministic; passes on macOS (font metrics).
-forEachAdapter(
-  'highlightRange selects a valid range and reveals it',
-  async (adapter, { page }) => {
-    await openEditor(page, adapter);
+// T28-02 #85: was quarantined as "Vue anchors at `to`". Root cause was the
+// spec harness, not the adapter: `openEditor` went green on the boot sample
+// doc while the fixture upload was still parsing, so the range resolved
+// against the wrong document. The fixture now waits for the uploaded doc.
+forEachAdapter('highlightRange selects a valid range and reveals it', async (adapter, { page }) => {
+  await openEditor(page, adapter);
 
-    const anchor = await page.evaluate(() => {
-      const hook = window.__DOCX_EDITOR_E2E__;
-      // Resolve a real paragraph paraId the same way the fixture's openEditor
-      // does (some demo docs leave the first textblock without a paraId attr).
-      const firstId =
-        hook?.getFirstTextblockParaId() ??
-        hook?.agentGetPageContent(1)?.paragraphs.find((p) => p.text.trim().length > 0)?.paraId ??
-        null;
-      if (!firstId) return null;
-      const end = hook?.getTextblockEndForParaId(firstId);
-      if (end == null) return null;
-      // A 1-char in-bounds range ending at the paragraph's end.
-      hook?.highlightRange(end - 1, end);
-      return { expected: end - 1, actual: hook?.getSelectionAnchor() ?? null };
-    });
+  const anchor = await page.evaluate(() => {
+    const hook = window.__DOCX_EDITOR_E2E__;
+    // Resolve a real paragraph paraId the same way the fixture's openEditor
+    // does (some demo docs leave the first textblock without a paraId attr).
+    const firstId =
+      hook?.getFirstTextblockParaId() ??
+      hook?.agentGetPageContent(1)?.paragraphs.find((p) => p.text.trim().length > 0)?.paraId ??
+      null;
+    if (!firstId) return null;
+    const end = hook?.getTextblockEndForParaId(firstId);
+    if (end == null) return null;
+    // A 1-char in-bounds range ending at the paragraph's end.
+    hook?.highlightRange(end - 1, end);
+    return { expected: end - 1, actual: hook?.getSelectionAnchor() ?? null };
+  });
 
-    expect(anchor).not.toBeNull();
-    expect(anchor!.actual).toBe(anchor!.expected);
-  },
-  { fixmeAdapters: ['vue'], fixmeReason: 'T28-02 #85: Vue highlightRange anchors at `to`' }
-);
+  expect(anchor).not.toBeNull();
+  expect(anchor!.actual).toBe(anchor!.expected);
+});
 
 forEachAdapter(
   'highlightRange clamps an out-of-range `to` instead of crashing',
@@ -79,33 +77,31 @@ forEachAdapter('highlightRange no-ops for a `from` past the end', async (adapter
   expect(result!.after).toBe(result!.before);
 });
 
-// QUARANTINE (T28-02 #85): Vue agentAddComment refuses the first-textblock paraId
-// (plant returns null), so scrollToCommentId has nothing to resolve. CI-deterministic.
-forEachAdapter(
-  'scrollToCommentId resolves a planted comment',
-  async (adapter, { page }) => {
-    await openEditor(page, adapter);
+// T28-02 #85: was quarantined as "Vue agentAddComment refuses first paraId".
+// Same harness race as above — the planted paraId came from the boot sample
+// doc, then the fixture swap landed and the lookup missed. Fixed by waiting
+// for the fixture document in `openEditor`.
+forEachAdapter('scrollToCommentId resolves a planted comment', async (adapter, { page }) => {
+  await openEditor(page, adapter);
 
-    const result = await page.evaluate(() => {
-      const hook = window.__DOCX_EDITOR_E2E__;
-      const firstId = hook?.getFirstTextblockParaId();
-      if (!firstId) return null;
-      const commentId = hook?.agentAddComment({ paraId: firstId, text: 'reveal me' }) ?? null;
-      if (commentId == null) return null;
-      const ok = hook?.scrollToCommentId(commentId) ?? false;
-      const missing = hook?.scrollToCommentId(999999) ?? true;
-      return { ok, missing, anchor: hook?.getSelectionAnchor() ?? null };
-    });
+  const result = await page.evaluate(() => {
+    const hook = window.__DOCX_EDITOR_E2E__;
+    const firstId = hook?.getFirstTextblockParaId();
+    if (!firstId) return null;
+    const commentId = hook?.agentAddComment({ paraId: firstId, text: 'reveal me' }) ?? null;
+    if (commentId == null) return null;
+    const ok = hook?.scrollToCommentId(commentId) ?? false;
+    const missing = hook?.scrollToCommentId(999999) ?? true;
+    return { ok, missing, anchor: hook?.getSelectionAnchor() ?? null };
+  });
 
-    expect(result).not.toBeNull();
-    expect(result!.ok).toBe(true);
-    // Selection moved to the comment's anchored range.
-    expect(result!.anchor).not.toBeNull();
-    // An id that no longer resolves returns false (not a throw, not a no-op).
-    expect(result!.missing).toBe(false);
-  },
-  { fixmeAdapters: ['vue'], fixmeReason: 'T28-02 #85: Vue agentAddComment refuses first paraId' }
-);
+  expect(result).not.toBeNull();
+  expect(result!.ok).toBe(true);
+  // Selection moved to the comment's anchored range.
+  expect(result!.anchor).not.toBeNull();
+  // An id that no longer resolves returns false (not a throw, not a no-op).
+  expect(result!.missing).toBe(false);
+});
 
 forEachAdapter('scrollToChangeId returns false for an unknown id', async (adapter, { page }) => {
   await openEditor(page, adapter);

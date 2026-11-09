@@ -551,7 +551,17 @@ export class DocxEditorEngine {
       options?.selective !== false
     );
     const buffer = await agent.toBuffer(decision ? { selective: decision.selective } : undefined);
-    if (view) view.dispatch(clearTrackedChanges(view.state));
+    // The await above can span a document load: Vue recreates its body view
+    // on every load (`destroyEditorView` + `createEditorView`), so the
+    // captured view may be destroyed (or superseded) by the time the buffer
+    // resolves. Dispatching the tracker cleanup onto a destroyed view
+    // throws `null.matchesNode` inside prosemirror-view (`docView` is nulled
+    // by `EditorView.destroy`). Re-validate liveness — and only touch the
+    // view save actually read, never a newer document's view.
+    const live = this.getBodyView();
+    if (live && live === view && !live.isDestroyed) {
+      live.dispatch(clearTrackedChanges(live.state));
+    }
     return buffer;
   }
 

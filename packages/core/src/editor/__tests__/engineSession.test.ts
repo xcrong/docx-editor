@@ -132,4 +132,43 @@ describe('engine.save', () => {
     expect(toBufferOptions.length).toBe(1);
     expect(getChangedParagraphIds(engine.getBodyView()!.state).size).toBe(0);
   });
+
+  test('resolves when the body view is destroyed mid-save (T28-02 #85)', async () => {
+    // Vue recreates its body view on every document load; a load that lands
+    // inside `await agent.toBuffer(...)` destroys the view save captured.
+    // The post-save tracker cleanup must not dispatch onto it (used to throw
+    // `null.matchesNode` inside prosemirror-view) — save still resolves.
+    const { doc } = await seedDoc();
+    const { host, bodyHost, agent } = makeSaveHost(doc);
+    const engine = new DocxEditorEngine(host);
+    const view = engine.mountBodyView(bodyHost, doc);
+    const inner = agent.toBuffer.bind(agent);
+    agent.toBuffer = (async (o?: Parameters<DocumentAgent['toBuffer']>[0]) => {
+      engine.destroyBodyView();
+      return inner(o);
+    }) as DocumentAgent['toBuffer'];
+    const buffer = await engine.save({ selective: true });
+    expect(buffer).toBeInstanceOf(ArrayBuffer);
+    expect(view.isDestroyed).toBe(true);
+  });
+
+  test('never touches a superseding view mounted mid-save (T28-02 #85)', async () => {
+    // Same race, but a newer document's view is already mounted when the
+    // buffer resolves: save must leave it alone (its tracker belongs to the
+    // new document, and the captured view may be destroyed).
+    const { doc, bytes } = await seedDoc();
+    const { host, bodyHost, agent } = makeSaveHost(doc);
+    const engine = new DocxEditorEngine(host);
+    const stale = engine.mountBodyView(bodyHost, doc);
+    const inner = agent.toBuffer.bind(agent);
+    agent.toBuffer = (async (o?: Parameters<DocumentAgent['toBuffer']>[0]) => {
+      engine.destroyBodyView();
+      engine.mountBodyView(bodyHost, await parseDocx(bytes));
+      return inner(o);
+    }) as DocumentAgent['toBuffer'];
+    const buffer = await engine.save({ selective: true });
+    expect(buffer).toBeInstanceOf(ArrayBuffer);
+    expect(stale.isDestroyed).toBe(true);
+    expect(engine.getBodyView()).not.toBe(stale);
+  });
 });

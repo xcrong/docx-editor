@@ -43,14 +43,13 @@ test('Vue: selecting header text paints HF selection rects', async ({ page }) =>
   await expect(page.locator('.vue-hf-sel-rect')).toHaveCount(0);
 });
 
-// QUARANTINE (#99, owns T28-02 #85): fails deterministically in CI and locally,
-// pre-existing on main and pre-T23. `.vue-hf-sel-rect` never appears.
-// Regression for #691 (footer, multi-page): the same header/footer is painted
-// on every page, but the caret/selection overlay was always resolved against
-// the FIRST painted instance (page 1). Editing a footer on a later page drew
-// the highlight on page 1 — off-screen — so the user saw nothing. The overlay
-// now resolves against the painted instance nearest the viewport.
-test.fixme('Vue: footer selection on a later page paints rects on that page', async ({ page }) => {
+// T28-02 #85: was quarantined as "footer selection on a later page paints
+// no rects". Root cause was the adapter, fixed core-first: the HF overlay
+// resolved the painted instance by viewport-center proximity
+// (`resolveHfHostEl`), which picked page 1's copy while editing page 2's
+// footer. The engaged (dblclicked) host is now threaded through
+// `HfEditState.hostEl` into `computeHfSelectionRectsFromView`.
+test('Vue: footer selection on a later page paints rects on that page', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 });
   // Default demo document: multi-page with a footer ("Page N of M ...").
   await page.goto('http://localhost:5174/');
@@ -66,6 +65,20 @@ test.fixme('Vue: footer selection on a later page paints rects on that page', as
   await footer2.scrollIntoViewIfNeeded().catch(() => {});
   await footer2.dblclick();
   await expect(page.locator('.hf-editor')).toHaveCount(1);
+
+  // Place the caret in the page-2 footer first: dblclick engages HF mode
+  // but leaves focus where it was (same as the header test above clicking
+  // its span). Without this, select-all has no HF selection to extend.
+  const footerSpan = footer2.locator('span[data-pm-start]').first();
+  await footerSpan.click();
+  // Scroll page 1's footer to the viewport center AFTER engaging: a
+  // proximity-resolved overlay would paint page 1's copy here, so this
+  // pins the regression (T28-02 #85) deterministically on every machine.
+  await footers
+    .first()
+    .scrollIntoViewIfNeeded()
+    .catch(() => {});
+  await page.waitForTimeout(400);
   await page.keyboard.press('ControlOrMeta+a');
 
   const rect = page.locator('.vue-hf-sel-rect').first();

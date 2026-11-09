@@ -14,32 +14,25 @@ import {
   findBodyPmSpans,
   findBodyPmAnchor,
   clickToPositionDom,
+  resolveHfHostEl,
 } from '@xcrong/docx-editor-core/layout-bridge';
 import { findPageIndexContainingPmPos } from '@xcrong/docx-editor-core/layout-engine';
 import type { Layout } from '@xcrong/docx-editor-core/layout-engine';
 import { findWordBoundaries } from '@xcrong/docx-editor-core/utils';
 
 /**
- * Resolve the painted header/footer instance nearest the viewport center — the
- * one the user is editing. The same HF is painted on every page (shared
- * `r:id`), so the chrome outline must track the active page rather than snap to
- * page one's copy (mirrors core's `getHfDomSnapshot` host pick; #691).
+ * Resolve the painted header/footer instance the user is editing. Prefers
+ * the engaged instance (the dblclick target that opened HF edit mode) when
+ * provided and still connected; otherwise the host nearest the viewport
+ * center. Shared with core's HF snapshot pick via `resolveHfHostEl` (#691,
+ * T28-02 #85) so the chrome outline and the caret/selection overlay agree
+ * on which page's copy is active.
  */
-export function nearestHfHostEl(position: 'header' | 'footer'): HTMLElement | null {
-  const hosts = window.document.querySelectorAll<HTMLElement>(`.layout-page-${position}`);
-  if (hosts.length === 0) return null;
-  const vpCenter = window.innerHeight / 2;
-  let host = hosts[0];
-  let bestDist = Infinity;
-  for (const h of Array.from(hosts)) {
-    const r = h.getBoundingClientRect();
-    const dist = Math.abs((r.top + r.bottom) / 2 - vpCenter);
-    if (dist < bestDist) {
-      bestDist = dist;
-      host = h;
-    }
-  }
-  return host;
+export function nearestHfHostEl(
+  position: 'header' | 'footer',
+  preferredEl?: HTMLElement | null
+): HTMLElement | null {
+  return resolveHfHostEl(position, window.document, preferredEl);
 }
 
 /**

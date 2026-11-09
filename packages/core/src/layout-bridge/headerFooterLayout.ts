@@ -468,19 +468,35 @@ export function invalidateHfDomCache(): void {
   hfDomCache.footer = null;
 }
 
-function getHfDomSnapshot(
+/**
+ * Pick the painted header/footer host the caret/selection overlay must
+ * render on. The same HF doc is painted on every page (shared by `r:id`),
+ * so any painted instance carries the right PM coords — but the overlay
+ * must render on the instance the user is actually editing.
+ *
+ * When the caller knows the engaged instance (e.g. the dblclick target that
+ * opened HF edit mode), it wins outright: the viewport-center heuristic
+ * below can pick a different page's copy — editing a footer on page 2 while
+ * page 1 sits nearest the center drew the highlight on page 1, off-screen,
+ * so the user saw nothing (T28-02 #85). Otherwise fall back to the host
+ * nearest the viewport center.
+ *
+ * @public
+ */
+export function resolveHfHostEl(
   section: 'header' | 'footer',
-  doc: globalThis.Document
-): HfDomSnapshot | null {
-  // The same HF doc is painted on every page (shared by `r:id`), so any painted
-  // instance carries the right PM coords. But the caret/selection overlay must
-  // render on the instance the user is actually editing — pick the host nearest
-  // the viewport center. Always taking the first (page 1) host drew the overlay
-  // on page 1 even while editing a header/footer on a later page, so the user
-  // saw no caret or highlight where they were typing (#691 footer).
-  // Scoping to `.layout-page-${section}` keeps the header and footer from
-  // shadowing each other (#671).
-  const hosts = doc.querySelectorAll<HTMLElement>(`.layout-page-${section}`);
+  doc: globalThis.Document,
+  preferredHost?: HTMLElement | null
+): HTMLElement | null {
+  const selector = `.layout-page-${section}`;
+  const engaged =
+    preferredHost && preferredHost.isConnected
+      ? preferredHost.matches(selector)
+        ? preferredHost
+        : preferredHost.closest(selector)
+      : null;
+  if (engaged) return engaged as HTMLElement;
+  const hosts = doc.querySelectorAll<HTMLElement>(selector);
   if (hosts.length === 0) return null;
   const win = doc.defaultView;
   const vpCenter = win ? win.innerHeight / 2 : 0;
@@ -494,6 +510,16 @@ function getHfDomSnapshot(
       host = h;
     }
   }
+  return host;
+}
+
+function getHfDomSnapshot(
+  section: 'header' | 'footer',
+  doc: globalThis.Document,
+  preferredHost?: HTMLElement | null
+): HfDomSnapshot | null {
+  const host = resolveHfHostEl(section, doc, preferredHost);
+  if (!host) return null;
   // Reuse the cached span lists only when they belong to the same painted host
   // (and it's still live). The host changes as the user scrolls between pages,
   // so a section-only cache would keep resolving against the wrong instance.
@@ -531,12 +557,13 @@ function getHfDomSnapshot(
 export function computeHfCaretRectFromView(
   view: EditorView,
   section: 'header' | 'footer',
-  doc: globalThis.Document = globalThis.document
+  doc: globalThis.Document = globalThis.document,
+  preferredHost?: HTMLElement | null
 ): { top: number; left: number; height: number } | null {
   const sel = view.state.selection;
   if (!sel.empty) return null;
   const pmPos = sel.head;
-  const snapshot = getHfDomSnapshot(section, doc);
+  const snapshot = getHfDomSnapshot(section, doc, preferredHost);
   if (!snapshot) return null;
   const { host, spans } = snapshot;
   for (const span of spans) {
@@ -661,7 +688,8 @@ export function computeHfCaretRectFromView(
 export function computeHfSelectionRectsFromView(
   view: EditorView,
   section: 'header' | 'footer',
-  doc: globalThis.Document = globalThis.document
+  doc: globalThis.Document = globalThis.document,
+  preferredHost?: HTMLElement | null
 ): Array<{ top: number; left: number; width: number; height: number }> {
   const sel = view.state.selection;
   if (sel.empty) return [];
@@ -673,7 +701,7 @@ export function computeHfSelectionRectsFromView(
   // for the section shares the same PM coord space (only one HF doc, painted N
   // times for the N pages), so a single host's spans suffice for selection
   // rects.
-  const snapshot = getHfDomSnapshot(section, doc);
+  const snapshot = getHfDomSnapshot(section, doc, preferredHost);
   if (!snapshot) return out;
   const { host, spans } = snapshot;
   for (const spanEl of spans) {

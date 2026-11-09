@@ -55,6 +55,14 @@ export interface HfEditState {
   rId: string | null;
   headerFooter: HeaderFooter | null;
   targetRect: { top: number; left: number; width: number; height: number } | null;
+  /**
+   * The painted header/footer instance the user engaged (dblclick target).
+   * The same HF doc is painted on every page, so the caret/selection
+   * overlay and chrome outline resolve against this instance instead of
+   * guessing by viewport proximity (T28-02 #85: footer on a later page).
+   * Null when unknown; resolvers fall back to the center heuristic.
+   */
+  hostEl: HTMLElement | null;
 }
 
 export interface ScrollPageInfo {
@@ -472,6 +480,9 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
       position,
       rId,
       headerFooter: hf,
+      // The engaged painted instance — overlays resolve against this, not
+      // whichever copy sits nearest the viewport center (T28-02 #85).
+      hostEl: hfEl,
       targetRect: {
         top: (elRect.top - vpRect.top + viewport.scrollTop) / z,
         left: (elRect.left - vpRect.left + viewport.scrollLeft) / z,
