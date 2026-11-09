@@ -44,39 +44,39 @@
 
 Per Decision 17, three test trees: `tests/` (React-only), `tests/vue/` (Vue-only), `tests/parity/` (cross-adapter contract).
 
-- [ ] 7.1 Create `tests/parity/` and `tests/vue/` directories. `tests/` stays React-only as today
-- [ ] 7.2 Copy spec patterns from `tests/` into `tests/parity/<feature>.spec.ts`, parameterized by adapter route (`/react/` vs `/vue/`); reframe to test cross-adapter contract, not React-specific behaviour
+- [x] 7.1 Done as `e2e/tests/parity/` (forEachAdapter specs + `smoke/`) and `e2e/tests/vue/` (30 specs). `e2e/tests/` top level stays React-only (chromium project). #97
+- [x] 7.2 Done via `e2e/tests/parity/parity-fixture.ts` `forEachAdapter` (emits `[react]`/`[vue]` titles, boots both demo servers). #97
 - [ ] 7.3 Move shared DOCX fixtures into `examples/parity/fixtures/`; update both runner suites to read from there
 - [ ] 7.4 Wire `tests/parity/__screenshots__/<feature>/{react,vue}.png` baselines for visual regressions
-- [ ] 7.5 Add scripts: `bun run test:e2e:react` (runs `tests/`), `bun run test:e2e:vue` (runs `tests/vue/`), `bun run test:e2e:parity` (runs `tests/parity/`), `bun run test:e2e:full` (all three)
-- [ ] 7.6 CI gating: `parity` runs on every PR; `react` runs on PRs touching `packages/react/` or `packages/agent-use/src/react/`; `vue` runs on PRs touching `packages/vue/` or `packages/agent-use/src/vue/`
-- [ ] 7.7 Run the parity suite locally against `1-0-0.docx-editor.dev` (or local `bun run dev:parity`); file issues for every failure
-- [ ] 7.8 **Matrix-update CI check**: add a script `scripts/check-parity-matrix.mjs` that runs in CI and fails if a PR modifies any path under `packages/{react,vue}/src/components/` or `packages/agent-use/src/{react,vue}/` without also modifying `specs/vue-react-parity/spec.md` or `notes/omitted-from-matrix.md`
+- [x] 7.5 Done in root `package.json`: `test:e2e:react` (chromium) / `test:e2e:vue` / `test:e2e:parity` (`NO_NUXT=1 --project=parity`) / `test:e2e:full`. #97
+- [x] 7.6 Done via `.github/workflows/parity.yml` (`parity-e2e` on every PR; `react-e2e`/`vue-e2e` path-filtered per §7.6). #97
+- [x] 7.7 Done in #97 (45–46 passed; 2 pre-existing Vue failures owned by #85) and closed out by #100 (49/49 `--project=parity` green).
+- [x] 7.8 Done via `scripts/check-parity-matrix.mjs`, wired into the CI build job. #97
 
 ## 8. Per-feature parity work (one task per partial row in the matrix)
 
-- [ ] 8.1 Mount + render — verify reactivity audit's findings are addressed; matrix row done
-- [ ] 8.2 Bold/italic/underline — confirm shortcut keys + toolbar state binding
-- [ ] 8.3 Alignment — left/center/right/justify
-- [ ] 8.4 Lists — bullet/numbered, indent/outdent
-- [ ] 8.5 Fonts — family + size dropdowns
-- [ ] 8.6 Colors — text + highlight, color picker dialog
-- [ ] 8.7 Tables — insert, delete, merge, split, borders
-- [ ] 8.8 Find / replace — dialog wiring + match navigation
-- [ ] 8.9 Hyperlinks — web URLs and bookmarks
-- [ ] 8.10 Images — insert, resize, replace, properties dialog (cherry-pick #245's image fix)
-- [ ] 8.11 Page setup — size, margins, orientation
-- [ ] 8.12 Printing — browser print handoff
-- [ ] 8.13 Comments — sidebar, inline markers, replies
-- [ ] 8.14 Tracked changes — accept / reject (NOT in #245; build from React reference)
-- [ ] 8.15 Keyboard shortcuts dialog — cross-check shortcuts list
-- [ ] 8.16 AI context menu — verify menu surface
-- [ ] 8.17 Document outline — heading list + scrollTo
-- [ ] 8.18 i18n — load `de.json`, `pl.json`, etc. via the prop and verify lookups
-- [ ] 8.19 Header / footer editing — InlineHeaderFooterEditor parity
-- [ ] 8.20 Symbol insertion — unicode picker
-- [ ] 8.21 Footnotes / endnotes — numbering, position
-- [ ] 8.22 Paste special — keep-formatting vs plain-text
+- [x] 8.1 Mount + render — matrix row done/done; `e2e/tests/parity/smoke/mount.spec.ts` + `screenshot-parity.spec.ts` green both adapters. #100
+- [x] 8.2 Bold/italic/underline — matrix row done/done; `e2e/tests/parity/smoke/toggle-bold.spec.ts` (shared core command path). #100
+- [x] 8.3 Alignment — matrix row done/done; `e2e/tests/alignment.spec.ts`, Vue dispatches shared core commands. #100
+- [x] 8.4 Lists — matrix row done/done; `e2e/tests/lists.spec.ts` (bullet/numbered + indent/outdent via shared core). #100
+- [x] 8.5 Fonts — matrix row done/done; `e2e/tests/fonts.spec.ts` (+ `e2e/tests/vue/fonts.spec.ts`), shared formatting commands. #100
+- [x] 8.6 Colors — matrix row done/done; `e2e/tests/colors.spec.ts`, shared formatting commands. #100
+- [x] 8.7 Tables — matrix row done/done; `e2e/tests/tables.spec.ts` (insert/edit/delete, merge/split, borders). #100
+- [x] 8.8 Find / replace — matrix row done/done (dialog wiring + match navigation via shared i18n keys). #100
+- [x] 8.9 Hyperlinks — matrix row done/done; `e2e/tests/hyperlinks.spec.ts` (web/bookmark tabs, validation). #100
+- [x] 8.10 Images — matrix row done/done (8-handle overlay, rotation, drag ghost, aspect-lock, properties menu). #100
+- [x] 8.11 Page setup — matrix row done/done (dialog wired to section properties + shared commands). #100
+- [x] 8.12 Printing — matrix row done/done (browser print handoff via Vue toolbar/menu path). #100
+- [x] 8.13 Comments — matrix row done/done; `e2e/tests/parity/smoke/agent-tool-call.spec.ts` (sidebar, markers, replies, bridge insertion). #100 fixed Vue save-after-load liveness
+- [x] 8.14 Tracked changes — matrix row done/done (sidebar cards, accept/reject via shared core; built from React reference, no #245 image-fix carryover needed). #100
+- [x] 8.15 Keyboard shortcuts dialog — matrix row done/done (cross-checked list, localized via shared i18n keys). #100
+- [x] 8.16 AI context menu — matrix row done/done via `@xcrong/docx-editor-agents/vue`. #352
+- [x] 8.17 Document outline — matrix row done/done (heading list + scrollTo navigation). #100
+- [x] 8.18 i18n — matrix row done/done (Vue `i18n` prop, reactive shared-locale fallback; `e2e/tests/vue/i18n-locale.spec.ts`). #100
+- [x] 8.19 Header / footer editing — matrix row done/done (InlineHeaderFooterEditor parity). #100 fixed HF host resolution (`resolveHfHostEl`) + footer scroll pinning
+- [x] 8.20 Symbol insertion — matrix row done/done (unicode picker, shared i18n keys). #100
+- [x] 8.21 Footnotes / endnotes — matrix row done/done (numbering, position, locale-reactive labels). #100
+- [x] 8.22 Paste special — matrix row done/done (dialog + paste-mode handling, shared i18n keys). #100
 
 ## 8b. Parity gate infrastructure (defense in depth)
 
@@ -101,9 +101,9 @@ Per Decisions 20 and 21. New scripts live in `scripts/`. Wire pre-commit/pre-pus
 
 ### 8b.4. Snapshot parity (Document round-trip)
 
-- [ ] 8b.9 Write `tests/parity/snapshot/document-roundtrip.test.ts` — runs in `bun test` (unit-level, no browser); imports both adapter engines, applies a deterministic edit sequence to each, deep-equals the resulting `Document` model
-- [ ] 8b.10 Use `examples/parity/fixtures/snapshot-fixtures.json` (a list of `[fixture, edits]` pairs) so the test corpus grows by adding entries to the JSON, no new test files
-- [ ] 8b.11 Add to pre-commit hook (it's fast — runs in <10s)
+- [x] 8b.9 Done at `packages/core/src/__tests__/document-roundtrip-parity.test.ts` (unit-level `bun test`, deterministic edit sequences + committed-digest match) instead of the literal `tests/parity/snapshot/` path. #97
+- [x] 8b.10 Done at `examples/parity/fixtures/snapshot-corpus.json` (+ `snapshot-digests.json`) — corpus grows via JSON entries. #97
+- [x] 8b.11 Done: pre-commit hook runs `bun run check:snapshot-parity` (fast, <1s) alongside the other parity gates. #97
 
 ### 8b.5. Smoke parity E2E (on-demand tool)
 
@@ -113,8 +113,8 @@ Per Decisions 20 and 21. New scripts live in `scripts/`. Wire pre-commit/pre-pus
 
 ### 8b.6. Bundle size parity
 
-- [ ] 8b.15 Write `scripts/parity-bundle-size.mjs` — gzip both `packages/react/dist/index.mjs` and `packages/vue/dist/index.mjs`, compute relative diff, write to `notes/bundle-size/<sha>.json`. Fail if diff >25% AND the larger side grew vs previous main
-- [ ] 8b.16 Wire into CI as a separate job (informational on PRs that don't touch either package)
+- [x] 8b.15 Done as `scripts/check-parity-bundle-size.mjs` + `scripts/parity/bundle-size.baseline.json` (gzip both dist bundles; fail iff gap >25% AND the larger side grew vs baseline). #97
+- [x] 8b.16 Done: CI build job runs `check:parity-bundle-size` after `build:packages` (informational on PRs that don't touch either package). #97
 
 ### 8b.7. Pair-edit dev mode
 
