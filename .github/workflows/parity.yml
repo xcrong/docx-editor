@@ -93,7 +93,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: React-only suite
-        run: npx playwright test --project=chromium --timeout=30000
+        run: NO_NUXT=1 npx playwright test --project=chromium --timeout=30000
 
       - name: Upload failure screenshots
         if: failure()
@@ -124,7 +124,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Vue-only suite
-        run: npx playwright test --project=vue --timeout=30000
+        run: NO_NUXT=1 npx playwright test --project=vue --timeout=30000
 
       - name: Upload failure screenshots
         if: failure()
