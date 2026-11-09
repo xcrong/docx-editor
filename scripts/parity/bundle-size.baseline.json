@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "updatedFor": "51a781dc",
+  "entries": {
+    "react": "packages/react/dist/index.mjs",
+    "vue": "packages/vue/dist/index.js"
+  },
+  "gzip": {
+    "react": 59410,
+    "vue": 39838
+  }
+}

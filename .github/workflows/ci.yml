@@ -63,6 +63,9 @@ jobs:
       - name: i18n locale + typed-exports sync check
         run: bun run i18n:validate
 
+      - name: Snapshot parity check
+        run: bun run check:snapshot-parity
+
       - name: Run tests
         run: bun test
 
@@ -73,6 +76,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.3
+        with:
+          # The parity-matrix gate diffs the PR against its base.
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -95,6 +101,12 @@ jobs:
 
       - name: i18n per-locale bundle size check
         run: bun run check:i18n-bundle-size
+
+      - name: Adapter bundle-size parity check
+        run: bun run check:parity-bundle-size
+
+      - name: Parity matrix freshness check
+        run: bun run check:parity-matrix
 
       - name: Docs JSON generation (smoke test)
         # Not committed — `docs/json/` is gitignored. Run as a smoke test

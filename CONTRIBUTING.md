@@ -114,7 +114,18 @@ The editor ships first-party adapters for React (`packages/react`) and Vue (`pac
 
 **When you touch layout, parsing, or rendering logic, put it in core, not in an adapter.** If you copy a 30-line helper from React to Vue, you've created a divergence trap. The footnote convergence loop (`stabilizeFootnoteLayout` in `packages/core/src/layout-bridge/footnoteLayout.ts`) is the canonical example: one helper, both adapters call it.
 
-Parity smoke tests live under `e2e/tests/parity/smoke/` and run each spec against both demos. Add one when you fix a bug that could plausibly affect rendering on either side.
+Before pushing parity-affecting changes, run the smoke suite on demand (it's
+not auto-triggered — pre-push hooks stay fast; CI runs the same script as a
+backstop):
+
+```bash
+bun run test:e2e:parity:smoke
+```
+
+The parity specs boot both adapter demos themselves (React on 5173, Vue on 5174) and reuse them when they're already running (`bun run dev:react` +
+`bun run dev:vue` in separate terminals). The full cross-adapter suite is
+`bun run test:e2e:parity`; snapshot and bundle gates are
+`bun run check:snapshot-parity` and `bun run check:parity-bundle-size`.
 
 ## Reporting Bugs
 

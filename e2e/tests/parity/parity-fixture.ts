@@ -30,7 +30,7 @@ export interface AdapterFixture {
   readySelector: string;
 }
 
-const ADAPTERS: AdapterFixture[] = [
+export const ADAPTERS: AdapterFixture[] = [
   {
     name: 'react',
     baseUrl: 'http://localhost:5173',
@@ -95,6 +95,12 @@ export async function openEditor(
 /**
  * Declare a test once, run it once per adapter. Each generated test gets
  * `[<adapter>]` appended to its title.
+ *
+ * On failure an explicit screenshot is captured to the test's output
+ * directory as `<adapter>-failure.png` (alongside Playwright's own
+ * only-on-failure screenshot). The output path embeds the test title —
+ * which carries the `[react]` / `[vue]` tag — so a failing artifact is
+ * always attributable to its adapter without opening the report.
  */
 export function forEachAdapter(
   title: string,
@@ -104,7 +110,18 @@ export function forEachAdapter(
     // First arg must literally destructure for Playwright's fixture
     // detection: `(args) =>` would fail "First argument must use the
     // object destructuring pattern".
-    test(`${title} [${adapter.name}]`, ({ page }) => body(adapter, { page }));
+    test(`${title} [${adapter.name}]`, async ({ page }, testInfo) => {
+      try {
+        await body(adapter, { page });
+      } catch (error) {
+        // The page may already be dead (navigation failure, crash) — never
+        // let the attribution screenshot mask the original error.
+        await page
+          .screenshot({ path: testInfo.outputPath(`${adapter.name}-failure.png`) })
+          .catch(() => {});
+        throw error;
+      }
+    });
   }
 }
 

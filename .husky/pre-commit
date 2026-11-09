@@ -19,6 +19,17 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# Snapshot parity gate — fast (<1s). Re-runs the deterministic
+# parse -> edit -> save pipeline for each corpus entry and fails on digest
+# drift vs examples/parity/fixtures/snapshot-digests.json. Regen with
+# `bun run snapshot:update` when a core change intentionally alters output.
+echo "Running snapshot parity check..."
+bun run check:snapshot-parity
+if [ $? -ne 0 ]; then
+  echo "Snapshot parity failed. Run 'bun run snapshot:update' if the drift is intentional, then commit the updated digests."
+  exit 1
+fi
+
 # API snapshot gate — catches changes to any @public symbol that the
 # committer forgot to regenerate. CI runs the same `api:check`, so failing
 # here saves a round-trip. Fix is `bun run api:extract` then
