@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { Document } from '@xcrong/docx-editor-core/types/document';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import { parseDocx } from '@xcrong/docx-editor-core/docx';
@@ -64,11 +64,6 @@ export function useDocumentLoader({
   // group.
   setDocumentFonts: (fonts: FontOption[]) => void;
 }) {
-  // Monotonically increasing generation counter so a late `parseDocx`
-  // result doesn't overwrite a newer load that started while we were
-  // parsing.
-  const loadGenerationRef = useRef(0);
-
   const loadParsedDocument = useCallback(
     (doc: Document) => {
       resetForNewDocument();
@@ -90,21 +85,20 @@ export function useDocumentLoader({
 
   const loadBuffer = useCallback(
     async (buffer: DocxInput) => {
-      const generation = ++loadGenerationRef.current;
+      const engine = pagedEditorRef.current?.getEngine();
       resetForNewDocument();
       setLoadingState({ isLoading: true, parseError: null });
       try {
-        const doc = await parseDocx(buffer);
-        if (loadGenerationRef.current !== generation) return;
+        const doc = engine ? await engine.load(buffer) : await parseDocx(buffer);
+        if (!doc) return; // stale: a newer load started while parsing
         loadParsedDocument(doc);
       } catch (error) {
-        if (loadGenerationRef.current !== generation) return;
         const message = error instanceof Error ? error.message : 'Failed to parse document';
         setLoadingState({ isLoading: false, parseError: message });
         onError?.(error instanceof Error ? error : new Error(message));
       }
     },
-    [resetForNewDocument, loadParsedDocument, onError, setLoadingState]
+    [resetForNewDocument, loadParsedDocument, onError, setLoadingState, pagedEditorRef]
   );
 
   // React to documentBuffer / document prop changes.

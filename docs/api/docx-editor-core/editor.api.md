@@ -4,9 +4,34 @@
 
 ```ts
 
+import { Command } from 'prosemirror-state';
 import { EditorState } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
+import { MarkSpec } from 'prosemirror-model';
 import { Node as Node_2 } from 'prosemirror-model';
+import { NodeSpec } from 'prosemirror-model';
+import { Plugin as Plugin_2 } from 'prosemirror-state';
+import { Schema } from 'prosemirror-model';
 import { Transaction } from 'prosemirror-state';
+
+// @public
+export function applyScrollRestore(pending: PendingScrollRestore, pagesEl: HTMLElement, scrollParent: HTMLElement): void;
+
+// @public (undocumented)
+export interface BodyStateOptions {
+    // (undocumented)
+    document: Document_2 | null;
+    manager?: ExtensionManager;
+    prefixPlugins?: Plugin_2[];
+    // (undocumented)
+    styles: StyleDefinitions | null | undefined;
+}
+
+// @public
+export function buildPendingScrollRestore(renderPagesKind: RenderPagesUpdateKind, scrollParent: HTMLElement, anchor: ScrollAnchor): PendingScrollRestore;
+
+// @public
+export function captureScrollAnchor(pagesEl: HTMLElement, scrollParent: HTMLElement, headPos: number): ScrollAnchor;
 
 // @public
 export function computeLayout(inputs: ComputeLayoutInputs): LayoutComputation;
@@ -24,7 +49,7 @@ export interface ComputeLayoutInputs {
     // (undocumented)
     finalMargins: PageMargins;
     // (undocumented)
-    finalPageSize: PageSizePx;
+    finalPageSize: PageSizePx$1;
     // (undocumented)
     finalSectionProperties: SectionProperties | null | undefined;
     // (undocumented)
@@ -42,7 +67,7 @@ export interface ComputeLayoutInputs {
     // (undocumented)
     pageGap: number;
     // (undocumented)
-    pageSize: PageSizePx;
+    pageSize: PageSizePx$1;
     // (undocumented)
     sectionProperties: SectionProperties | null | undefined;
     // (undocumented)
@@ -53,8 +78,185 @@ export interface ComputeLayoutInputs {
     theme: Theme | null | undefined;
 }
 
+// @public
+export function createBodyEditorState(options: BodyStateOptions): EditorState;
+
+// @public
+export function createHfEditorState(options: HfStateOptions): EditorState;
+
+// @public
+export function createHfExtensionManager(): ExtensionManager;
+
 // @public (undocumented)
 export function createLayoutScheduler(run: (state: EditorState) => void, scheduleFrame?: (cb: () => void) => number, cancelFrame?: (handle: number) => void): LayoutScheduler;
+
+// @public
+export function createRafFrameScheduler(): FrameScheduler;
+
+// @public
+export function decideSelectiveSave(editorState: EditorState | null, comments: Comment_2[], selective: boolean): SelectiveSaveDecision | undefined;
+
+// @public (undocumented)
+export class DocxEditorEngine {
+    constructor(host: EngineHost);
+    cancelLoads(): void;
+    cancelScheduledLayout(): void;
+    consumePendingScrollRestore(): PendingScrollRestore | null;
+    destroyBodyView(): void;
+    destroyHfViews(): void;
+    // (undocumented)
+    getBodyView(): EditorView | null;
+    // (undocumented)
+    getHfView(rId: string): EditorView | null;
+    // (undocumented)
+    getHfViews(): Map<string, EditorView>;
+    handleHfTransaction(rId: string, view: EditorView, docChanged: boolean): void;
+    handleTransaction(tr: Transaction, newState: EditorState): void;
+    load(buffer: DocxInput): Promise<Document_2 | null>;
+    mountBodyView(hostEl: HTMLElement, document: Document_2 | null): EditorView;
+    run(state: EditorState): LayoutComputation | undefined;
+    save(options?: {
+        selective?: boolean;
+        comments?: Comment_2[];
+    }): Promise<ArrayBuffer | null>;
+    scheduleLayout(state: EditorState): void;
+    syncHfViews(document: Document_2 | null): void;
+    updateBodyViewForDocument(document: Document_2 | null): void;
+}
+
+// @public
+export interface EngineHeaderFooter {
+    // (undocumented)
+    firstFooter: HeaderFooter | null | undefined;
+    // (undocumented)
+    firstHeader: HeaderFooter | null | undefined;
+    // (undocumented)
+    footer: HeaderFooter | null | undefined;
+    // (undocumented)
+    header: HeaderFooter | null | undefined;
+}
+
+// @public
+export interface EngineHost {
+    // (undocumented)
+    cancelFrame?(handle: number): void;
+    computeAnchorPositions?(layout: Layout, blocks: FlowBlock[], measures: Measure[]): Map<string, number> | undefined;
+    // (undocumented)
+    destroyView(view: EditorView): void;
+    getAgent?(): DocumentAgent | null;
+    getBodyExtensionManager?(): ExtensionManager | undefined;
+    // (undocumented)
+    getBodyPrefixPlugins?(): Plugin_2[];
+    getBodyState?(): EditorState | null;
+    getComments?(): Comment_2[];
+    getDocument(): Document_2 | null;
+    getFinalSectionProperties(): SectionProperties | null | undefined;
+    getHeaderFooter(): EngineHeaderFooter;
+    getHfHostEl(): HTMLElement | null;
+    getHfPmDoc(hf: HeaderFooter): Node_2 | null | undefined;
+    // (undocumented)
+    getPageGap(): number;
+    getPagesContainer(): HTMLElement | null;
+    // (undocumented)
+    getResolvedCommentIds(): Set<number> | undefined;
+    getScrollContainer(): HTMLElement | null;
+    getSectionProperties(): SectionProperties | null | undefined;
+    // (undocumented)
+    getStyles(): StyleDefinitions | null | undefined;
+    getSuggestionState?(): {
+        active: boolean;
+        author: string;
+    };
+    getSyncCoordinator(): LayoutSelectionGate | undefined;
+    // (undocumented)
+    getTheme(): Theme | null | undefined;
+    // (undocumented)
+    isReadOnly?(): boolean;
+    measureBlocks(blocks: FlowBlock[], contentWidth: number | number[], pageGeometry?: FloatPageGeometry): Measure[];
+    mountView(hostEl: HTMLElement, state: EditorState, dispatch: (tr: Transaction, view?: EditorView) => void, kind: 'body' | 'hf'): EditorView;
+    // (undocumented)
+    onAnchorPositions?(positions: Map<string, number>): void;
+    // (undocumented)
+    onBodyKeyDown?(view: EditorView, event: KeyboardEvent): boolean;
+    onBodyState?(newState: EditorState, tr: Transaction | null): void;
+    // (undocumented)
+    onBodyViewDestroy?(): void;
+    // (undocumented)
+    onBodyViewReady?(view: EditorView): void;
+    onDecorationsChanged?(): void;
+    onDocumentChanged?(newState: EditorState): void;
+    // (undocumented)
+    onError?(error: unknown): void;
+    onHfDocumentChanged?(rId: string, state: EditorState): void;
+    onHfTransaction?(rId: string, view: EditorView, docChanged: boolean): void;
+    onLayout(layout: Layout, blocks: FlowBlock[], measures: Measure[], lookup: BlockLookup): void;
+    onPaintContainer?(layout: Layout): void;
+    onPainted?(info: EnginePaintedInfo): void;
+    onScrollRestore?(pending: PendingScrollRestore): boolean | void;
+    onSelectionChanged?(newState: EditorState): void;
+    onSelectionTransaction?(newState: EditorState): void;
+    onTotalPages?(total: number): void;
+    // (undocumented)
+    scheduleFrame(cb: () => void): number;
+}
+
+// @public
+export interface EnginePaintedInfo {
+    // (undocumented)
+    layout: Layout;
+    // (undocumented)
+    renderKind: RenderPagesUpdateKind;
+    // (undocumented)
+    state: EditorState;
+}
+
+// @public
+export function enumerateHfSlots(doc: Document_2 | null): HfSlot[];
+
+// @public
+export function findPaintedPmStartAtOrBefore(pages: HTMLElement, pmPos: number): number | null;
+
+// @public (undocumented)
+export interface FrameScheduler {
+    // (undocumented)
+    cancelFrame(handle: number): void;
+    // (undocumented)
+    scheduleFrame(cb: () => void): number;
+}
+
+// @public
+export function getDocumentId(doc: Document_2 | null): string;
+
+// @public
+export type HfPartKind = 'header' | 'footer';
+
+// @public (undocumented)
+export interface HfSlot {
+    // (undocumented)
+    kind: HfPartKind;
+    // (undocumented)
+    rId: string;
+}
+
+// @public (undocumented)
+export interface HfStateOptions {
+    // (undocumented)
+    author: string;
+    // (undocumented)
+    defaultTableStyleId: string | null | undefined;
+    // (undocumented)
+    defaultTabStopTwips: number | null | undefined;
+    // (undocumented)
+    hf: HeaderFooter;
+    // (undocumented)
+    manager: ExtensionManager;
+    // (undocumented)
+    styles: StyleDefinitions | null | undefined;
+    // (undocumented)
+    suggesting: boolean;
+    // (undocumented)
+    theme: Theme | null | undefined;
+}
 
 // @public (undocumented)
 export interface LayoutComputation {
@@ -86,6 +288,23 @@ export interface LayoutComputation {
     watermark: Watermark | undefined;
 }
 
+// @public (undocumented)
+export interface LayoutGeometry {
+    // (undocumented)
+    columns: ColumnLayout | undefined;
+    contentWidth: number;
+    // (undocumented)
+    finalColumns: ColumnLayout | undefined;
+    // (undocumented)
+    finalMargins: PageMargins;
+    // (undocumented)
+    finalPageSize: PageSizePx;
+    // (undocumented)
+    margins: PageMargins;
+    // (undocumented)
+    pageSize: PageSizePx;
+}
+
 // @public
 export interface LayoutScheduler {
     cancel(): void;
@@ -93,7 +312,55 @@ export interface LayoutScheduler {
 }
 
 // @public
+export class LoadGeneration {
+    begin(): number;
+    invalidate(): void;
+    isCurrent(generation: number): boolean;
+}
+
+// @public
 export type MeasureBlocksFn = (blocks: FlowBlock[], contentWidth: number | number[], pageGeometry?: FloatPageGeometry) => Measure[];
+
+// @public
+export interface PageSizePx {
+    // (undocumented)
+    h: number;
+    // (undocumented)
+    w: number;
+}
+
+// @public
+export interface PendingScrollRestore {
+    // (undocumented)
+    domAnchorOffsetInScroller: number;
+    // (undocumented)
+    domAnchorPmStart: number | null;
+    // (undocumented)
+    ratio: number;
+    // (undocumented)
+    renderKind: RenderPagesUpdateKind;
+    // (undocumented)
+    scrollTopSnapshot: number | null;
+}
+
+// @public
+export function reclampIncrementalSnapshot(pending: PendingScrollRestore | null, scrollParent: HTMLElement | null, snapshotAgeMs: number, onlyIfSnapshotJustWritten: boolean): void;
+
+// @public
+export function resolveLayoutGeometry(sectionProperties: SectionProperties | null | undefined, finalSectionProperties: SectionProperties | null | undefined): LayoutGeometry;
+
+// @public (undocumented)
+export interface ScrollAnchor {
+    domAnchorOffsetInScroller: number;
+    domAnchorPmStart: number | null;
+    scrollRestoreRatioPre: number;
+}
+
+// @public (undocumented)
+export interface SelectiveSaveDecision {
+    // (undocumented)
+    selective: SelectiveSaveOptions;
+}
 
 // @public
 export function stripScrollFlag(transaction: Transaction, probeTr: Transaction): void;

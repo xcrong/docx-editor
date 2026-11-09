@@ -19,32 +19,20 @@ import { EditorState, type Transaction, type Plugin } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 
 // Core imports — these all resolve through Vite aliases to packages/core/src/
-import { parseDocx } from '@xcrong/docx-editor-core/docx/parser';
 import {
   getRenderableDocumentFonts,
   getEmbeddedFontFamilies,
 } from '@xcrong/docx-editor-core/utils';
 import type { FontOption } from '@xcrong/docx-editor-core/utils/fontOptions';
-import {
-  toProseDoc,
-  createEmptyDoc,
-  headerFooterToProseDoc,
-  proseDocToBlocks,
-} from '@xcrong/docx-editor-core/prosemirror/conversion';
+import { proseDocToBlocks } from '@xcrong/docx-editor-core/prosemirror/conversion';
 import { fromProseDoc } from '@xcrong/docx-editor-core/prosemirror/conversion/fromProseDoc';
-import { schema, ensureParaIdsInState } from '@xcrong/docx-editor-core/prosemirror';
 import { singletonManager } from '@xcrong/docx-editor-core/prosemirror/schema';
+import { DocumentAgent } from '@xcrong/docx-editor-core/agent';
+import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import {
   createSuggestionModePlugin,
   setSuggestionMode,
-  createDocumentStylesPlugin,
-  createDocumentContextPlugin,
 } from '@xcrong/docx-editor-core/prosemirror/plugins';
-import {
-  ExtensionManager,
-  createStarterKit,
-} from '@xcrong/docx-editor-core/prosemirror/extensions';
-import type { CommandMap } from '@xcrong/docx-editor-core/prosemirror/extensions/types';
 import {
   measureBlocksWithFloats,
   measureParagraph,
@@ -53,24 +41,19 @@ import type {
   FloatingImageZone,
   FloatPageGeometry,
 } from '@xcrong/docx-editor-core/layout-bridge/measuring';
+import { measureTableBlock, resolveHeaderFooter } from '@xcrong/docx-editor-core/layout-bridge';
 import {
-  measureTableBlock,
-  getPageSize,
-  getMargins,
-  getColumns,
-  resolveHeaderFooter,
-} from '@xcrong/docx-editor-core/layout-bridge';
-import {
-  computeLayout,
-  createLayoutScheduler,
-  stripScrollFlag,
+  applyScrollRestore,
+  createRafFrameScheduler,
+  DocxEditorEngine,
 } from '@xcrong/docx-editor-core/editor';
+import type { EngineHost } from '@xcrong/docx-editor-core/editor';
+import type { CommandMap } from '@xcrong/docx-editor-core/prosemirror/extensions/types';
 import {
   DEFAULT_TEXTBOX_MARGINS,
   DEFAULT_TEXTBOX_WIDTH,
   assertExhaustiveFlowBlock,
 } from '@xcrong/docx-editor-core/layout-engine';
-import { renderPages } from '@xcrong/docx-editor-core/layout-painter/renderPage';
 import type {
   FlowBlock,
   Layout,
@@ -80,15 +63,8 @@ import type {
   ImageBlock,
   TextBoxBlock,
 } from '@xcrong/docx-editor-core/layout-engine/types';
-import {
-  buildBlockLookup,
-  enclosingSdtGroupIds,
-  applySdtFocus,
-  type BlockLookup,
-  type FootnoteRenderItem,
-  type RenderPageOptions,
-} from '@xcrong/docx-editor-core/layout-painter';
-import type { Document } from '@xcrong/docx-editor-core/types/document';
+import { enclosingSdtGroupIds, applySdtFocus } from '@xcrong/docx-editor-core/layout-painter';
+import type { Document, HeaderFooter } from '@xcrong/docx-editor-core/types/document';
 import type { LayoutSelectionGate } from '@xcrong/docx-editor-core/prosemirror';
 
 // ProseMirror CSS — must be imported for the hidden editor to work
@@ -110,9 +86,9 @@ const DEFAULT_PAGE_GAP = 24;
 // HELPERS
 // ============================================================================
 
-// `getPageSize`, `getMargins`, `resolveHeaderFooter` live in
-// `@xcrong/docx-editor-core/layout-bridge` so React and Vue agree on
-// twips→px math + HF lookup. Imported at the top of this file.
+// `resolveHeaderFooter` lives in `@xcrong/docx-editor-core/layout-bridge`
+// so React and Vue agree on HF lookup; `resolveLayoutGeometry` (used by the
+// engine) agrees on twips→px math.
 
 /**
  * Block measurement for the Vue harness. Two-pass HF measurement is still
@@ -278,6 +254,11 @@ export interface UseDocxEditorReturn {
   ) => void;
   /** Publish a fresh Document object (used by HF materialisation). */
   setDocument: (doc: Document) => void;
+  /**
+   * Provide the adapter-owned comment list for `save()`. Falls back to
+   * the document model when unset.
+   */
+  setSaveCommentsProvider: (provider: (() => Comment[]) | null) => void;
 }
 
 export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorReturn {
@@ -321,105 +302,52 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   // Layout pipeline
   // ========================================================================
 
-  function runLayoutPipeline(state: EditorState) {
-    const container = pagesContainer.value;
-    if (!container || !document.value) return;
-    const layoutSeq = syncCoordinator?.getStateSeq() ?? 0;
-    syncCoordinator?.onLayoutStart();
-
-    const body = document.value.package?.document;
-    // Initial geometry comes from the FIRST section's properties; the trailing
-    // section uses `finalSectionProperties`. Mirrors React's PagedEditor split
-    // so multi-section docs paginate the lead pages with the correct margins.
+  // Section split the engine derives geometry from: the body pages use the
+  // FIRST section's properties, the trailing section uses
+  // `finalSectionProperties`. Mirrors React's PagedEditor split so
+  // multi-section docs paginate the lead pages with the correct margins.
+  function currentSectionProperties() {
+    const body = document.value?.package?.document;
     const initialSp = body?.sections?.[0]?.properties ?? body?.finalSectionProperties ?? null;
     const finalSp = body?.finalSectionProperties ?? initialSp;
-    const pageSize = getPageSize(initialSp);
-    const margins = getMargins(initialSp);
-    const finalPageSize = getPageSize(finalSp);
-    const finalMargins = getMargins(finalSp);
-    const columns = getColumns(initialSp);
-    const finalColumns = getColumns(finalSp);
-    const contentWidth = pageSize.w - margins.left - margins.right;
-    const theme = document.value.package?.theme ?? null;
-    const styles = document.value.package?.styles ?? null;
+    return { initialSp, finalSp };
+  }
+  // rAF frame source for the engine's coalescer (step 2).
+  const frameScheduler = createRafFrameScheduler();
 
-    try {
-      // Steps 1-5 (blocks → measure → HF resolve → margin extend → layout →
-      // footnote items) are the shared compute pass in core/editor. Paint +
-      // container styling + SDT focus stay here. Routing through the same
-      // `computeLayout` as React keeps the adapters in lockstep and gives Vue
-      // column / per-block-width support it lacked.
+  // Adapter-owned comment list provider (set by DocxEditor.vue from its
+  // `comments` ref). Falls back to the document model's comments.
+  let saveCommentsProvider: (() => Comment[]) | null = null;
+
+  const engineHost: EngineHost = {
+    getDocument: () => document.value,
+    getStyles: () => document.value?.package?.styles ?? null,
+    getTheme: () => document.value?.package?.theme ?? null,
+    getSectionProperties: () => currentSectionProperties().initialSp,
+    getFinalSectionProperties: () => currentSectionProperties().finalSp,
+    getHeaderFooter: () => {
+      const { initialSp } = currentSectionProperties();
       const { header, footer, firstHeader, firstFooter } = resolveHeaderFooter(
         document.value,
         initialSp
       );
-      const {
-        blocks,
-        measures,
-        layout: newLayout,
-        headerContentForRender,
-        footerContentForRender,
-        firstPageHeaderForRender,
-        firstPageFooterForRender,
-        hasTitlePg,
-        watermark,
-        headerDistancePx,
-        footerDistancePx,
-        pageBorders,
-        footnotesByPage,
-      } = computeLayout({
-        state,
-        document: document.value,
-        pageSize,
-        margins,
-        columns,
-        finalPageSize,
-        finalMargins,
-        finalColumns,
-        pageGap,
-        contentWidth,
-        theme,
-        styles,
-        sectionProperties: initialSp,
-        finalSectionProperties: finalSp,
-        headerContent: header,
-        footerContent: footer,
-        firstPageHeaderContent: firstHeader,
-        firstPageFooterContent: firstFooter,
-        measureBlocks,
-        getHfPmDoc: (hf) => getHfPmView(hf)?.state.doc ?? null,
-      });
-
+      return { header, footer, firstHeader, firstFooter };
+    },
+    getPageGap: () => pageGap,
+    getResolvedCommentIds: () => undefined,
+    getHfPmDoc: (hf) => getHfPmView(hf)?.state.doc ?? null,
+    measureBlocks,
+    getSyncCoordinator: () => syncCoordinator,
+    getPagesContainer: () => pagesContainer.value,
+    // The Vue pages container scrolls itself (overflowY is set to auto on
+    // every paint), so it is its own scroll parent.
+    getScrollContainer: () => pagesContainer.value,
+    onLayout: (newLayout) => {
       layout.value = newLayout;
-
-      // Step 6: Build block lookup and paint
-      const blockLookup = buildBlockLookup(blocks, measures);
-
-      const pageOptions: RenderPageOptions & {
-        pageGap?: number;
-        pageBackground?: string;
-        showShadow?: boolean;
-        blockLookup?: BlockLookup;
-        footnotesByPage?: Map<number, FootnoteRenderItem[]>;
-      } = {
-        pageGap,
-        showShadow: true,
-        pageBackground: 'var(--doc-page-bg, #ffffff)',
-        blockLookup,
-        theme,
-        headerContent: headerContentForRender,
-        footerContent: footerContentForRender,
-        firstPageHeaderContent: firstPageHeaderForRender,
-        firstPageFooterContent: firstPageFooterForRender,
-        titlePg: hasTitlePg,
-        headerDistance: headerDistancePx,
-        footerDistance: footerDistancePx,
-        pageBorders,
-        watermark,
-        footnotesByPage,
-      };
-      renderPages(newLayout.pages, container, pageOptions);
-
+    },
+    onPaintContainer: () => {
+      const container = pagesContainer.value;
+      if (!container) return;
       // renderPages sets display:flex on the container — fix scrolling
       container.style.overflowY = 'auto';
       container.style.minHeight = '0';
@@ -427,24 +355,157 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       for (const child of Array.from(container.children)) {
         (child as HTMLElement).style.flexShrink = '0';
       }
-      // Keep a content control's boundary visible while the caret is inside it
-      // (Word-style focus); re-applied here so it survives every re-paint.
-      applySdtFocus(
-        container,
-        enclosingSdtGroupIds(state.doc, state.selection.from, state.selection.to)
-      );
-    } catch (err) {
-      console.error('[useDocxEditor] Layout pipeline error:', err);
-      onError?.(err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      syncCoordinator?.onLayoutComplete(layoutSeq);
-    }
+    },
+    // Vue applies scroll-restore synchronously post-paint (no post-commit
+    // effect like React's useLayoutEffect) and the engine drops its copy.
+    onScrollRestore: (pending) => {
+      const container = pagesContainer.value;
+      if (!container) return false;
+      applyScrollRestore(pending, container, container);
+      return true;
+    },
+    onError: (error) => {
+      console.error('[useDocxEditor] Layout pipeline error:', error);
+      onError?.(error instanceof Error ? error : new Error(String(error)));
+    },
+    // Transaction loop (step 3): the engine sequences, schedules, and
+    // renders; these hooks keep Vue-owned writeback + chrome in place.
+    onDocumentChanged: (newState) => {
+      // Snapshot marks at cursor for reactive toolbar state. Re-layout on
+      // doc changes — coalesced so a burst of keystrokes lays out once per
+      // frame (the selection overlay waits via `syncCoordinator`).
+      try {
+        if (document.value) {
+          const updatedDoc = fromProseDoc(newState.doc, document.value);
+          document.value = updatedDoc;
+          agentRef.current = DocumentAgent.fromDocument(updatedDoc);
+          onChange?.(updatedDoc);
+        }
+      } catch (err) {
+        console.error('[useDocxEditor] fromProseDoc error:', err);
+      }
+    },
+    onSelectionTransaction: (newState) => {
+      // Selection-only moves don't relayout, so update content-control
+      // focus here too; relayouts re-apply it from runLayoutPipeline.
+      const pagesEl = pagesContainer.value;
+      if (pagesEl) {
+        applySdtFocus(
+          pagesEl,
+          enclosingSdtGroupIds(newState.doc, newState.selection.from, newState.selection.to)
+        );
+      }
+    },
+    onSelectionChanged: () => {
+      onSelectionUpdate?.();
+    },
+    getBodyState: () => editorState.value,
+    onHfDocumentChanged: (rId, hfState) => {
+      // Writeback: sync the HF view's doc back into
+      // `Document.package.headers[rId].content` (or `.footers[rId].content`)
+      // so `save()` reads the latest HF content.
+      const pkg = document.value?.package;
+      if (!pkg) return;
+      const isHeader = pkg.headers?.has(rId) ?? false;
+      const bag = isHeader ? pkg.headers : pkg.footers;
+      const hf = bag?.get(rId);
+      if (hf) {
+        hf.content = proseDocToBlocks(hfState.doc);
+        hf.verbatimXml = undefined;
+      }
+    },
+    onHfTransaction: (rId, view, docChanged) => {
+      onHfTransactionRef.value?.(rId, view, docChanged);
+    },
+    scheduleFrame: frameScheduler.scheduleFrame,
+    cancelFrame: frameScheduler.cancelFrame,
+    // -- view lifecycle (step 4): the engine owns mount/teardown +
+    // dispatch routing; this host supplies framework-specific
+    // construction (body chrome) and the off-screen HF container.
+    mountView: (hostEl, state, dispatch, kind) => {
+      if (kind === 'body') {
+        return new EditorView(hostEl, {
+          state,
+          editable: () => !unref(readOnly),
+          // Keeps `overflow-anchor` on the PM root across outer-deco sync.
+          attributes: { style: 'overflow-anchor: none' },
+          dispatchTransaction(this: EditorView, transaction: Transaction) {
+            dispatch(transaction, this);
+          },
+          // Paginated layer owns scroll; never let PM scroll ancestors.
+          handleScrollToSelection: () => true,
+          // Prevent focus handling from interfering with visual layer.
+          handleDOMEvents: { focus: () => false, blur: () => false },
+        });
+      }
+      return new EditorView(hostEl, {
+        state,
+        dispatchTransaction(this: EditorView, transaction: Transaction) {
+          dispatch(transaction, this);
+        },
+      });
+    },
+    destroyView: (view) => {
+      view.destroy();
+    },
+    getHfHostEl: () => ensureHfHost(),
+    getBodyExtensionManager: () => mgr,
+    getBodyPrefixPlugins: () => [
+      createSuggestionModePlugin(unref(editorMode) === 'suggesting', unref(author) ?? 'User'),
+      ...externalPlugins,
+    ],
+    isReadOnly: () => !!unref(readOnly),
+    onBodyState: (newState) => {
+      editorState.value = newState;
+    },
+    onBodyViewReady: (view) => {
+      editorState.value = view.state;
+      isReady.value = true;
+      // Initial layout + first paint request, mirroring the old
+      // createEditorView tail. Runs synchronously inside mountBodyView,
+      // the same point the old code laid out (pre-await, post-mount).
+      runLayoutPipeline(view.state);
+      syncCoordinator?.requestRender();
+      // Auto-focus the hidden ProseMirror so the user can start typing
+      // immediately, without first clicking into the page. Mirrors React's
+      // PagedEditor.handleEditorViewReady. rAF ensures the DOM is painted.
+      if (!unref(readOnly)) {
+        requestAnimationFrame(() => {
+          view.focus();
+        });
+      }
+    },
+    getSuggestionState: () => ({
+      active: unref(editorMode) === 'suggesting',
+      author: unref(author) ?? 'User',
+    }),
+    getAgent: () => agentRef.current,
+    getComments: () =>
+      saveCommentsProvider?.() ?? document.value?.package?.document?.comments ?? [],
+  };
+  const engine = new DocxEditorEngine(engineHost);
+
+  const agentRef: { current: DocumentAgent | null } = { current: null };
+  function syncAgent() {
+    agentRef.current = document.value ? DocumentAgent.fromDocument(document.value) : null;
   }
 
-  // rAF-coalescing layout scheduler (shared with React via core). Body
-  // doc-change transactions schedule through this so a burst of keystrokes
-  // lays out once per frame instead of synchronously per keystroke.
-  const layoutScheduler = createLayoutScheduler(runLayoutPipeline);
+  function runLayoutPipeline(state: EditorState) {
+    const container = pagesContainer.value;
+    if (!container || !document.value) return;
+    const computation = engine.run(state);
+    if (!computation) return;
+    // Keep a content control's boundary visible while the caret is inside it
+    // (Word-style focus); re-applied here so it survives every re-paint.
+    applySdtFocus(
+      container,
+      enclosingSdtGroupIds(state.doc, state.selection.from, state.selection.to)
+    );
+  }
+
+  // Explicit refresh (`reLayout` below: page setup, zoom) stays synchronous —
+  // callers read the fresh layout right after, unlike the coalesced
+  // transaction path which settles next frame. Step 2 decision.
 
   // ========================================================================
   // ProseMirror setup
@@ -453,45 +514,12 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   function createEditorView() {
     const host = hiddenContainer.value;
     if (!host) return;
-
-    const docStyles = document.value?.package?.styles;
-    const doc = document.value
-      ? toProseDoc(document.value, { styles: docStyles ?? undefined })
-      : createEmptyDoc();
-
-    // Suggestion-mode plugin is registered inactive; `setSuggestionMode()`
-    // toggles its `active` state via PluginKey meta. Mirrors React's
-    // mount-once-and-toggle pattern (DocxEditor.tsx createSuggestionModePlugin).
-    const suggestionPlugin = createSuggestionModePlugin(false);
-    // Expose the document's styles to style-aware commands (e.g. the Enter
-    // handler's `w:next` switch from heading to body text). Mirrors React's
-    // HiddenProseMirror createInitialState.
-    const styleResolverPlugin = createDocumentStylesPlugin(docStyles);
-    // Document context (theme + settings `w:defaultTableStyle`) for the
-    // table-insert command's default-table-style adoption.
-    const documentContextPlugin = createDocumentContextPlugin({
-      theme: document.value?.package?.theme ?? null,
-      defaultTableStyleId: document.value?.package?.settings?.defaultTableStyle ?? null,
-    });
-    const plugins: Plugin[] = [
-      suggestionPlugin,
-      ...externalPlugins,
-      ...(mgr.getPlugins() ?? []),
-      styleResolverPlugin,
-      documentContextPlugin,
-    ];
-
-    // Give every paragraph a paraId up front (docs without `w14:paraId` ship
-    // none), so block ids / agent scope work before the first edit — the
-    // allocator plugin's appendTransaction never fires on create (#738).
-    const state = ensureParaIdsInState(
-      EditorState.create({
-        doc,
-        schema: mgr.getSchema(),
-        plugins,
-      })
-    );
-    editorState.value = state;
+    // State construction, view construction, and dispatch routing live in
+    // the engine (step 4); initial layout + autofocus ride through
+    // `onBodyViewReady`, which fires synchronously inside the mount.
+    const view = engine.mountBodyView(host, document.value);
+    editorView.value = view;
+    editorState.value = view.state;
 
     // Sync the cached host Document with the just-allocated paraIds so
     // getDocument() exposes them before the first edit (#746). The allocation
@@ -503,86 +531,18 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     // comment ops rely on.
     if (document.value) {
       try {
-        document.value = fromProseDoc(state.doc, document.value);
+        document.value = fromProseDoc(view.state.doc, document.value);
       } catch (err) {
         console.error('[useDocxEditor] paraId cache sync error:', err);
       }
     }
-
-    const view = new EditorView(host, {
-      state,
-      editable: () => !unref(readOnly),
-      dispatchTransaction(transaction: Transaction) {
-        if (!view) return;
-        // Paginated painter owns scroll; strip PM's scroll flag so updateState
-        // doesn't yank this hidden off-screen view's ancestors to the caret.
-        stripScrollFlag(transaction, view.state.tr);
-        const newState = view.state.apply(transaction);
-        view.updateState(newState);
-        editorState.value = newState;
-
-        // Snapshot marks at cursor for reactive toolbar state.
-        // Re-layout on doc changes — coalesced through the shared core
-        // scheduler so a burst of keystrokes lays out once per frame (the
-        // selection overlay waits via `syncCoordinator`, matching React).
-        if (transaction.docChanged) {
-          syncCoordinator?.incrementStateSeq();
-          layoutScheduler.schedule(newState);
-          // Notify parent about document change
-          try {
-            if (document.value) {
-              const updatedDoc = fromProseDoc(newState.doc, document.value);
-              document.value = updatedDoc;
-              onChange?.(updatedDoc);
-            }
-          } catch (err) {
-            console.error('[useDocxEditor] fromProseDoc error:', err);
-          }
-        }
-
-        // Notify about selection changes (for highlight overlay)
-        syncCoordinator?.requestRender();
-        onSelectionUpdate?.();
-
-        // Selection-only moves don't relayout, so update content-control focus
-        // here too; relayouts re-apply it from runLayoutPipeline.
-        if (!transaction.docChanged) {
-          const pagesEl = pagesContainer.value;
-          if (pagesEl) {
-            applySdtFocus(
-              pagesEl,
-              enclosingSdtGroupIds(newState.doc, newState.selection.from, newState.selection.to)
-            );
-          }
-        }
-      },
-    });
-
-    editorView.value = view;
-    isReady.value = true;
-
-    // Initial layout
-    runLayoutPipeline(state);
-    syncCoordinator?.requestRender();
-
-    // Auto-focus the hidden ProseMirror so the user can start typing
-    // immediately, without first clicking into the page. Mirrors React's
-    // PagedEditor.handleEditorViewReady. rAF ensures the DOM is painted.
-    if (!unref(readOnly)) {
-      requestAnimationFrame(() => {
-        view.focus();
-      });
-    }
   }
 
   function destroyEditorView() {
-    // Drop any pending coalesced layout frame so a reload (destroy → recreate)
-    // can't repaint the old document's state against the new document.
-    layoutScheduler.cancel();
-    if (editorView.value) {
-      editorView.value.destroy();
-      editorView.value = null;
-    }
+    // Drops the pending coalesced frame too, so a reload (destroy →
+    // recreate) can't repaint the old document's state against the new one.
+    engine.destroyBodyView();
+    editorView.value = null;
     editorState.value = null;
     isReady.value = false;
   }
@@ -597,10 +557,6 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
 
   /** Off-screen host that owns all HF EditorView DOM. */
   const hfHostRef: { current: HTMLDivElement | null } = { current: null };
-  /** rId → mounted EditorView. */
-  const hfViews = new Map<string, EditorView>();
-  /** rId → ExtensionManager owning the view's plugins/commands. */
-  const hfManagers = new Map<string, ExtensionManager>();
 
   function ensureHfHost(): HTMLDivElement {
     if (hfHostRef.current && hfHostRef.current.isConnected) return hfHostRef.current;
@@ -621,9 +577,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
    * when the doc is unloaded or the HF isn't currently in the package
    * (e.g. just removed).
    */
-  function findHfRid(
-    hf: import('@xcrong/docx-editor-core/types/document').HeaderFooter
-  ): string | null {
+  function findHfRid(hf: HeaderFooter): string | null {
     const pkg = document.value?.package;
     if (!pkg) return null;
     if (pkg.headers) {
@@ -640,126 +594,25 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
    * persistent EditorView for the HF instance, or null when no PM is yet
    * mounted (cold boot, or the HF was just materialised at runtime).
    */
-  function getHfPmView(
-    hf: import('@xcrong/docx-editor-core/types/document').HeaderFooter
-  ): EditorView | null {
+  function getHfPmView(hf: HeaderFooter): EditorView | null {
     const rId = findHfRid(hf);
     if (!rId) return null;
-    return hfViews.get(rId) ?? null;
+    return engine.getHfView(rId);
   }
 
   /**
    * Mount missing HF EditorViews and tear down stale ones to match the
-   * current `Document.package.headers/footers`. Called on every document
-   * load + after the inline overlay's save (`package.headers` swap).
+   * current `Document.package.headers/footers`. Construction + dispatch
+   * live in the engine (step 4); the trigger stays adapter-side. Called
+   * on every document load + after the inline overlay's save
+   * (`package.headers` swap).
    */
   function syncHfPMs() {
-    const pkg = document.value?.package;
-    const host = ensureHfHost();
-    const wantRIds = new Set<string>();
-    if (pkg?.headers) for (const rId of pkg.headers.keys()) wantRIds.add(rId);
-    if (pkg?.footers) for (const rId of pkg.footers.keys()) wantRIds.add(rId);
-
-    // Tear down rIds no longer present (e.g. user removed a header).
-    for (const [rId, view] of hfViews) {
-      if (!wantRIds.has(rId)) {
-        view.destroy();
-        view.dom.parentElement?.remove();
-        hfManagers.get(rId)?.destroy();
-        hfManagers.delete(rId);
-        hfViews.delete(rId);
-      }
-    }
-
-    // Bring up new ones. Each gets its own ExtensionManager — history /
-    // input rules plugins are per-EditorView and can't be shared.
-    if (!pkg) return;
-    const styles = pkg.styles ?? null;
-    const theme = pkg.theme ?? null;
-    // Read from package.settings (canonical) not editorState (race on first sync).
-    const defaultTabStopTwips = pkg.settings?.defaultTabStop ?? null;
-    const defaultTableStyleId = pkg.settings?.defaultTableStyle ?? null;
-    for (const rId of wantRIds) {
-      if (hfViews.has(rId)) continue;
-      const hf = pkg.headers?.get(rId) ?? pkg.footers?.get(rId);
-      if (!hf) continue;
-      const kind = pkg.headers?.has(rId) ? 'header' : 'footer';
-
-      const mgr = new ExtensionManager(createStarterKit());
-      mgr.buildSchema();
-      mgr.initializeRuntime();
-      hfManagers.set(rId, mgr);
-
-      const node = window.document.createElement('div');
-      node.dataset.hfRId = rId;
-      node.dataset.hfKind = kind;
-      host.appendChild(node);
-
-      const pmDoc = headerFooterToProseDoc(hf.content, {
-        styles: styles ?? undefined,
-        theme,
-        defaultTabStopTwips,
-      });
-      // Header/footer paragraphs share the document's style table, so they get
-      // the same style-aware behavior (e.g. Enter after a heading → body text).
-      const hfStyleResolverPlugin = createDocumentStylesPlugin(styles);
-      // Document context (theme + settings `w:defaultTableStyle`) so inserting a
-      // table in a header/footer adopts the default table style too.
-      const hfDocumentContextPlugin = createDocumentContextPlugin({
-        theme,
-        defaultTableStyleId,
-      });
-      const hfSuggestionPlugin = createSuggestionModePlugin(
-        unref(editorMode) === 'suggesting',
-        unref(author)
-      );
-      const state = EditorState.create({
-        doc: pmDoc,
-        schema,
-        plugins: [
-          hfSuggestionPlugin,
-          ...mgr.getPlugins(),
-          hfStyleResolverPlugin,
-          hfDocumentContextPlugin,
-        ],
-      });
-      const slotKind = kind;
-      const view: EditorView = new EditorView(node, {
-        state,
-        dispatchTransaction(tr) {
-          const newState = view.state.apply(tr);
-          view.updateState(newState);
-          // Writeback: sync `view.state.doc` into
-          // `Document.package.headers[rId].content` (or `.footers[rId].content`)
-          // so `save()` reads the latest HF content. Without this the
-          // persistent PM holds edits the saved DOCX doesn't.
-          if (tr.docChanged) {
-            const pkg = document.value?.package;
-            const bag = slotKind === 'header' ? pkg?.headers : pkg?.footers;
-            const hf = bag?.get(rId);
-            if (hf) {
-              hf.content = proseDocToBlocks(newState.doc);
-              hf.verbatimXml = undefined;
-            }
-          }
-          // Only re-layout when the HF doc actually changed — selection-only
-          // transactions don't move text so the painter has nothing new.
-          if (tr.docChanged && editorState.value) runLayoutPipeline(editorState.value);
-          onHfTransactionRef.value?.(rId, view, tr.docChanged);
-        },
-      });
-      hfViews.set(rId, view);
-    }
+    engine.syncHfViews(document.value);
   }
 
   function destroyHfPMs() {
-    for (const view of hfViews.values()) {
-      view.destroy();
-      view.dom.parentElement?.remove();
-    }
-    hfViews.clear();
-    for (const mgr of hfManagers.values()) mgr.destroy();
-    hfManagers.clear();
+    engine.destroyHfViews();
     if (hfHostRef.current) {
       hfHostRef.current.remove();
       hfHostRef.current = null;
@@ -778,7 +631,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       if (view) {
         setSuggestionMode(active, view.state, view.dispatch, who);
       }
-      for (const hfView of hfViews.values()) {
+      for (const hfView of engine.getHfViews().values()) {
         setSuggestionMode(active, hfView.state, hfView.dispatch, who);
       }
     },
@@ -808,19 +661,8 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     isReady.value = false;
 
     try {
-      let arrayBuf: ArrayBuffer;
-      if (buffer instanceof Blob || buffer instanceof File) {
-        arrayBuf = await buffer.arrayBuffer();
-      } else if (buffer instanceof Uint8Array) {
-        arrayBuf = buffer.buffer.slice(
-          buffer.byteOffset,
-          buffer.byteOffset + buffer.byteLength
-        ) as ArrayBuffer;
-      } else {
-        arrayBuf = buffer;
-      }
-
-      const doc = await parseDocx(arrayBuf);
+      const doc = await engine.load(buffer);
+      if (!doc) return; // stale: a newer load started while parsing
       document.value = doc;
       updateDocumentFonts(doc);
 
@@ -829,6 +671,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       destroyHfPMs();
       createEditorView();
       syncHfPMs();
+      syncAgent();
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       parseError.value = error.message;
@@ -844,6 +687,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     destroyHfPMs();
     createEditorView();
     syncHfPMs();
+    syncAgent();
   }
 
   // Surface the document's own renderable fonts (embedded faces loaded by
@@ -859,29 +703,8 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   // ========================================================================
 
   async function save(): Promise<Blob | null> {
-    if (!editorView.value || !document.value) return null;
-
-    const { repackDocx, createDocx } = await import('@xcrong/docx-editor-core/docx/rezip');
-    const { injectReplyRangeMarkers, injectTCReplyRangeMarkers } =
-      await import('@xcrong/docx-editor-core/docx');
-
-    const updatedDoc = fromProseDoc(editorView.value.state.doc, document.value);
-    // Word/Pages need parallel `commentRangeStart`/`End` markers for
-    // every reply (regular comment replies AND tracked-change replies)
-    // in document.xml. Without them the saved doc loses replies. Same
-    // step React runs in its `handleSave` (DocxEditor.tsx).
-    const comments = updatedDoc.package.document?.comments ?? [];
-    if (updatedDoc.package.document?.content && comments.length > 0) {
-      injectReplyRangeMarkers(updatedDoc.package.document.content, comments);
-      injectTCReplyRangeMarkers(updatedDoc.package.document.content, comments);
-    }
-
-    let buffer: ArrayBuffer;
-    if (updatedDoc.originalBuffer) {
-      buffer = await repackDocx(updatedDoc);
-    } else {
-      buffer = await createDocx(updatedDoc);
-    }
+    const buffer = await engine.save({ selective: true });
+    if (!buffer) return null;
     return new Blob([buffer], {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     });
@@ -894,6 +717,8 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   function destroy() {
     destroyEditorView(); // cancels the layout scheduler
     destroyHfPMs();
+    engine.cancelLoads();
+    agentRef.current = null;
     document.value = null;
   }
 
@@ -938,7 +763,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     // HF unification surface — phase 6 of openspec/changes/unify-hf-editing.
     getHfPmView,
     getHfPmViews(): Map<string, EditorView> {
-      return hfViews;
+      return engine.getHfViews();
     },
     syncHfPMs,
     setHfTransactionListener,
@@ -948,6 +773,13 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
      */
     setDocument(doc: Document) {
       document.value = doc;
+    },
+    /**
+     * Provide the adapter-owned comment list for `save()` (the SFC's
+     * `comments` ref). Falls back to the document model when unset.
+     */
+    setSaveCommentsProvider(provider: (() => Comment[]) | null) {
+      saveCommentsProvider = provider;
     },
   };
 }

@@ -908,7 +908,6 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
     handleInsertImageClick,
     handleImageFileChange,
   } = useFileIO({
-    agentRef,
     pagedEditorRef,
     containerRef,
     comments,
@@ -1833,6 +1832,7 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
             setExpandedSidebarItem={setExpandedSidebarItem}
             onSidebarNavigate={handleSidebarNavigate}
             comments={comments}
+            agentRef={agentRef}
             resolvedCommentIds={resolvedCommentIds}
             resolvedIdsForRender={resolvedIdsForRender}
             setShowCommentsSidebar={setShowCommentsSidebar}

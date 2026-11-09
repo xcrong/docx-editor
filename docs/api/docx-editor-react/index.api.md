@@ -13,6 +13,7 @@ import { CreateEmptyDocumentOptions } from '@xcrong/docx-editor-core';
 import { CSSProperties } from 'react';
 import { Document as Document_2 } from '@xcrong/docx-editor-core/types/document';
 import { DocumentAgent } from '@xcrong/docx-editor-core/agent';
+import { DocxEditorEngine } from '@xcrong/docx-editor-core/editor';
 import { DocxInput } from '@xcrong/docx-editor-core/utils';
 import { EditorHandle } from '@xcrong/docx-editor-core';
 import { EditorState } from 'prosemirror-state';

@@ -52,6 +52,9 @@ import type {
   HeaderFooter,
 } from '@xcrong/docx-editor-core/types/document';
 import type { WrapType } from '@xcrong/docx-editor-core/docx/wrapTypes';
+import type { DocumentAgent } from '@xcrong/docx-editor-core/agent';
+import type { Comment } from '@xcrong/docx-editor-core/types/content';
+import type { DocxEditorEngine } from '@xcrong/docx-editor-core/editor';
 import type { RenderedDomContext } from '../../plugin-api/types';
 import {
   DEFAULT_PAGE_WIDTH,
@@ -194,6 +197,10 @@ export interface PagedEditorProps {
   isSuggesting?: boolean;
   /** Active author for suggestion mode */
   author?: string;
+  /** Live agent wrapping the loaded document (engine.save reads via host). */
+  agentRef?: React.RefObject<DocumentAgent | null>;
+  /** Adapter-owned comment list (engine.save reads via host). */
+  comments?: Comment[];
 }
 
 export interface PagedEditorRef {
@@ -269,6 +276,8 @@ export interface PagedEditorRef {
   getHfPmView(hf: HeaderFooter): EditorView | null;
   /** Get all active header/footer EditorViews mapped by rId. */
   getHfPmViews(): Map<string, EditorView>;
+  /** Live engine (load/save session seam). */
+  getEngine(): DocxEditorEngine;
 }
 
 // =============================================================================
@@ -327,6 +336,8 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       onHyperlinkPopupClose,
       isSuggesting = false,
       author = 'User',
+      agentRef,
+      comments,
     } = props;
 
     // Resolve the scroll container: prefer parent-provided ref, fallback to own container
@@ -435,19 +446,34 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       [document]
     );
 
+    // Forwarded to the engine host before `useSelectionOverlay` below
+    // initializes; assigned right after. Engine calls happen post-mount,
+    // after assignment — never in the TDZ window.
+    const updateSelectionOverlayRef = useRef<((state: EditorState) => void) | null>(null);
+
+    // Forwarded to the engine host alongside the overlay updater; assigned
+    // right after `useSelectionOverlay` below. Engine calls happen post-mount,
+    // after assignment — never in the TDZ window.
+    const handleSelectionChangeRef = useRef<((state: EditorState) => void) | null>(null);
+    // Forwarded to the engine host before `handleEditorViewReady` below is
+    // defined; assigned right after. Engine calls happen post-mount, after
+    // assignment — never in the TDZ window.
+    const handleEditorViewReadyRef = useRef<((view: EditorView) => void) | null>(null);
+    // Shared off-screen host owning all HF mount nodes (rendered by
+    // `HiddenHeaderFooterPMs`, read by the engine host).
+    const hfHostRef = useRef<HTMLDivElement | null>(null);
     // Layout pipeline — owns layout/blocks/measures state, the rAF-coalesced
-    // scheduler, scroll-restore plumbing, the painter, and the page-count
-    // notifier. Returns `notifyDecorationLayer` for the DecorationLayer
-    // resync that handleTransaction triggers on every PM transaction.
+    // scheduler, scroll-restore plumbing, the painter, the page-count
+    // notifier, and (step 4) the PM view lifecycle. The document/selection
+    // callbacks below keep PagedEditor-owned behavior at the same points.
     const {
       layout,
       blocks,
       measures,
       decorationSyncToken,
-      notifyDecorationLayer,
       contentWidth,
       runLayoutPipeline,
-      scheduleLayout,
+      engine,
     } = useLayoutPipeline({
       document,
       styles,
@@ -470,6 +496,27 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       onTotalPagesChange,
       onAnchorPositionsChange,
       onRenderedDomContextReady,
+      onDocumentChange: (doc) => onDocumentChangeRef.current?.(doc),
+      onSelectionOnlyTransaction: (state) => handleSelectionChangeRef.current?.(state),
+      onHfTransaction,
+      extensionManager,
+      externalPlugins,
+      isReadOnly: readOnly || !!hfEditMode,
+      // Selection-only moves refresh the overlay through the gated
+      // `handleSelectionChange` funnel (image-suppression + layout gate);
+      // the null-tr swap path (external document load) also resyncs it.
+      // Doc changes skip the sync pass — the post-layout effect recomputes
+      // against painted DOM (no stale-DOM flash).
+      onBodyState: (newState, tr) => {
+        if (!tr) updateSelectionOverlayRef.current?.(newState);
+      },
+      onBodyViewReady: (view) => handleEditorViewReadyRef.current?.(view),
+      onBodyKeyDown: (view, event) => handlePMKeyDown(view, event),
+      isSuggesting,
+      author,
+      hfHostRef,
+      agentRef,
+      comments,
     });
 
     // Selection overlay — caret, range rects, image overlay info, plus the
@@ -496,49 +543,12 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       isImageInteractingRef,
       onSelectionChangeRef,
     });
+    updateSelectionOverlayRef.current = updateSelectionOverlay;
+    handleSelectionChangeRef.current = handleSelectionChange;
 
     // =========================================================================
     // Event Handlers
     // =========================================================================
-
-    /**
-     * Handle PM transaction - re-layout on content/selection change.
-     */
-    const handleTransaction = useCallback(
-      (transaction: Transaction, newState: EditorState) => {
-        // Bump on every transaction (including selection-only and meta-only
-        // ones) so DecorationLayer re-syncs — yCursorPlugin awareness updates
-        // arrive as meta transactions with no doc change.
-        notifyDecorationLayer();
-
-        if (transaction.docChanged) {
-          // Increment state sequence to signal document changed
-          syncCoordinator.incrementStateSeq();
-
-          // Content changed - schedule layout (coalesced via rAF)
-          scheduleLayout(newState);
-
-          // Notify document change - use ref to avoid infinite loops
-          const newDoc = hiddenPMRef.current?.getDocument();
-          if (newDoc) {
-            onDocumentChangeRef.current?.(newDoc);
-          }
-        }
-
-        // Request selection update (will only execute when layout is current)
-        syncCoordinator.requestRender();
-
-        // Only update selection overlay immediately for non-doc-changing transactions
-        // (e.g. arrow keys, clicks). For doc changes, the overlay will be updated
-        // after layout completes via the useEffect([layout]) hook, avoiding cursor
-        // flicker from stale DOM positions.
-        if (!transaction.docChanged) {
-          updateSelectionOverlay(newState);
-        }
-      },
-      [scheduleLayout, updateSelectionOverlay, syncCoordinator, notifyDecorationLayer]
-      // NOTE: onDocumentChange removed from dependencies - accessed via ref to prevent infinite loops
-    );
 
     // Scroll API exposed via the PagedEditorRef. Owns the AbortController
     // chain that lets a fresh scroll supersede an in-flight paint-settle.
@@ -772,6 +782,7 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       },
       [runLayoutPipeline, updateSelectionOverlay, readOnly]
     );
+    handleEditorViewReadyRef.current = handleEditorViewReady;
 
     // Re-layout triggers: web-font load complete + header/footer content changes.
     useLayoutTriggers({
@@ -796,6 +807,7 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
       scrollToParaIdImpl,
       scrollToPageImpl,
       setIsFocused,
+      engine,
       onReadyRef,
     });
 
@@ -823,43 +835,22 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
         onKeyDown={handleKeyDown}
         onMouseDown={handleContainerMouseDown}
       >
-        {/* Hidden ProseMirror for keyboard input */}
+        {/* Hidden ProseMirror for keyboard input (engine-owned view) */}
         <HiddenProseMirror
           ref={hiddenPMRef}
           document={document}
-          styles={styles}
           widthPx={contentWidth}
-          // When HF mode is active, the body PM is functionally retired —
-          // marking it readOnly stops keystrokes / input events from being
-          // applied to the body doc even if focus briefly slips to it.
-          readOnly={readOnly || !!hfEditMode}
-          onTransaction={handleTransaction}
-          onSelectionChange={handleSelectionChange}
-          externalPlugins={externalPlugins}
-          extensionManager={extensionManager}
-          onEditorViewReady={handleEditorViewReady}
-          onKeyDown={handlePMKeyDown}
+          engine={engine}
         />
 
-        {/* Persistent hidden HF PMs — one per distinct rId */}
+        {/* Persistent hidden HF PMs — one per distinct rId (engine-owned) */}
         <HiddenHeaderFooterPMs
           ref={hiddenHfPMsRef}
           document={document}
-          styles={styles}
-          theme={_theme}
+          engine={engine}
+          hostRef={hfHostRef}
           isSuggesting={isSuggesting}
           author={author}
-          defaultTabStopTwips={document?.package?.settings?.defaultTabStop ?? null}
-          onTransaction={(rId, view, docChanged) => {
-            // Only re-layout when the HF doc actually changed — selection-only
-            // transactions (arrow keys, click-to-position) don't move text, so
-            // the painter has nothing new to paint.
-            if (docChanged) {
-              const bodyState = hiddenPMRef.current?.getState();
-              if (bodyState) runLayoutPipeline(bodyState);
-            }
-            onHfTransaction?.(rId, view, docChanged);
-          }}
         />
 
         {/* Viewport for visible pages */}

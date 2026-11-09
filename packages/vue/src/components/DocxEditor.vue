@@ -590,6 +590,7 @@ const {
   getHfPmViews,
   syncHfPMs,
   setHfTransactionListener,
+  setSaveCommentsProvider,
   setDocument,
 } = useDocxEditor({
   hiddenContainer: hiddenPmRef,
@@ -625,10 +626,12 @@ const {
   },
 });
 
+// Save path reads the SFC-owned comment list through the engine host.
+setSaveCommentsProvider(() => comments.value);
+
 // Host-facing comment callbacks + onEditorViewReady wiring (the `onComment*` /
 // `onEditorViewReady` props), threaded into the comment composables below.
 const { commentCallbacks } = useHostCallbacks(props, editorView);
-
 // ─── Document-state derived computed refs ─────────────────────────────────
 // Active section's properties drive the horizontal ruler (margins + indents).
 // React reads `package.document.finalSectionProperties` for the same purpose;
@@ -781,12 +784,7 @@ onMounted(() => {
 });
 
 // Sidebar-aware layout (shift/ruler/min-width; overlay keeps page centered).
-const {
-  minLayoutWidth,
-  pagesContainerStyle,
-  rulerRowStyle,
-  pageWidthPx,
-} = useSidebarLayout({
+const { minLayoutWidth, pagesContainerStyle, rulerRowStyle, pageWidthPx } = useSidebarLayout({
   showSidebar,
   sidebarOverlayMode: () => sidebarOverlayMode.value,
   showOutline,

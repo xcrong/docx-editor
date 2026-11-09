@@ -34,8 +34,9 @@ import { MaterialSymbol } from '../ui/Icons';
 import { PENDING_COMMENT_ID } from './commentFactories';
 import type { HyperlinkPopupData } from '../ui/HyperlinkPopup';
 import type { WrapType } from '@xcrong/docx-editor-core/docx/wrapTypes';
-import type { ReactSidebarItem } from '../../plugin-api/types';
+import type { DocumentAgent } from '@xcrong/docx-editor-core/agent';
 import type { RenderedDomContext } from '../../plugin-api/types';
+import type { ReactSidebarItem } from '../../plugin-api/types';
 
 /**
  * Body of the editor: the paged ProseMirror host, its sidebar overlay
@@ -118,6 +119,7 @@ export function DocxEditorPagedArea({
   isSuggesting = false,
   author = 'User',
   onHfTransaction,
+  agentRef,
 }: {
   pagedEditorRef: React.RefObject<PagedEditorRef | null>;
   hfEditorRef: React.RefObject<InlineHeaderFooterEditorRef | null>;
@@ -194,6 +196,7 @@ export function DocxEditorPagedArea({
   setAddCommentYPosition: React.Dispatch<React.SetStateAction<number | null>>;
   setIsAddingComment: React.Dispatch<React.SetStateAction<boolean>>;
   setFloatingCommentBtn: React.Dispatch<React.SetStateAction<{ top: number; left: number } | null>>;
+  agentRef?: React.RefObject<DocumentAgent | null>;
   isSuggesting?: boolean;
   author?: string;
 }) {
@@ -401,6 +404,8 @@ export function DocxEditorPagedArea({
         onAnchorPositionsChange={onAnchorPositionsChange}
         onTotalPagesChange={onTotalPagesChange}
         resolvedCommentIds={resolvedIdsForRender}
+        agentRef={agentRef}
+        comments={comments}
         scrollContainerRef={scrollContainerRef}
         sidebarOverlay={
           <>

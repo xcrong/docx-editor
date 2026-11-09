@@ -1,13 +1,5 @@
 import { useCallback, useRef } from 'react';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
-import { DocumentAgent } from '@xcrong/docx-editor-core/agent';
-import { injectReplyRangeMarkers, injectTCReplyRangeMarkers } from '@xcrong/docx-editor-core/docx';
-import {
-  getChangedParagraphIds,
-  hasStructuralChanges,
-  hasUntrackedChanges,
-  clearTrackedChanges,
-} from '@xcrong/docx-editor-core/prosemirror/extensions';
 import { readDocxFileFromInput, type DocxInput } from '@xcrong/docx-editor-core/utils';
 import { insertImageFromFile } from '@xcrong/docx-editor-core/prosemirror/commands';
 import { renderAllPagesNow } from '@xcrong/docx-editor-core/layout-painter';
@@ -28,7 +20,6 @@ function toFileIOError(error: unknown, fallbackMessage: string): Error {
  * because they switch targets when the header/footer editor is active.
  */
 export function useFileIO({
-  agentRef,
   pagedEditorRef,
   containerRef,
   comments,
@@ -42,7 +33,6 @@ export function useFileIO({
   getActiveEditorView,
   focusActiveEditor,
 }: {
-  agentRef: React.RefObject<DocumentAgent | null>;
   pagedEditorRef: React.RefObject<PagedEditorRef | null>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   comments: Comment[];
@@ -61,65 +51,18 @@ export function useFileIO({
 
   const handleSave = useCallback(
     async (options?: { selective?: boolean }): Promise<ArrayBuffer | null> => {
-      if (!agentRef.current) return null;
-
+      const engine = pagedEditorRef.current?.getEngine();
+      if (!engine) return null;
       try {
-        const agentDoc = agentRef.current.getDocument();
-
-        // Get the document from the PM editor state — this runs fromProseDoc which
-        // converts PM comment marks into commentRangeStart/End in the document body.
-        // The agent's internal document has the original parsed content and won't
-        // include markers for newly added comments.
-        const pmDoc = pagedEditorRef.current?.getDocument();
-        if (pmDoc?.package?.document) {
-          agentDoc.package.document.content = pmDoc.package.document.content;
-        }
-
-        // Sync React comments state (including new replies) back to the document model
-        agentDoc.package.document.comments = comments;
-
-        // Inject commentRangeStart/End for reply comments that share the parent's range.
-        // Pages/Word require every comment (including replies) to have range markers in document.xml.
-        injectReplyRangeMarkers(agentDoc.package.document.content, comments);
-        // Also inject range markers for comments that reply to tracked changes.
-        injectTCReplyRangeMarkers(agentDoc.package.document.content, comments);
-
-        // Build selective save options from change tracker state
-        const useSelective = options?.selective !== false;
-        const view = pagedEditorRef.current?.getView();
-        let selectiveOptions: Parameters<typeof agentRef.current.toBuffer>[0] = undefined;
-
-        if (useSelective && view) {
-          const editorState = view.state;
-          // Force full repack if any reply comments exist (both comment replies and
-          // tracked-change replies need range markers injected into document.xml,
-          // which selective save can't handle since the affected paragraphs may not
-          // be in changedParaIds)
-          const hasInjectedReplies = comments.some((c) => c.parentId != null);
-          selectiveOptions = {
-            selective: {
-              changedParaIds: getChangedParagraphIds(editorState),
-              structuralChange: hasStructuralChanges(editorState) || hasInjectedReplies,
-              hasUntrackedChanges: hasUntrackedChanges(editorState),
-            },
-          };
-        }
-
-        const buffer = await agentRef.current.toBuffer(selectiveOptions);
-
-        // Clear change tracker after successful save
-        if (view) {
-          view.dispatch(clearTrackedChanges(view.state));
-        }
-
-        onSave?.(buffer);
+        const buffer = await engine.save({ selective: options?.selective, comments });
+        if (buffer) onSave?.(buffer);
         return buffer;
       } catch (error) {
         onError?.(toFileIOError(error, 'Failed to save document'));
         return null;
       }
     },
-    [agentRef, pagedEditorRef, comments, onSave, onError]
+    [pagedEditorRef, comments, onSave, onError]
   );
 
   const handleDirectPrint = useCallback(() => {
