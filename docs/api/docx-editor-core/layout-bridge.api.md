@@ -99,14 +99,14 @@ export function collectFootnoteRefs(blocks: FlowBlock[]): FootnoteRefLocation[];
 export function columnWidthForSection(config: SectionLayoutConfig): number;
 
 // @public
-export function computeHfCaretRectFromView(view: EditorView, section: 'header' | 'footer', doc?: globalThis.Document): {
+export function computeHfCaretRectFromView(view: EditorView, section: 'header' | 'footer', doc?: globalThis.Document, preferredHost?: HTMLElement | null): {
     top: number;
     left: number;
     height: number;
 } | null;
 
 // @public
-export function computeHfSelectionRectsFromView(view: EditorView, section: 'header' | 'footer', doc?: globalThis.Document): Array<{
+export function computeHfSelectionRectsFromView(view: EditorView, section: 'header' | 'footer', doc?: globalThis.Document, preferredHost?: HTMLElement | null): Array<{
     top: number;
     left: number;
     width: number;
@@ -612,6 +612,9 @@ export function resolveHeaderFooter(doc: Document_2 | null, sp: SectionPropertie
 
 // @public (undocumented)
 export function resolveHeaderFooterVisualTop(run: ImageRun, paragraphY: number, flowHeight: number, metrics: HeaderFooterMetrics): number;
+
+// @public
+export function resolveHfHostEl(section: 'header' | 'footer', doc: globalThis.Document, preferredHost?: HTMLElement | null): HTMLElement | null;
 
 // @public
 export function resolveListTemplate(template: string, counters: number[], levelNumFmts: NumberFormat[] | undefined): string;
