@@ -685,9 +685,9 @@ const hfSelectionRects = ref<Array<{ top: number; left: number; width: number; h
 // (mirror of React's `applyHfOverlay`). `computeHfCaretRectFromView` returns
 // null for a non-empty selection and `computeHfSelectionRectsFromView` returns
 // [] for a collapsed one, so the caret and highlight are mutually exclusive.
-function applyHfOverlay(view: EditorView, position: 'header' | 'footer') {
-  hfCaretRect.value = computeHfCaretRectFromView(view, position);
-  hfSelectionRects.value = computeHfSelectionRectsFromView(view, position);
+function applyHfOverlay(view: EditorView, position: 'header' | 'footer', hostEl?: HTMLElement | null) {
+  hfCaretRect.value = computeHfCaretRectFromView(view, position, document, hostEl);
+  hfSelectionRects.value = computeHfSelectionRectsFromView(view, position, document, hostEl);
 }
 function clearHfOverlay() {
   hfCaretRect.value = null;
@@ -718,8 +718,8 @@ onMounted(() => {
     requestAnimationFrame(() => {
       const edit = hfEdit.value;
       if (!edit) return;
-      applyHfOverlay(view, edit.position);
-      const hfEl = nearestHfHostEl(edit.position);
+      applyHfOverlay(view, edit.position, edit.hostEl);
+      const hfEl = nearestHfHostEl(edit.position, edit.hostEl);
       const viewport = pagesViewportRef.value;
       if (!hfEl || !viewport) return;
       const el = hfEl.getBoundingClientRect();
@@ -771,7 +771,7 @@ onMounted(() => {
       const hf = hfEdit.value;
       if (!hf?.headerFooter) return;
       const view = getHfPmView(hf.headerFooter);
-      if (view) applyHfOverlay(view, hf.position);
+      if (view) applyHfOverlay(view, hf.position, hf.hostEl);
     });
   }
   window.addEventListener('scroll', onHfScroll, true);

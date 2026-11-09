@@ -123,6 +123,7 @@ export {
   convertHeaderFooterPmDocToContent,
   computeHfCaretRectFromView,
   computeHfSelectionRectsFromView,
+  resolveHfHostEl,
   invalidateHfDomCache,
 } from './headerFooterLayout';
 export type { HeaderFooterMetrics, ConvertHeaderFooterOptions } from './headerFooterLayout';

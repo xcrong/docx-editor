@@ -63,6 +63,18 @@ export async function openAgentPanel(
   await expect(page.getByTestId('agent-panel')).toBeVisible();
 }
 
+/**
+ * Marker text unique to `PARA_ID_FIXTURE` (`example-with-image.docx`).
+ * Neither adapter's boot `sample.docx` contains it, so it proves the
+ * uploaded fixture finished parsing — not just that *some* document
+ * rendered. Without this, the poll below goes green on the still-loading
+ * default sample doc while the fixture parse is in flight (fonts add
+ * 1s+ in CI), and specs evaluate against the wrong document: Vue
+ * highlightRange anchors collapse, agentAddComment plants miss, and a
+ * mid-swap save can dispatch onto a destroyed view (T28-02 #85).
+ */
+export const FIXTURE_TEXT_MARKER = 'Beispieltext';
+
 /** Navigate to the editor-only demo and wait for the adapter shell. */
 export async function openEditor(
   page: Page,
@@ -87,6 +99,20 @@ export async function openEditor(
             null;
           return pageCount > 0 && typeof firstParaId === 'string' && firstParaId.length > 0;
         }),
+      { timeout: 25000 }
+    )
+    .toBe(true);
+  // The poll above also passes on the boot sample doc while the fixture
+  // upload is still parsing — wait for the fixture's own text so every
+  // spec below observes the same document on both adapters.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (marker) =>
+            window.__DOCX_EDITOR_E2E__?.agentGetDocumentText?.().includes(marker) ?? false,
+          FIXTURE_TEXT_MARKER
+        ),
       { timeout: 25000 }
     )
     .toBe(true);
