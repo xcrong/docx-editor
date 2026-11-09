@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "digests": {
+    "empty-from-scratch": "46af03f04b23267f247e05ebec19085c514a1535d57d6f1ba4574bfd43357a04",
+    "rich-text-edits": "79f4023e3d4807e88740006a02ca5c559c2af9a91d07e2e6ffc3a8006f0a9e03",
+    "table-doc-edits": "3572acf7ac55d6a5b1dd4b92485d8fb1c423833aebdbb4e88cd3a017e0463562"
+  }
+}

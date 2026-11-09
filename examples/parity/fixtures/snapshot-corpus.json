@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "comment": "Snapshot-parity corpus (T28-01, issue #84; tracks #71). Each case names a source DOCX (repo-relative under e2e/fixtures/, or null for a from-scratch document) plus a deterministic edit sequence expressed as @xcrong/docx-editor-core AgentCommands. The bun test `packages/core/src/__tests__/document-roundtrip-parity.test.ts` runs every case twice through the exact headless save pipeline both adapters share (parseDocx -> executeCommands -> repackDocx/createDocx), normalizes volatile fields (timestamps, rsids, zip metadata), and asserts (a) both runs produce identical digests and (b) the digest matches `snapshot-digests.json`. To grow coverage, add an entry here and run `bun run snapshot:update`. NEVER compare raw bytes: createEmpty writes `new Date()` and JSZip stamps entry dates.",
+  "fixtureDir": "e2e/fixtures",
+  "cases": [
+    {
+      "id": "empty-from-scratch",
+      "fixture": null,
+      "edits": [
+        {
+          "type": "insertText",
+          "position": { "paragraphIndex": 0, "offset": 0 },
+          "text": "Parity snapshot probe."
+        },
+        {
+          "type": "formatText",
+          "range": {
+            "start": { "paragraphIndex": 0, "offset": 0 },
+            "end": { "paragraphIndex": 0, "offset": 6 }
+          },
+          "formatting": { "bold": true }
+        }
+      ]
+    },
+    {
+      "id": "rich-text-edits",
+      "fixture": "example-with-image.docx",
+      "edits": [
+        {
+          "type": "insertText",
+          "position": { "paragraphIndex": 0, "offset": 0 },
+          "text": "T28-01 "
+        },
+        {
+          "type": "formatText",
+          "range": {
+            "start": { "paragraphIndex": 1, "offset": 0 },
+            "end": { "paragraphIndex": 1, "offset": 12 }
+          },
+          "formatting": { "italic": true }
+        },
+        { "type": "formatParagraph", "paragraphIndex": 2, "formatting": { "alignment": "center" } }
+      ]
+    },
+    {
+      "id": "table-doc-edits",
+      "fixture": "with-tables.docx",
+      "edits": [
+        {
+          "type": "insertText",
+          "position": { "paragraphIndex": 1, "offset": 0 },
+          "text": "edited "
+        },
+        {
+          "type": "formatText",
+          "range": {
+            "start": { "paragraphIndex": 0, "offset": 0 },
+            "end": { "paragraphIndex": 0, "offset": 8 }
+          },
+          "formatting": { "bold": true }
+        }
+      ]
+    }
+  ]
+}

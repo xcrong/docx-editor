@@ -46,3 +46,20 @@ To stand up a preview for the `1.0.0-release` branch on a custom URL:
 - In your Vercel project Settings → Domains, add a domain (e.g. `next.docx-editor.dev` or `1-0-0-release.docx-editor.dev`) and set its Git Branch to `1.0.0-release`. Every push to that branch redeploys.
 
 The existing `docx-editor.xcrong.me` deployment off `main` will pick up the parity build on its next deploy after this change merges. `/` redirects to `/react/`, the React adapter takes the full viewport, and a switcher pill in the toolbar flips to `/vue/`. A yellow banner on each editor route notes that this is a preview build of a community fork and links the fork repository.
+
+## Parity gates (T28-01, issue #84)
+
+The same `/react/` + `/vue/` routes are exercised by three gates, all
+running on every PR (`.github/workflows/parity.yml`):
+
+| Gate               | Command                                                           | What turns it red                                                                                                                                    |
+| ------------------ | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cross-adapter E2E  | `bun run test:e2e:parity`                                         | Any `e2e/tests/parity/` spec failing on either adapter; per-adapter failure screenshots (`<adapter>-failure.png`) upload as CI artifacts             |
+| Render equivalence | `e2e/tests/parity/screenshot-parity.spec.ts` (in the suite above) | First-page pixel diff over 2% between adapters (coarse v1 threshold; known gaps tracked for #85)                                                     |
+| Snapshot parity    | `bun run check:snapshot-parity`                                   | Round-trip digest drift vs `fixtures/snapshot-digests.json`; regen with `bun run snapshot:update`                                                    |
+| Bundle-size parity | `bun run check:parity-bundle-size`                                | Gzip gap over 25% with the larger side grown vs `scripts/parity/bundle-size.baseline.json`; re-baseline with `bun run parity-bundle-baseline:update` |
+| Matrix freshness   | `bun run check:parity-matrix`                                     | Component surface changed without a matrix update under `openspec/changes/vue-editor-robust-implementation/`                                         |
+
+Shared inputs live in `examples/parity/fixtures/` (`snapshot-corpus.json`
+corpus + committed digests; see its README). The binary `.docx` corpus
+stays in the repo-root `e2e/fixtures/` directory shared by all suites.

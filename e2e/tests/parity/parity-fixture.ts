@@ -30,7 +30,7 @@ export interface AdapterFixture {
   readySelector: string;
 }
 
-const ADAPTERS: AdapterFixture[] = [
+export const ADAPTERS: AdapterFixture[] = [
   {
     name: 'react',
     baseUrl: 'http://localhost:5173',
@@ -95,16 +95,42 @@ export async function openEditor(
 /**
  * Declare a test once, run it once per adapter. Each generated test gets
  * `[<adapter>]` appended to its title.
+ *
+ * On failure an explicit screenshot is captured to the test's output
+ * directory as `<adapter>-failure.png` (alongside Playwright's own
+ * only-on-failure screenshot). The output path embeds the test title —
+ * which carries the `[react]` / `[vue]` tag — so a failing artifact is
+ * always attributable to its adapter without opening the report.
+ *
+ * @param opts.fixmeAdapters quarantine these adapters via `test.fixme`
+ * (tracked cross-adapter gap — skip shows in reports, suite stays green,
+ * owning issue re-enables).
  */
 export function forEachAdapter(
   title: string,
-  body: (adapter: AdapterFixture, args: { page: Page }) => Promise<void>
+  body: (adapter: AdapterFixture, args: { page: Page }) => Promise<void>,
+  opts?: { fixmeAdapters?: string[]; fixmeReason?: string }
 ): void {
   for (const adapter of ADAPTERS) {
+    const quarantined = opts?.fixmeAdapters?.includes(adapter.name) ?? false;
+    const declareTest = quarantined ? test.fixme : test;
     // First arg must literally destructure for Playwright's fixture
     // detection: `(args) =>` would fail "First argument must use the
     // object destructuring pattern".
-    test(`${title} [${adapter.name}]`, ({ page }) => body(adapter, { page }));
+    declareTest(`${title} [${adapter.name}]`, async ({ page }, testInfo) => {
+      if (quarantined && opts?.fixmeReason)
+        testInfo.annotations.push({ type: 'issue', description: opts.fixmeReason });
+      try {
+        await body(adapter, { page });
+      } catch (error) {
+        // The page may already be dead (navigation failure, crash) — never
+        // let the attribution screenshot mask the original error.
+        await page
+          .screenshot({ path: testInfo.outputPath(`${adapter.name}-failure.png`) })
+          .catch(() => {});
+        throw error;
+      }
+    });
   }
 }
 

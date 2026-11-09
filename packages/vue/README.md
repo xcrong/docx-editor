@@ -108,7 +108,9 @@ For lower-level mounting on your own DOM, use the `useDocxEditor` composable.
 
 ## Contributing
 
-Contributions welcome. See [CONTRIBUTING.md](https://github.com/xcrong/docx-editor/blob/main/CONTRIBUTING.md) for setup, tests, and the community contribution terms (no CLA to sign).
+Before pushing adapter changes, run the on-demand parity smoke suite (boots
+both demos itself; CI re-runs it as a backstop): `bun run
+test:e2e:parity:smoke`. Full suite: `bun run test:e2e:parity`.
 
 ## Commercial Support
 
