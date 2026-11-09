@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedFor": "51a781dc",
+  "updatedFor": "49fd2044",
   "entries": {
     "react": "packages/react/dist/index.mjs",
     "vue": "packages/vue/dist/index.js"
