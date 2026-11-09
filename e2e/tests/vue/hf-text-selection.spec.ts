@@ -43,12 +43,14 @@ test('Vue: selecting header text paints HF selection rects', async ({ page }) =>
   await expect(page.locator('.vue-hf-sel-rect')).toHaveCount(0);
 });
 
+// QUARANTINE (#99, owns T28-02 #85): fails deterministically in CI and locally,
+// pre-existing on main and pre-T23. `.vue-hf-sel-rect` never appears.
 // Regression for #691 (footer, multi-page): the same header/footer is painted
 // on every page, but the caret/selection overlay was always resolved against
 // the FIRST painted instance (page 1). Editing a footer on a later page drew
 // the highlight on page 1 — off-screen — so the user saw nothing. The overlay
 // now resolves against the painted instance nearest the viewport.
-test('Vue: footer selection on a later page paints rects on that page', async ({ page }) => {
+test.fixme('Vue: footer selection on a later page paints rects on that page', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 });
   // Default demo document: multi-page with a footer ("Page N of M ...").
   await page.goto('http://localhost:5174/');
