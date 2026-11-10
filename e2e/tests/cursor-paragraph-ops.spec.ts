@@ -169,8 +169,7 @@ test.describe('Cursor-Only Alignment Operations', () => {
     expect(textAlign).toBe('justify');
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails full-run + all CI retries; passes unloaded solo).
-  test.fixme('align left (reset) with cursor only', async ({ page }) => {
+  test('align left (reset) with cursor only', async ({ page }) => {
     await editor.typeText('Reset to left');
 
     // First center it
@@ -191,14 +190,15 @@ test.describe('Cursor-Only Alignment Operations', () => {
     expect(textAlign).toBe('left');
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('keyboard shortcut Ctrl+E centers with cursor only', async ({ page }) => {
+  test('keyboard shortcut Ctrl+E centers with cursor only', async ({ page }) => {
     await editor.typeText('Shortcut test');
 
     await page.keyboard.press('Home');
 
-    // Use keyboard shortcut
-    await page.keyboard.press('Control+e');
+    // Use keyboard shortcut (ControlOrMeta = the platform's Mod key: Ctrl on
+    // Win/Linux, Cmd on macOS — matching the Mod-e binding; a literal Ctrl+e
+    // is claimed by baseKeymap's selectTextblockEnd on macOS).
+    await page.keyboard.press('ControlOrMeta+e');
 
     const paragraph = page.locator('.ProseMirror p');
     const textAlign = await paragraph.evaluate((el) => {

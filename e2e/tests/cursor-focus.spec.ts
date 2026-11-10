@@ -82,29 +82,41 @@ test.describe('Cursor Focus - Toolbar Interactions', () => {
     expect(editorHasFocus).toBe(true);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('cursor stays visible after clicking alignment buttons', async ({ page }) => {
+  test('cursor stays visible after clicking alignment buttons', async ({ page }) => {
     await editor.typeText('Test text');
 
-    // Click Center alignment
-    await page.getByRole('button', { name: 'Center (Ctrl+E)' }).click();
+    // Click Center alignment (FormattingBar uses an alignment dropdown now)
+    await editor.toolbar.locator('[data-testid="toolbar-alignment"]').click();
+    await page.locator('[data-testid="alignment-center"]').click();
 
-    // Verify focus is maintained
-    const editorHasFocus = await page.evaluate(() => {
-      const editor = document.querySelector('.ProseMirror');
-      return document.activeElement === editor || editor?.contains(document.activeElement);
-    });
-    expect(editorHasFocus).toBe(true);
+    // Verify focus is maintained (poll: the dropdown menu briefly takes focus
+    // while closing, so allow it a moment to return to the editor).
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const editor = document.querySelector('.ProseMirror');
+            return document.activeElement === editor || editor?.contains(document.activeElement);
+          }),
+        { timeout: 3000 }
+      )
+      .toBe(true);
 
     // Click Right alignment
-    await page.getByRole('button', { name: 'Align Right (Ctrl+R)' }).click();
+    await editor.toolbar.locator('[data-testid="toolbar-alignment"]').click();
+    await page.locator('[data-testid="alignment-right"]').click();
 
     // Verify focus is still maintained
-    const stillHasFocus = await page.evaluate(() => {
-      const editor = document.querySelector('.ProseMirror');
-      return document.activeElement === editor || editor?.contains(document.activeElement);
-    });
-    expect(stillHasFocus).toBe(true);
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const editor = document.querySelector('.ProseMirror');
+            return document.activeElement === editor || editor?.contains(document.activeElement);
+          }),
+        { timeout: 3000 }
+      )
+      .toBe(true);
   });
 
   test('cursor stays visible after clicking list buttons', async ({ page }) => {
@@ -334,13 +346,13 @@ test.describe('Cursor Focus - Background Click', () => {
     await editor.focus();
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('clicking toolbar does not lose editor focus', async ({ page }) => {
+  test('clicking toolbar does not lose editor focus', async ({ page }) => {
     // Type some text first
     await editor.typeText('Some text');
 
-    // Click on the toolbar area (but not on a button)
-    const toolbar = page.getByTestId('toolbar');
+    // Click on the toolbar area (but not on a button). The demo renders
+    // FormattingBar (data-testid="formatting-bar"), not the legacy Toolbar.
+    const toolbar = editor.toolbar;
     const box = await toolbar.boundingBox();
     if (box) {
       // Click on empty area of toolbar (far right where there are no buttons)

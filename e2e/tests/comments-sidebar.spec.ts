@@ -404,8 +404,7 @@ test.describe('Comments sidebar — resolve / reopen (regression #268)', () => {
     expect(await isCommentExpanded(page, id)).toBe(true);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails full-run + all CI retries; passes unloaded solo).
-  test.fixme('clicking Resolve immediately collapses the card to the checkmark marker', async ({
+  test('clicking Resolve immediately collapses the card to the checkmark marker', async ({
     page,
   }) => {
     // Resolving without moving the cursor should not leave the expanded card
@@ -596,8 +595,7 @@ test.describe('Comments sidebar — feedback-loop stability', () => {
     expect(await isCommentExpanded(page, id)).toBe(true);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails full-run + all CI retries; passes unloaded solo).
-  test.fixme('clicking a collapsed card in the sidebar expands it without moving the cursor', async ({
+  test('clicking a collapsed card in the sidebar expands it without moving the cursor', async ({
     page,
   }) => {
     const editor = await setupEmptyDoc(page);

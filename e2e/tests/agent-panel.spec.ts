@@ -64,18 +64,25 @@ test.describe('AgentPanel — toolbar toggle + close', () => {
     await expect(panel).toContainText('BYO chat goes here.');
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('drag handle resizes the panel within min/max bounds', async ({ page }) => {
+  test('drag handle resizes the panel within min/max bounds', async ({ page }) => {
     await page.getByRole('button', { name: 'Open assistant' }).click();
     const panel = page.getByTestId('agent-panel');
     await expect(panel).toHaveAttribute('data-state', 'open');
 
-    // Wait for the open transition to settle so the initial bounding box
-    // reflects the panel's resting width, not a mid-transition value.
+    // Wait for the open transition to fully settle: the width must stop
+    // changing (not merely exceed 300), otherwise the running transition
+    // fights the drag's inline widths and the drag lands short.
     await expect
-      .poll(async () => (await panel.boundingBox())?.width ?? 0, { timeout: 2000 })
+      .poll(
+        async () => {
+          const a = (await panel.boundingBox())?.width ?? 0;
+          await page.waitForTimeout(150);
+          const b = (await panel.boundingBox())?.width ?? 0;
+          return a > 300 && Math.abs(a - b) < 1 ? a : 0;
+        },
+        { timeout: 5000 }
+      )
       .toBeGreaterThan(300);
-
     const initialBox = await panel.boundingBox();
     expect(initialBox).not.toBeNull();
     const startWidth = initialBox!.width;
@@ -91,11 +98,13 @@ test.describe('AgentPanel — toolbar toggle + close', () => {
     await page.mouse.down();
     await page.mouse.move(startX - 100, startY, { steps: 10 });
     await page.mouse.up();
-
-    const finalBox = await panel.boundingBox();
-    expect(finalBox).not.toBeNull();
-    expect(finalBox!.width).toBeGreaterThan(startWidth + 60);
-    expect(finalBox!.width).toBeLessThan(startWidth + 140);
+    // Poll: React state + re-render land after the last pointermove.
+    await expect
+      .poll(async () => (await panel.boundingBox())?.width ?? 0, { timeout: 2000 })
+      .toBeGreaterThan(startWidth + 60);
+    await expect
+      .poll(async () => (await panel.boundingBox())?.width ?? 0, { timeout: 2_000 })
+      .toBeLessThan(startWidth + 140);
   });
 });
 
