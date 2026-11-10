@@ -82,6 +82,12 @@ jobs:
     if: needs.changes.outputs.react == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # 1016 tests on 1 CI worker (stability) exceeds 30min — split into
+    # 2 shards, each ~500 tests (~17min). Keep workers at 1 per shard.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ['1/2', '2/2']
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.3
@@ -100,14 +106,14 @@ jobs:
       - name: Install metric-compatible fonts (Calibri/Cambria)
         run: sudo apt-get update && sudo apt-get install -y fonts-crosextra-carlito fonts-crosextra-caladea
 
-      - name: React-only suite
-        run: NO_NUXT=1 npx playwright test --project=chromium --timeout=30000
+      - name: React-only suite (shard ${{ matrix.shard }})
+        run: NO_NUXT=1 npx playwright test --project=chromium --timeout=30000 --shard=${{ matrix.shard }}
 
-      - name: Upload failure screenshots
+      - name: Upload failure screenshots (shard ${{ matrix.shard }})
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: react-failure-screenshots
+          name: react-failure-screenshots-${{ matrix.shard }}
           path: screenshots/test-results/
           retention-days: 7
 
