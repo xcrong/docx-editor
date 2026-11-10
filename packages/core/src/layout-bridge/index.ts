@@ -50,6 +50,9 @@ export {
 } from './hitTest';
 export type { Point, PageHit, FragmentHit, TableCellHit, HitTestResult } from './hitTest';
 
+// Sidebar anchors — PM comment/revision positions to layout Y, no DOM needed.
+export { computeCommentAnchorPositions } from './anchorPositions';
+
 // Click → PM position
 //
 // Two variants: the geometric `clickToPosition` works on layout state alone

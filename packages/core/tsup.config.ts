@@ -37,6 +37,7 @@ export default defineConfig([
       'layout-painter/index': 'src/layout-painter/index.ts',
       'layout-painter/renderPage': 'src/layout-painter/renderPage.ts',
       'layout-bridge/index': 'src/layout-bridge/index.ts',
+      'layout-bridge/anchorPositions': 'src/layout-bridge/anchorPositions.ts',
       'layout-bridge/clickToPositionDom': 'src/layout-bridge/clickToPositionDom.ts',
       'layout-bridge/measuring/index': 'src/layout-bridge/measuring/index.ts',
       'layout-bridge/tableInsertHover': 'src/layout-bridge/tableInsertHover.ts',

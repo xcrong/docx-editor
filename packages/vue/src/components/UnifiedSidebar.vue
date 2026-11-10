@@ -102,6 +102,12 @@ const props = defineProps<{
   pagesContainer: HTMLElement | null;
   pageWidthPx: number;
   zoom?: number;
+  /**
+   * Engine-computed anchors in pages-container coords (PM+layout, no DOM
+   * dependency). Primary source — the DOM query below only fills keys
+   * missing here (unrendered virtualized pages anchor via this map).
+   */
+  engineAnchorPositions?: Map<string, number>;
   /** Controlled expand: when set, overrides local click toggling.
    *  Used by DocxEditor to auto-expand cards when the cursor
    *  lands on a commented / tracked span (mirrors React
@@ -280,6 +286,18 @@ function computePositions() {
           : insertionEls.get(String(change.insertionRevisionId ?? change.revisionId));
     }
     if (anchor) anchorPositions.set(item.anchorKey, anchorY(anchor));
+  }
+  // Engine anchors first-class: PM+layout positions need no painted DOM,
+  // so virtualized (unmounted) pages still anchor. The DOM pass above wins
+  // on overlap (it sees HF scopes in another PM document); the engine map
+  // fills keys the DOM can't see. Both maps are in pages-container coords.
+  const engineAnchors = props.engineAnchorPositions;
+  if (engineAnchors) {
+    for (const item of list) {
+      if (!item.anchorKey || anchorPositions.has(item.anchorKey)) continue;
+      const y = engineAnchors.get(item.anchorKey);
+      if (y != null) anchorPositions.set(item.anchorKey, y);
+    }
   }
 
   // Card-height lookup: also batched into one querySelectorAll.

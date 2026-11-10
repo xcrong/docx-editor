@@ -237,6 +237,7 @@ export interface UseDocxEditorOptions {
     author?: MaybeRef<string>;
     editorMode?: MaybeRef<'editing' | 'suggesting' | 'viewing'>;
     externalPlugins?: Plugin_2[];
+    getZoom?: () => number;
     hiddenContainer: Ref<HTMLElement | null>;
     onChange?: (doc: Document_2) => void;
     onError?: (error: Error) => void;
@@ -253,6 +254,7 @@ export interface UseDocxEditorReturn {
     documentFonts: Ref<FontOption[]>;
     editorState: ShallowRef<EditorState | null>;
     editorView: ShallowRef<EditorView | null>;
+    engineAnchorPositions: ShallowRef<Map<string, number>>;
     focus: () => void;
     getCommands: () => CommandMap;
     getDocument: () => Document_2 | null;

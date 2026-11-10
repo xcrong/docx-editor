@@ -99,6 +99,9 @@ export function collectFootnoteRefs(blocks: FlowBlock[]): FootnoteRefLocation[];
 export function columnWidthForSection(config: SectionLayoutConfig): number;
 
 // @public
+export function computeCommentAnchorPositions(pmView: EditorView | null, layout: Layout, blocks: FlowBlock[], measures: Measure[], contentOffset: number): Map<string, number>;
+
+// @public
 export function computeHfCaretRectFromView(view: EditorView, section: 'header' | 'footer', doc?: globalThis.Document, preferredHost?: HTMLElement | null): {
     top: number;
     left: number;
