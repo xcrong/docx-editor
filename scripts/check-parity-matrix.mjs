@@ -3,7 +3,7 @@
 //
 // Fails when a change touches component/UI surface under
 // `packages/{react,vue}/src/components/` or
-// `packages/agent-use/src/{react,vue}/` without also updating the parity
+// `packages/agents/src/{react,vue}/` without also updating the parity
 // matrix (`openspec/changes/vue-editor-robust-implementation/` — the spec
 // or its notes). Keeps "what's done / partial / missing" honest: no
 // silent UI drift without a matrix row update.
@@ -16,8 +16,8 @@ import { execSync } from 'node:child_process';
 const COMPONENT_PREFIXES = [
   'packages/react/src/components/',
   'packages/vue/src/components/',
-  'packages/agent-use/src/react/',
-  'packages/agent-use/src/vue/',
+  'packages/agents/src/react/',
+  'packages/agents/src/vue/',
 ];
 const MATRIX_PREFIX = 'openspec/changes/vue-editor-robust-implementation/';
 

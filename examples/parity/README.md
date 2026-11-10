@@ -63,3 +63,16 @@ running on every PR (`.github/workflows/parity.yml`):
 Shared inputs live in `examples/parity/fixtures/` (`snapshot-corpus.json`
 corpus + committed digests; see its README). The binary `.docx` corpus
 stays in the repo-root `e2e/fixtures/` directory shared by all suites.
+
+## Pair-edit dev mode (T28-03, issue #86)
+
+`bun run dev:parity:watch`, edit a Vue component, see the smoke parity
+tests re-run on save. The watcher boots the React (`:5173`) and Vue
+(`:5174`) demos once, runs `e2e/tests/parity/smoke/` immediately, then
+watches `packages/*/src` + the demo sources and re-runs smoke (debounced
+1.5s, serialised — a save mid-run queues one more run). Playwright reuses
+the already-running demos instead of booting its own.
+
+No new dependencies: the watcher is `scripts/dev-parity-watch.mjs`
+(node `child_process` + `fs.watch`). Plain two-server dev without the
+test loop is `bun run dev:parity`.
