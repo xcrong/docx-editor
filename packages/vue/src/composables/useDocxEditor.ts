@@ -268,6 +268,12 @@ export interface UseDocxEditorReturn {
    * the document model when unset.
    */
   setSaveCommentsProvider: (provider: (() => Comment[]) | null) => void;
+  /**
+   * Provide the adapter-owned resolved-comment id set for highlight
+   * rendering. Falls back to undefined (all highlights shown) when unset.
+   * Mirrors React's resolvedCommentIds pipeline input.
+   */
+  setResolvedCommentIdsProvider: (provider: (() => Set<number>) | null) => void;
 }
 export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorReturn {
   const {
@@ -334,6 +340,10 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   // Adapter-owned comment list provider (set by DocxEditor.vue from its
   // `comments` ref). Falls back to the document model's comments.
   let saveCommentsProvider: (() => Comment[]) | null = null;
+  // Adapter-owned resolved-comment id set for highlight rendering (set by
+  // DocxEditor.vue from its `resolvedCommentIds` computed). Falls back to
+  // undefined (all highlights shown) when unset.
+  let resolvedCommentIdsProvider: (() => Set<number>) | null = null;
 
   const engineHost: EngineHost = {
     getDocument: () => document.value,
@@ -350,7 +360,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       return { header, footer, firstHeader, firstFooter };
     },
     getPageGap: () => pageGap,
-    getResolvedCommentIds: () => undefined,
+    getResolvedCommentIds: () => resolvedCommentIdsProvider?.() ?? undefined,
     getHfPmDoc: (hf) => getHfPmView(hf)?.state.doc ?? null,
     measureBlocks,
     getSyncCoordinator: () => syncCoordinator,
@@ -814,6 +824,13 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
      */
     setSaveCommentsProvider(provider: (() => Comment[]) | null) {
       saveCommentsProvider = provider;
+    },
+    /**
+     * Provide the adapter-owned resolved-comment id set for highlight
+     * rendering (the SFC's `resolvedCommentIds` computed).
+     */
+    setResolvedCommentIdsProvider(provider: (() => Set<number>) | null) {
+      resolvedCommentIdsProvider = provider;
     },
   };
 }
