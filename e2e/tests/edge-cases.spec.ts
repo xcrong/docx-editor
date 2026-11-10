@@ -363,7 +363,10 @@ test.describe('Performance', () => {
   });
 
   test('handles large text input', async ({ page }) => {
-    test.setTimeout(60000);
+    // Throughput smoke, not a latency bound: typing is ~10ms/char linear
+    // (measured), so 5600 chars need ~55s + overhead. CI runners are slower
+    // than dev machines — 60s flaked. The assertion is survival, not speed.
+    test.setTimeout(120000);
 
     const largeText = 'Lorem ipsum dolor sit amet. '.repeat(200);
     await editor.typeText(largeText);
