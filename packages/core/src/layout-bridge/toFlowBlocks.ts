@@ -50,6 +50,7 @@ const DEFAULT_SIZE = 11; // points (Word 2007+ default)
  * Convert PM paragraph attrs to layout engine paragraph attrs.
  */
 function convertParagraphAttrs(
+  node: PMNode,
   pmAttrs: PMParagraphAttrs,
   theme?: Theme | null,
   listCounters?: Map<number, number[]>,
@@ -299,6 +300,26 @@ function convertParagraphAttrs(
   // bar and don't cross-pollute the cache with same-text-no-revision peers.
   if (pmAttrs.pPrIns) attrs.pPrIns = pmAttrs.pPrIns;
   if (pmAttrs.pPrDel) attrs.pPrDel = pmAttrs.pPrDel;
+  // Property-change histories ride the same reference into the block (no
+  // copy): the painter renders change bars from them in T27-03 and the
+  // measurement cache discriminates on their presence.
+  if (pmAttrs.pPrChange) attrs.pPrChange = pmAttrs.pPrChange;
+  if (pmAttrs.paraRPrChange) attrs.paraRPrChange = pmAttrs.paraRPrChange;
+  const sectPrChange = pmAttrs._sectionProperties?.sectPrChange;
+  if (sectPrChange) attrs.sectPrChange = sectPrChange;
+  // Run-level `revision_change` marks (Phase 3) live on descendant text
+  // nodes; the block itself only records presence. Early-exit scan — the
+  // common no-mark case still walks the paragraph once, matching the cost
+  // of the runs conversion above.
+  let hasRevisionChange = false;
+  node.descendants((child) => {
+    if (child.isText && child.marks.some((m) => m.type.name === 'revision_change')) {
+      hasRevisionChange = true;
+      return false;
+    }
+    return undefined;
+  });
+  if (hasRevisionChange) attrs.hasRevisionChange = true;
 
   // List-marker tracked-change state. When the numbering itself is a pending
   // revision the painter colors the marker (Word shows an inserted list item's
@@ -355,6 +376,7 @@ function convertParagraph(
   const pmAttrs = node.attrs as PMParagraphAttrs;
   const runs = paragraphToRuns(node, startPos, options);
   const attrs = convertParagraphAttrs(
+    node,
     pmAttrs,
     options.theme,
     options.listCounters,

@@ -131,6 +131,42 @@ export function extractTrackedChanges(state: EditorState | null): TrackedChanges
           });
         }
       }
+      // Paragraph-mark run-property changes — one entry per (id, author,
+      // date) entry in the paraRPrChange array (CT_ParaRPrChange).
+      const paraRPrChange = node.attrs.paraRPrChange as Array<{
+        info: { id: number; author: string; date?: string };
+      }> | null;
+      if (Array.isArray(paraRPrChange)) {
+        for (const entry of paraRPrChange) {
+          raw.push({
+            type: 'paragraphMarkPropertiesChanged',
+            text: node.textContent || '',
+            author: entry.info.author || '',
+            date: entry.info.date ?? undefined,
+            from: pos,
+            to: pos + node.nodeSize,
+            revisionId: entry.info.id,
+          });
+        }
+      }
+      // Section-property change carried on this paragraph's section
+      // properties (pPr-level w:sectPrChange). Body-level changes live on
+      // the document's final section properties, outside the PM doc.
+      const sectProps = node.attrs._sectionProperties as {
+        sectPrChange?: { info: { id: number; author: string; date?: string } };
+      } | null;
+      const sectPrChange = sectProps?.sectPrChange;
+      if (sectPrChange) {
+        raw.push({
+          type: 'sectionPropertiesChanged',
+          text: node.textContent || '',
+          author: sectPrChange.info.author || '',
+          date: sectPrChange.info.date ?? undefined,
+          from: pos,
+          to: pos + node.nodeSize,
+          revisionId: sectPrChange.info.id,
+        });
+      }
       // Descend into paragraph content; do not return here.
     }
 

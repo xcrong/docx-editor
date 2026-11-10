@@ -8,6 +8,11 @@
  */
 
 import type { InlineSdtWidget } from './inlineSdtWidgets';
+import type {
+  ParagraphMarkPropertyChange,
+  ParagraphPropertyChange,
+  SectionPropertyChange,
+} from '../types/content/trackedChange';
 
 export type { InlineSdtWidget } from './inlineSdtWidgets';
 
@@ -360,6 +365,29 @@ export type ParagraphAttrs = {
   pPrIns?: import('../types/content/trackedChange').RevisionInfo | null;
   /** Tracked-change marker on the paragraph mark (`<w:pPr><w:rPr><w:del/>`). */
   pPrDel?: import('../types/content/trackedChange').RevisionInfo | null;
+  /**
+   * Paragraph property changes (`<w:pPrChange>`). Carried from the PM
+   * paragraph node so the painter can render the margin change bar and the
+   * measurement cache can discriminate. Same array reference (no copy).
+   */
+  pPrChange?: ParagraphPropertyChange[] | null;
+  /**
+   * Paragraph-mark run-property changes (`CT_ParaRPrChange`). Same
+   * passthrough contract as `pPrChange`.
+   */
+  paraRPrChange?: ParagraphMarkPropertyChange[] | null;
+  /**
+   * Section-property change (`<w:sectPrChange>`) from this paragraph's
+   * section properties, if any. Body-level changes live on the document's
+   * final section properties, outside any block.
+   */
+  sectPrChange?: SectionPropertyChange | null;
+  /**
+   * Any run in this paragraph carries a `revision_change` mark (run-level
+   * `w:rPrChange`; the mark type lands in Phase 3). Forward-compatible
+   * presence flag for the painter and the measurement cache key.
+   */
+  hasRevisionChange?: boolean;
 };
 
 /**

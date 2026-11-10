@@ -314,6 +314,14 @@ export function hashParagraphBlock(block: ParagraphBlock): string {
     // cache entry, or the second-painted doc inherits the first's pilcrow.
     if (attrs.pPrIns) parts.push(`pins:${attrs.pPrIns.revisionId}`);
     if (attrs.pPrDel) parts.push(`pdel:${attrs.pPrDel.revisionId}`);
+    // Property-change histories paint a margin change bar (and the pilcrow
+    // glyph for paraRPrChange) — same-text paragraphs with different
+    // histories must not share a measurement. Presence-only: the prior
+    // snapshots never affect layout geometry.
+    if (attrs.pPrChange) parts.push('pchg');
+    if (attrs.paraRPrChange) parts.push('mchg');
+    if (attrs.sectPrChange) parts.push('schg');
+    if (attrs.hasRevisionChange) parts.push('rchg');
   }
 
   return parts.join('||');

@@ -33,6 +33,7 @@ import {
   paragraphStartsWithRenderedPageBreak,
   parseParagraphContents,
   parseParagraphPropertyChanges,
+  parseParagraphMarkPropertyChanges,
 } from './paragraphParser/content';
 
 // Public re-exports (preserve historical import surface).
@@ -138,6 +139,15 @@ export function parseParagraph(
         if (info) paragraph.pPrDel = info;
       }
     }
+    // Paragraph-mark run-property change (`w:rPrChange` inside the
+    // paragraph-mark rPr — CT_ParaRPrChange, NOT the run-rPrChange path).
+    const markChanges = parseParagraphMarkPropertyChanges(
+      pPrRPr,
+      theme,
+      styles,
+      paragraph.formatting?.runProperties
+    );
+    if (markChanges) paragraph.paraRPrChange = markChanges;
 
     // Check for section properties within paragraph (marks end of a section)
     const sectPr = findChild(pPr, 'w', 'sectPr');

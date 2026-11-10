@@ -316,3 +316,10 @@ export function createSuggestionModePlugin(initialActive = false, author = 'User
 // Public surface — keep import paths stable for external consumers.
 export { suggestionModeKey, SUGGESTION_BYPASS_META } from './state';
 export { toggleSuggestionMode, setSuggestionMode, isSuggestionModeActive } from './commands';
+export {
+  withSuggestingSnapshot,
+  freezePriorEntry,
+  clearNoOpEntries,
+  sameRevisionSession,
+} from './snapshot';
+export type { PropertyChangeEntry, PropertySnapshotter } from './snapshot';

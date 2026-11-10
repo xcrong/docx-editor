@@ -8,6 +8,7 @@ import type { Command, Transaction } from 'prosemirror-state';
 import type { EditorState } from 'prosemirror-state';
 import { SUGGESTION_BYPASS_META } from '../plugins/suggestionMode';
 import { extractTrackedChanges } from '../utils/extractTrackedChanges';
+import { restoreParagraphPriorProperties } from '../utils/restorePriorProperties';
 
 /**
  * Add a comment mark to the current selection.
@@ -477,86 +478,6 @@ function clearParagraphPropertyChangeEntry(
 }
 
 /**
- * Restore fields from a prior `ParagraphFormatting` snapshot onto the
- * paragraph's PM attrs. Only the user-visible fields are copied — anything
- * not in `prior` is left untouched.
- */
-function applyPriorParagraphFormattingToAttrs(
-  attrs: Record<string, unknown>,
-  prior: import('../../types/document').ParagraphFormatting,
-  current?: import('../../types/document').ParagraphFormatting
-): Record<string, unknown> {
-  const next: Record<string, unknown> = { ...attrs };
-  // Only fields whose PM-attr shape matches the model `ParagraphFormatting`
-  // shape are safe to copy verbatim. Specifically EXCLUDED:
-  //
-  //   - `borders` — model is `{ top?: BorderSpec, ... }`, PM attr same
-  //     shape — IS safe and IS included below.
-  //   - `shading` — same shape — IS safe.
-  //   - `tabs` — model `TabStop[]`, PM same — IS safe.
-  //   - `numPr` — model `{ numId?, ilvl? }`, PM same — IS safe.
-  //   - `frame` — model `FrameProperties`; PM has no equivalent attr —
-  //     SKIPPED.
-  //   - `runProperties` — model rPr; PM uses resolved `defaultTextFormatting`
-  //     via a style cascade — SKIPPED (would overwrite resolved data).
-  //   - `widowControl`, `suppressLineNumbers`, `suppressAutoHyphens` — model
-  //     has them but PM does not surface as attrs — SKIPPED until plumbed.
-  //
-  // Fields below are confirmed congruent in both shapes. Adding a new
-  // ParagraphFormatting field requires verifying its PM attr shape (see
-  // `packages/core/src/prosemirror/schema/nodes.ts`'s ParagraphAttrs).
-  const fields: Array<keyof import('../../types/document').ParagraphFormatting> = [
-    'alignment',
-    'spaceBefore',
-    'spaceAfter',
-    'lineSpacing',
-    'lineSpacingRule',
-    'beforeAutospacing',
-    'afterAutospacing',
-    'spacingExplicit',
-    'indentLeft',
-    'indentRight',
-    'indentFirstLine',
-    'hangingIndent',
-    'styleId',
-    'borders',
-    'shading',
-    'tabs',
-    'pageBreakBefore',
-    'keepNext',
-    'keepLines',
-    'contextualSpacing',
-    'bidi',
-    'outlineLevel',
-    'numPr',
-  ];
-  for (const f of fields) {
-    if (Object.prototype.hasOwnProperty.call(prior, f)) {
-      next[f as string] = prior[f] ?? null;
-    }
-  }
-  // Numbering added by the change must be removed on reject. When `prior` has
-  // no `numPr` the loop above leaves the current numbering in place — correct
-  // for an unrelated property change (e.g. alignment) on a list item, but
-  // wrong when THIS change is what introduced the numbering. Disambiguate via
-  // `current`: if the post-change snapshot carried `numPr` and the prior did
-  // not, the numbering was part of the change, so clear it. This is the path a
-  // list-creation suggestion takes after a save/reload, where the empty prior
-  // `<w:pPr/>` round-trips without a `numPr` key (issue #634).
-  if (current?.numPr && !Object.prototype.hasOwnProperty.call(prior, 'numPr')) {
-    next.numPr = null;
-  }
-  // Keep the render-only list attrs consistent with `numPr`: once numbering is
-  // gone, the bullet/format/marker hints must go too, or a stale glyph lingers.
-  if (next.numPr == null) {
-    next.listIsBullet = null;
-    next.listNumFmt = null;
-    next.listMarker = null;
-  }
-  return next;
-}
-
-/**
  * Resolve every site sharing a revision id in one PM transaction. Bypass
  * the suggesting-mode keymap (we're applying, not authoring).
  *
@@ -694,11 +615,7 @@ function resolveById(revisionId: number, mode: 'accept' | 'reject'): Command {
         // Restore prior fields BEFORE clearing the entry so we don't lose
         // the snapshot in the intermediate state. `current` lets the restore
         // detect (and clear) numbering the change introduced.
-        const restored = applyPriorParagraphFormattingToAttrs(
-          liveNode.attrs,
-          site.prior,
-          site.current
-        );
+        const restored = restoreParagraphPriorProperties(liveNode.attrs, site.prior, site.current);
         const nextChanges = liveChanges.slice();
         nextChanges.splice(liveIndex, 1);
         tr.setNodeMarkup(mappedPos, undefined, {

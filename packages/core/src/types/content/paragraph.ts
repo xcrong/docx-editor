@@ -21,6 +21,7 @@ import type {
   MoveToRangeStart,
   MoveToRangeEnd,
   ParagraphPropertyChange,
+  ParagraphMarkPropertyChange,
   TrackedChangeInfo,
 } from './trackedChange';
 import type { MathEquation } from './math';
@@ -88,6 +89,13 @@ export interface Paragraph {
    * suggesting mode. Accept joins this paragraph with the following one.
    */
   pPrDel?: TrackedChangeInfo;
+  /**
+   * Paragraph-mark run-property changes (`w:pPr/w:rPr/w:rPrChange`,
+   * `CT_ParaRPrChange`). Array because multiple authors can stack edits on
+   * the same paragraph mark. Separate from `propertyChanges` (which is
+   * `w:pPrChange`) and from run `w:rPrChange` — different schema positions.
+   */
+  paraRPrChange?: ParagraphMarkPropertyChange[];
   /** Paragraph content */
   content: ParagraphContent[];
   /**

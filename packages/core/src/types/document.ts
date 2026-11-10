@@ -108,6 +108,8 @@ export type {
   MoveToRangeStart,
   MoveToRangeEnd,
   RunPropertyChange,
+  ParagraphMarkPropertyChange,
+  SectionPropertyChange,
   ParagraphPropertyChange,
   TablePropertyChange,
   TableRowPropertyChange,
