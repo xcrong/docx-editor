@@ -543,6 +543,9 @@
       "docx/rezip": [
         "./dist/docx/rezip.d.ts"
       ],
+      "layout-bridge/anchorPositions": [
+        "./dist/layout-bridge/anchorPositions.d.ts"
+      ],
       "layout-bridge/clickToPositionDom": [
         "./dist/layout-bridge/clickToPositionDom.d.ts"
       ],
