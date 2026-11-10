@@ -1143,6 +1143,7 @@ export interface Paragraph {
     leadingBlockMarkers?: (BookmarkStart | BookmarkEnd)[];
     listRendering?: ListRendering;
     paraId?: string;
+    paraRPrChange?: ParagraphMarkPropertyChange[];
     pPrDel?: TrackedChangeInfo;
     pPrIns?: TrackedChangeInfo;
     propertyChanges?: ParagraphPropertyChange[];
@@ -1535,6 +1536,7 @@ export interface SectionProperties {
     paperSrcFirst?: number;
     paperSrcOther?: number;
     sectionStart?: SectionStart;
+    sectPrChange?: SectionPropertyChange;
     separator?: boolean;
     titlePg?: boolean;
     verticalAlign?: VerticalAlign;
