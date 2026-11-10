@@ -138,10 +138,9 @@ test.describe('Agent bridge — formatting + paged reads', () => {
     expect(ok).toBe(false);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('getPageContent returns paragraphs on page 1 with stable paraIds', async ({
-    page,
-  }) => {
+  // The loadDocxFile settle-wait (first-paraId identity change) fixed the
+  // default-doc vs fixture race that quarantined this test (#107).
+  test('getPageContent returns paragraphs on page 1 with stable paraIds', async ({ page }) => {
     const paraId = await getFirstParaId(page);
     test.skip(!paraId, 'Fixture has no paraIds');
 

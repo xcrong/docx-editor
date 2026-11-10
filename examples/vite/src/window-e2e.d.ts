@@ -4,6 +4,8 @@ import type { ContentBlock } from '@xcrong/docx-editor-agents';
 declare global {
   interface Window {
     __DOCX_EDITOR_E2E__?: {
+      // Raw body EditorView — lets specs build precise PM states without driving the toolbar UI.
+      getView: () => unknown;
       getPmStartForParaId: (paraId: string) => number | null;
       getSelectionAnchor: () => number | null;
       getTextblockEndForParaId: (paraId: string) => number | null;
