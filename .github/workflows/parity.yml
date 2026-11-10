@@ -38,9 +38,11 @@ jobs:
             react:
               - 'packages/react/**'
               - 'packages/agents/src/react/**'
+              - 'packages/core/**'
             vue:
               - 'packages/vue/**'
               - 'packages/agents/src/vue/**'
+              - 'packages/core/**'
 
   parity-e2e:
     if: github.actor != 'dependabot[bot]'
