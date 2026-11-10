@@ -118,19 +118,19 @@ Per Decisions 20 and 21. New scripts live in `scripts/`. Wire pre-commit/pre-pus
 
 ### 8b.7. Pair-edit dev mode
 
-- [ ] 8b.17 Add `bun run dev:parity:watch` script — concurrently runs the React dev server, Vue dev server, and `playwright test tests/parity/smoke/ --watch`
-- [ ] 8b.18 Document in `examples/parity/README.md` how to use it: "`bun run dev:parity:watch`, edit a Vue component, see the smoke parity tests re-run on save"
+- [x] 8b.17 Done as `scripts/dev-parity-watch.mjs` + `bun run dev:parity:watch` (T28-03 #86): boots React :5173 + Vue :5174 dev servers, runs `e2e/tests/parity/smoke/` once, then re-runs on save (debounced, serialised). Playwright has no `--watch` flag, so the script is a dep-free node watcher (`child_process` + `fs.watch`); Playwright reuses the running demos via `reuseExistingServer`. Plain two-server dev without the test loop is `bun run dev:parity`
+- [x] 8b.18 Documented in `examples/parity/README.md` "Pair-edit dev mode" (T28-03 #86)
 
 ### 8b.8. Pre-publish aggregate gate
 
 - [x] 8b.19 Write `scripts/parity-prepublish.mjs` — aggregates: typecheck + static parity checks + i18n validation + built parity preview + packed consumer install + test:e2e:parity:smoke. Exits non-zero if any layer fails
 - [x] 8b.20 Add to release workflow before `changeset publish`. The publish step refuses to run if the aggregate fails
-- [ ] 8b.21 Document the gate in `CLAUDE.md` Releasing section so maintainers know what to fix when it blocks a release
+- [x] 8b.21 Documented in `CLAUDE.md` Releasing section (T28-03 #86): `release.yml` runs `bun run parity:prepublish` before `changeset publish`; failure fix is re-running it locally and fixing the first failing layer. Notes the a11y cron is intentionally outside the gate
 
 ### 8b.9. Accessibility parity (deferred to weekly cron)
 
-- [ ] 8b.22 Write `scripts/check-a11y-parity.mjs` — runs axe-core against both `/react/` and `/vue/` routes on the parity preview, diffs the violation sets, fails if asymmetric
-- [ ] 8b.23 Wire as a weekly GitHub Action cron, post results to `notes/a11y-parity/<date>.md`. Not a blocking gate — informational, surfaces drift over time
+- [x] 8b.22 Done as `scripts/check-a11y-parity.mjs` + `bun run check:a11y-parity` (T28-03 #86). Dep-free Playwright CDP ax-tree diff over the editor + agent-panel routes (`page.accessibility` was removed in Playwright 1.5x), not axe-core: layer 1 fails on unnamed interactive controls, layer 1b on visibility assertions (editor shell, paged canvas, agent panel, named toolbar button), layer 2 on interactive-role asymmetry with reviewed pattern choices in `KNOWN_ROLE_ASYMMETRY` (vue pickers are button+menu, not combobox). Exact label wording is informational only. Calibrated green locally 2026-11-10 (47 matched controls/route, 0 unnamed)
+- [x] 8b.23 Done as `.github/workflows/a11y-parity.yml` (T28-03 #86): weekly Monday cron + `workflow_dispatch`, uploads the report artifact (90d retention), posts failures to a tracking issue (comments on the open one if present). Not a blocking gate. Results post to the issue rather than committing `notes/a11y-parity/<date>.md` (avoids weekly main-branch churn; the artifact is the dated record)
 
 ## 9. Agent SDK Vue subpath
 
@@ -188,8 +188,8 @@ Per Decision 16, four named perf budgets with measurement scripts.
 
 ## 12. Docs
 
-- [ ] 12.1 Replace `examples/vue/` placeholder content with a working demo (use the demo from #245 as a starting point); standardise it with the React example's structure; include `<AgentPanel>` integration so the parity preview shows the agent SDK working in Vue
-- [ ] 12.2 Write `packages/vue/README.md` with quick-start, API reference, and the `<DocxEditor>` props / emits / ref API; cross-reference `@xcrong/docx-editor-agents/vue` for the agent SDK. **Composable-first**: first code example uses `useDocxEditor()`; the imperative-ref pattern appears later as "for agent integration." Include a copy-pasteable "Add an AI assistant in 30 lines" snippet. Include a "Nuxt usage" section showing `<ClientOnly>` wrapping or `defineAsyncComponent`. Link the per-component map from task 3.1
+- [x] 12.1 Done (verified T28-03 #86): `examples/vue/` is a working demo mirroring the React example's structure (toolbar, title-bar slots, adapter switcher, theme toggle) and renders `AgentPanel` + `AgentChatLog` + `AgentComposer` under `?agentPanel=1` with the same `?agentTimeline=` fixture as React, so the parity suite runs unchanged
+- [x] 12.2 Done (T28-03 #86): `packages/vue/README.md` has quick-start, blank-document, subpaths, Component API (props/emits/ref via docx-editor.dev/docs/props), agent-SDK cross-reference + "Add an AI assistant in 30 lines" snippet, Nuxt module section, Architecture section linking the task-3.1 audit map + reactivity notes, and the parity-smoke contributing note. Two deliberate deviations from the 1.0 draft: quick-start stays component-first (the standard adapter pattern; `useDocxEditor` is documented under Component API / Imperative mounting), and Nuxt documents the official module rather than a `<ClientOnly>` wrapper
 - [x] 12.3 `packages/agent-use/README.md` updated: subpath table now lists `/vue` + `/ai-sdk/vue` alongside `/react`; the React component list expanded to include the agent UI components migrated in #351; the live-editor-bridge example now shows React + Vue side by side; "switching adapters is one import line" framing added
 - [x] 12.4 Add a Vue section to root `README.md` Quick Start showing both `npm install @xcrong/docx-editor-react` and `npm install @xcrong/docx-editor-vue` paths
 - [x] 12.5 `CLAUDE.md` Editor Architecture section gained a "Vue mounting path" subsection: `<DocxEditor>` mounts via `useDocxEditor()`'s `onMounted`; `EditorView` and `Document` are `shallowRef`; visible pages still come from `layout-painter/`, not `toDOM`; reactivity contract refs `notes/reactivity.md`

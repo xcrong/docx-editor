@@ -37,10 +37,10 @@ jobs:
           filters: |
             react:
               - 'packages/react/**'
-              - 'packages/agent-use/src/react/**'
+              - 'packages/agents/src/react/**'
             vue:
               - 'packages/vue/**'
-              - 'packages/agent-use/src/vue/**'
+              - 'packages/agents/src/vue/**'
 
   parity-e2e:
     if: github.actor != 'dependabot[bot]'

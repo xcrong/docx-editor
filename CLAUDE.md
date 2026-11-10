@@ -91,54 +91,54 @@ Stable dataset attrs on painted DOM (CSS, queries, selection map depend on these
 
 ### Key file map
 
-| Debugging                    | File                                                            |
-| ---------------------------- | --------------------------------------------------------------- |
-| Text/paragraph rendering     | `layout-painter/renderParagraph.ts`                             |
-| Image rendering              | `layout-painter/renderImage.ts`                                 |
-| Table rendering              | `layout-painter/renderTable.ts`                                 |
-| Table borders / cut edges    | `layout-painter/renderTableBorders.ts`                          |
-| Table grid geometry (SoT)    | `layout-bridge/tableWidthUtils.ts` (`resolveCellGrid`)          |
-| Table page-break geometry    | `layout-engine/tableRowBreak.ts`                                |
-| Page composition             | `layout-painter/renderPage.ts`                                  |
-| Formatting commands          | `prosemirror/extensions/marks/`, `nodes/`                       |
-| Keyboard shortcuts           | `prosemirror/extensions/features/BaseKeymapExtension.ts`        |
-| Toolbar ↔ selection          | `prosemirror/plugins/selectionTracker.ts`                       |
-| DOCX XML parsers             | `docx/paragraphParser.ts`, `docx/tableParser.ts`                |
-| Document → PM                | `prosemirror/conversion/toProseDoc.ts`                          |
-| Click → PM position          | `components/DocxEditor/hooks/usePagesPointer.ts`                |
-| Selection rects / caret      | `components/DocxEditor/hooks/useSelectionOverlay.ts`            |
-| HF persistent PMs            | `components/DocxEditor/HiddenHeaderFooterPMs.tsx`               |
-| HF caret in painter          | `components/DocxEditor/DocxEditorPagedArea.tsx` (`hfCaretRect`) |
-| HF inline chrome             | `components/InlineHeaderFooterEditor.tsx`                       |
-| Layout pipeline (engine.run)     | `core/editor/DocxEditorEngine.ts` (`EngineHost` hooks per adapter) |
-| Scroll API                   | `components/DocxEditor/hooks/usePagedScrollApi.ts`              |
-| Image resize/drag            | `components/DocxEditor/hooks/useImageInteractions.ts`           |
-| Font/HF reflow triggers      | `components/DocxEditor/hooks/useLayoutTriggers.ts`              |
-| Table resize                 | `components/DocxEditor/hooks/useTableResizeState.ts`            |
-| Measure-block cache          | `components/DocxEditor/internals/measureBlock.ts`               |
-| Sidebar comment Y positions  | `components/DocxEditor/internals/sidebarAnchorPositions.ts`     |
-| PM position → DOM            | `components/DocxEditor/internals/pmAnchors.ts`                  |
-| Main toolbar                 | `components/Toolbar.tsx`                                        |
-| Document/PM CSS              | `prosemirror/editor.css`                                        |
-| UI chrome CSS + color tokens | `packages/core/src/styles/editor.css` (SINGLE SOURCE OF TRUTH)  |
+| Debugging                    | File                                                               |
+| ---------------------------- | ------------------------------------------------------------------ |
+| Text/paragraph rendering     | `layout-painter/renderParagraph.ts`                                |
+| Image rendering              | `layout-painter/renderImage.ts`                                    |
+| Table rendering              | `layout-painter/renderTable.ts`                                    |
+| Table borders / cut edges    | `layout-painter/renderTableBorders.ts`                             |
+| Table grid geometry (SoT)    | `layout-bridge/tableWidthUtils.ts` (`resolveCellGrid`)             |
+| Table page-break geometry    | `layout-engine/tableRowBreak.ts`                                   |
+| Page composition             | `layout-painter/renderPage.ts`                                     |
+| Formatting commands          | `prosemirror/extensions/marks/`, `nodes/`                          |
+| Keyboard shortcuts           | `prosemirror/extensions/features/BaseKeymapExtension.ts`           |
+| Toolbar ↔ selection          | `prosemirror/plugins/selectionTracker.ts`                          |
+| DOCX XML parsers             | `docx/paragraphParser.ts`, `docx/tableParser.ts`                   |
+| Document → PM                | `prosemirror/conversion/toProseDoc.ts`                             |
+| Click → PM position          | `components/DocxEditor/hooks/usePagesPointer.ts`                   |
+| Selection rects / caret      | `components/DocxEditor/hooks/useSelectionOverlay.ts`               |
+| HF persistent PMs            | `components/DocxEditor/HiddenHeaderFooterPMs.tsx`                  |
+| HF caret in painter          | `components/DocxEditor/DocxEditorPagedArea.tsx` (`hfCaretRect`)    |
+| HF inline chrome             | `components/InlineHeaderFooterEditor.tsx`                          |
+| Layout pipeline (engine.run) | `core/editor/DocxEditorEngine.ts` (`EngineHost` hooks per adapter) |
+| Scroll API                   | `components/DocxEditor/hooks/usePagedScrollApi.ts`                 |
+| Image resize/drag            | `components/DocxEditor/hooks/useImageInteractions.ts`              |
+| Font/HF reflow triggers      | `components/DocxEditor/hooks/useLayoutTriggers.ts`                 |
+| Table resize                 | `components/DocxEditor/hooks/useTableResizeState.ts`               |
+| Measure-block cache          | `components/DocxEditor/internals/measureBlock.ts`                  |
+| Sidebar comment Y positions  | `components/DocxEditor/internals/sidebarAnchorPositions.ts`        |
+| PM position → DOM            | `components/DocxEditor/internals/pmAnchors.ts`                     |
+| Main toolbar                 | `components/Toolbar.tsx`                                           |
+| Document/PM CSS              | `prosemirror/editor.css`                                           |
+| UI chrome CSS + color tokens | `packages/core/src/styles/editor.css` (SINGLE SOURCE OF TRUTH)     |
 
 Shared React/Vue orchestration lives in core (Tier 1; Tier 2 engine spine, issue #33) — adapters re-export or delegate, so grepping an adapter lands on a thin wrapper:
 
-| Shared op                           | Core module (in `@xcrong/docx-editor-core`) |
-| ----------------------------------- | ------------------------------------------- |
-| paraId/text helpers                 | `prosemirror/paraText.ts`                   |
-| ref-API queries (find/selInfo/page) | `prosemirror/queries.ts`                    |
-| agent applyFormatting/setParaStyle  | `prosemirror/applyFormatting.ts`            |
-| comment/proposeChange + ID alloc    | `prosemirror/commentOps.ts`                 |
-| table-resize read/commit + twips    | `prosemirror/tableResize.ts`                |
-| image resize/drag PM commits        | `prosemirror/imageCommit.ts`                |
-| cell-selection highlight            | `layout-bridge/cellSelectionHighlight.ts`   |
-| drag auto-scroll delta math         | `utils/autoScroll.ts`                       |
-| layout compute→paint→scroll pass    | `editor/DocxEditorEngine.run` (+ `editor/geometry.ts`) |
-| rAF-coalescing scheduler            | `editor/DocxEditorEngine.scheduleLayout` |
+| Shared op                           | Core module (in `@xcrong/docx-editor-core`)                           |
+| ----------------------------------- | --------------------------------------------------------------------- |
+| paraId/text helpers                 | `prosemirror/paraText.ts`                                             |
+| ref-API queries (find/selInfo/page) | `prosemirror/queries.ts`                                              |
+| agent applyFormatting/setParaStyle  | `prosemirror/applyFormatting.ts`                                      |
+| comment/proposeChange + ID alloc    | `prosemirror/commentOps.ts`                                           |
+| table-resize read/commit + twips    | `prosemirror/tableResize.ts`                                          |
+| image resize/drag PM commits        | `prosemirror/imageCommit.ts`                                          |
+| cell-selection highlight            | `layout-bridge/cellSelectionHighlight.ts`                             |
+| drag auto-scroll delta math         | `utils/autoScroll.ts`                                                 |
+| layout compute→paint→scroll pass    | `editor/DocxEditorEngine.run` (+ `editor/geometry.ts`)                |
+| rAF-coalescing scheduler            | `editor/DocxEditorEngine.scheduleLayout`                              |
 | transaction→repaint loop            | `editor/DocxEditorEngine.handleTransaction` (+ `handleHfTransaction`) |
-| PM view lifecycle (body + HF map)   | `editor/viewLifecycle.ts` via engine view methods |
-| load/save session seam              | `editor/session.ts` via `engine.load` / `engine.save` |
+| PM view lifecycle (body + HF map)   | `editor/viewLifecycle.ts` via engine view methods                     |
+| load/save session seam              | `editor/session.ts` via `engine.load` / `engine.save`                 |
 
 ### Extensions
 
@@ -248,6 +248,17 @@ Release: merge the bot's `chore: release` PR. Publish runs via OIDC, tags, GH re
 Branches: `main` = 1.x line. `0.x` = pre-rename maintenance, patch/minor only; it does NOT receive security fixes (see `SECURITY.md` — only 1.x is security-supported).
 
 Packages: `@xcrong/docx-editor-{react,core,agents,i18n,vue}`, `@xcrong/nuxt-docx-editor`. All published.
+
+Pre-publish gate: `release.yml` runs `bun run parity:prepublish`
+(`scripts/parity-prepublish.mjs`) before `changeset publish` — typecheck,
+parity checks, i18n validation, full build, packed consumer install, and
+the parity smoke E2E. Any layer fails → publish refuses. When it blocks a
+release, run the same `bun run parity:prepublish` locally: the first
+failing layer it prints is the one to fix (usually a stale
+`parity.contract.json` bucket or a smoke spec broken by a demo change).
+A11y parity is intentionally outside this gate — weekly informational cron
+(`.github/workflows/a11y-parity.yml`, `bun run check:a11y-parity`), failures
+posted to a tracking issue, never blocking.
 
 ### Don't
 

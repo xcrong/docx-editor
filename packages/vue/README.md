@@ -106,6 +106,61 @@ editor.destroy();
 
 For lower-level mounting on your own DOM, use the `useDocxEditor` composable.
 
+## Add an AI assistant in 30 lines
+
+Pair the editor with the Vue chat UI from
+`@xcrong/docx-editor-agents/vue`. `useAgentBridge` wires the 14 agent
+tools to the live editor; bring your own model transport for replies.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DocxEditor, createEmptyDocument } from '@xcrong/docx-editor-vue';
+import {
+  AgentPanel,
+  AgentChatLog,
+  AgentComposer,
+  useAgentBridge,
+} from '@xcrong/docx-editor-agents/vue';
+import type { EditorRefLike, AgentMessage } from '@xcrong/docx-editor-agents/vue';
+
+const doc = ref(createEmptyDocument());
+const editorRef = ref<EditorRefLike | null>(null);
+const { executeToolCall } = useAgentBridge({ editorRef, author: 'Assistant' });
+const messages = ref<AgentMessage[]>([]);
+const input = ref('');
+
+async function sendMessage() {
+  const text = input.value;
+  input.value = '';
+  messages.value.push({ id: crypto.randomUUID(), role: 'user', text });
+  const result = await executeToolCall('read_selection', {});
+  messages.value.push({
+    id: crypto.randomUUID(),
+    role: 'assistant',
+    text: result.success ? JSON.stringify(result.data) : (result.error ?? 'Tool failed'),
+  });
+}
+</script>
+
+<template>
+  <DocxEditor ref="editorRef" :document="doc" mode="editing" />
+  <AgentPanel>
+    <AgentChatLog :messages="messages" />
+    <AgentComposer v-model="input" @submit="sendMessage" />
+  </AgentPanel>
+</template>
+```
+
+## Architecture
+
+Every SFC maps to a React peer in the per-component audit
+(`openspec/changes/vue-editor-robust-implementation/notes/audit.md`);
+state that mirrors ProseMirror objects (`EditorView`, `Document`,
+comments, tracked changes) lives in `shallowRef`, derived state in
+`computed` — see `notes/reactivity.md`. Keep forks thin: depend on
+`@xcrong/docx-editor-core` directly (Packages table above).
+
 ## Contributing
 
 Before pushing adapter changes, run the on-demand parity smoke suite (boots

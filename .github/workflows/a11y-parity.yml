@@ -1,0 +1,76 @@
+name: a11y parity (weekly, informational)
+
+# T28-03 §8b.9, issue #86. Compares the accessibility trees exposed by the
+# React and Vue parity demos and fails on asymmetric semantics (a control
+# exposed in one adapter but missing/unnamed in the other).
+#
+# Deliberately NOT a merge gate: it runs weekly on main and posts failures
+# to a tracking issue (failing-visibility without blocking PRs). The check
+# itself is dep-free (Playwright ax-tree diff, no axe-core); a full
+# axe-rules pass remains a future upgrade, tracked in the script header.
+#
+# Dependabot PRs are handled by dependabot-lockfile.yml, so we skip them
+# here like ci.yml does.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  a11y-parity:
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.3
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright (chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Install metric-compatible fonts (Calibri/Cambria)
+        run: sudo apt-get update && sudo apt-get install -y fonts-crosextra-carlito fonts-crosextra-caladea
+
+      - name: Run a11y parity check
+        id: check
+        run: |
+          set +e
+          NO_NUXT=1 bun run check:a11y-parity --report test-results/a11y-parity-report.md > test-results/a11y-parity.log 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat test-results/a11y-parity-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || tail -40 test-results/a11y-parity.log >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-parity-report
+          path: test-results/a11y-parity*
+          retention-days: 90
+
+      - name: Post failure to tracking issue
+        if: steps.check.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="a11y parity drift — $(date -u +%F)"
+          BODY="$(cat test-results/a11y-parity-report.md 2>/dev/null || tail -60 test-results/a11y-parity.log)"
+          EXISTING="$(gh issue list --state open --label a11y --search 'a11y parity drift' --json number --jq '.[0].number // empty')"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "Still red on $(date -u +%F). Latest report:\n\n$BODY"
+          else
+            gh issue create --title "$TITLE" --label a11y --body "Weekly a11y parity gate is red. Informational — not a merge gate (T28-03 §8b.9, issue #86).\n\n$BODY"
+          fi
