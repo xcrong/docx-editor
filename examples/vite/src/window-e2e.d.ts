@@ -96,6 +96,9 @@ declare global {
         paragraphs: Array<{ paraId: string; text: string; styleId?: string }>;
       } | null;
       agentGetDocumentText: () => string;
+      getDocument: () => {
+        package?: { styles?: { styles?: Array<{ styleId: string; type: string }> } };
+      } | null;
       // Review-plugin bridge surface (review-plugin 9.2) — backed by the real
       // `createReviewBridge`, not direct ref calls.
       agentBridgeGetContent: () => ContentBlock[];

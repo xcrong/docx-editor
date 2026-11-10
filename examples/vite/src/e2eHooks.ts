@@ -229,6 +229,9 @@ export function installE2EHooks(
     agentGetPageContent: (pageNumber: number) =>
       editorRef.current?.getPageContent(pageNumber) ?? null,
     agentGetDocumentText: () => extractDocumentText(editorRef.current?.getDocument()),
+    // Raw host-facing Document model — lets specs walk package data (e.g. the
+    // style list) that the flattened bridge readers don't expose.
+    getDocument: () => editorRef.current?.getDocument() ?? null,
     // Tracked structural revisions (#614). Drive the suggesting-mode plugin
     // and the new id-based accept/reject commands directly against the
     // active PM view, so tests don't depend on React mode-prop wiring.
