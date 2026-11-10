@@ -681,6 +681,7 @@ export interface Paragraph {
     leadingBlockMarkers?: (BookmarkStart | BookmarkEnd)[];
     listRendering?: ListRendering;
     paraId?: string;
+    paraRPrChange?: ParagraphMarkPropertyChange[];
     pPrDel?: TrackedChangeInfo;
     pPrIns?: TrackedChangeInfo;
     propertyChanges?: ParagraphPropertyChange[];
@@ -752,6 +753,15 @@ export interface ParagraphFormatting {
     suppressLineNumbers?: boolean;
     tabs?: TabStop[];
     widowControl?: boolean;
+}
+
+// @public
+export interface ParagraphMarkPropertyChange {
+    currentFormatting?: TextFormatting;
+    info: PropertyChangeInfo;
+    previousFormatting?: TextFormatting;
+    // (undocumented)
+    type: 'paragraphMarkPropertyChange';
 }
 
 // @public
@@ -914,9 +924,19 @@ export interface SectionProperties {
     paperSrcFirst?: number;
     paperSrcOther?: number;
     sectionStart?: SectionStart;
+    sectPrChange?: SectionPropertyChange;
     separator?: boolean;
     titlePg?: boolean;
     verticalAlign?: VerticalAlign;
+}
+
+// @public
+export interface SectionPropertyChange {
+    currentSectionProperties?: SectionProperties;
+    info: PropertyChangeInfo;
+    previousSectionProperties?: SectionProperties;
+    // (undocumented)
+    type: 'sectionPropertyChange';
 }
 
 // @public

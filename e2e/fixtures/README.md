@@ -109,6 +109,15 @@ plain-text fallback cases. Used to verify that docx-editor paints the existing
 Word glyph in flow while exposing only unlocked/unbound controls as clickable
 editor widgets.
 
+### paragraph-mark-revisions.docx
+
+A synthetic document carrying paragraph-mark revisions (T27-01, issues #77 +
+#70): `w:pPr/w:rPr/w:ins` (101), `w:del` (102) + paragraph-mark `w:rPrChange`
+(103, `CT_ParaRPrChange`), `w:pPrChange` (104), pPr-level `w:sectPrChange`
+(105), and body-level `w:sectPrChange` (106). Regenerate with
+`bun e2e/fixtures/build-paragraph-mark-revisions-fixture.mjs`. Manual Word
+round-trip (open → save, revisions still recognized) is tracked in #77.
+
 ## Generating Fixtures
 
 To regenerate fixtures, run:

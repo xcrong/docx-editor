@@ -13,6 +13,7 @@
 
 import type {
   SectionProperties,
+  SectionPropertyChange,
   HeaderReference,
   FooterReference,
   FootnoteProperties,
@@ -422,7 +423,35 @@ export function serializeSectionProperties(props: SectionProperties | undefined)
     parts.push('<w:evenAndOddHeaders/>');
   }
 
+  // Tracked section-property change — LAST child of w:sectPr per CT_SectPr
+  // ordering. Placed after the non-standard tail so strict readers see the
+  // schema-ordered elements first.
+  if (props.sectPrChange) {
+    parts.push(serializeSectionPropertyChange(props.sectPrChange));
+  }
+
   if (parts.length === 0) return '';
 
   return `<w:sectPr>${parts.join('')}</w:sectPr>`;
+}
+/**
+ * Serialize one tracked section-property change (`w:sectPrChange`). The
+ * inner `<w:sectPr>` is the FULL prior snapshot (not a diff), serialized
+ * with the same serializer — nested changes are never present because the
+ * parser skips them inside prior snapshots.
+ */
+function serializeSectionPropertyChange(change: SectionPropertyChange): string {
+  const normalizedId = Number.isInteger(change.info.id) && change.info.id >= 0 ? change.info.id : 0;
+  const authorCandidate = typeof change.info.author === 'string' ? change.info.author.trim() : '';
+  const normalizedAuthor = authorCandidate.length > 0 ? authorCandidate : 'Unknown';
+  const normalizedDate = typeof change.info.date === 'string' ? change.info.date.trim() : undefined;
+  const attrs = [`w:id="${normalizedId}"`, `w:author="${escapeXml(normalizedAuthor)}"`];
+  if (normalizedDate) {
+    attrs.push(`w:date="${escapeXml(normalizedDate)}"`);
+  }
+  const priorSectPrXml = change.previousSectionProperties
+    ? serializeSectionProperties(change.previousSectionProperties)
+    : '';
+  const normalizedPrior = priorSectPrXml.length > 0 ? priorSectPrXml : '<w:sectPr/>';
+  return `<w:sectPrChange ${attrs.join(' ')}>${normalizedPrior}</w:sectPrChange>`;
 }

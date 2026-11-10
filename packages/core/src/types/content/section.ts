@@ -18,6 +18,7 @@ import type {
   EndnoteProperties,
 } from './headerFooter';
 import type { Comment } from './comment';
+import type { SectionPropertyChange } from './trackedChange';
 
 /**
  * Page orientation
@@ -170,11 +171,16 @@ export interface SectionProperties {
     charSpace?: number;
   };
 
-  // Paper source
   /** First page paper source */
   paperSrcFirst?: number;
   /** Other pages paper source */
   paperSrcOther?: number;
+  /**
+   * Tracked section-property change (`w:sectPrChange`, last child of
+   * `w:sectPr`). Full prior snapshot, not a diff. Present in both
+   * placements; the host (paragraph vs body) records the placement.
+   */
+  sectPrChange?: SectionPropertyChange;
 }
 
 /**

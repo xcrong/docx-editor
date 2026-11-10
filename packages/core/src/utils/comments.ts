@@ -104,6 +104,11 @@ export interface TrackedChangeEntry {
    *   (`<w:cellIns>` / `<w:cellDel>` / `<w:cellMerge>` / `<w:tcPrChange>`).
    * - `tablePropertiesChanged` — table-level formatting
    *   (`<w:tblPrChange>`).
+   * - `paragraphMarkPropertiesChanged` — formatting of the paragraph-mark
+   *   glyph itself was changed (`w:pPr/w:rPr/w:rPrChange`,
+   *   `CT_ParaRPrChange`).
+   * - `sectionPropertiesChanged` — section geometry was changed
+   *   (`w:sectPrChange`).
    */
   type:
     | 'insertion'
@@ -121,7 +126,9 @@ export interface TrackedChangeEntry {
     | 'cellPropertiesChanged'
     | 'tableInserted'
     | 'tableDeleted'
-    | 'tablePropertiesChanged';
+    | 'tablePropertiesChanged'
+    | 'paragraphMarkPropertiesChanged'
+    | 'sectionPropertiesChanged';
   /**
    * Affected text. For inline types this is the run's text; for
    * structural types it's the surrounding paragraph / cell content

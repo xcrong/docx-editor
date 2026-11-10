@@ -19,6 +19,7 @@ import type {
   TableRowFormatting,
   TableCellFormatting,
   SectionProperties,
+  ParagraphMarkPropertyChange,
   RunPropertyChange,
 } from '../../types/document';
 import type { RevisionInfo } from '../../types/content/trackedChange';
@@ -223,6 +224,16 @@ export interface ParagraphAttrs {
    * `packages/core/src/types/content/trackedChange.ts`.
    */
   pPrChange?: import('../../types/document').ParagraphPropertyChange[] | null;
+
+  /**
+   * Paragraph-mark run-property changes (`w:pPr/w:rPr/w:rPrChange`,
+   * `CT_ParaRPrChange`). Array because multiple authors can stack edits on
+   * the same paragraph mark. Separate from `pPrChange` (`w:pPrChange`) and
+   * from run `w:rPrChange` — different schema positions. Section changes
+   * (`w:sectPrChange`) travel inside `_sectionProperties`, not here:
+   * placement (paragraph-level vs body-level) is structural.
+   */
+  paraRPrChange?: ParagraphMarkPropertyChange[] | null;
 }
 
 /**

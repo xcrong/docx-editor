@@ -12,6 +12,7 @@ import type {
   ParagraphContent,
   ParagraphFormatting,
   ParagraphPropertyChange,
+  ParagraphMarkPropertyChange,
   Run,
   Hyperlink,
   BookmarkStart,
@@ -28,6 +29,7 @@ import type {
   MoveFrom,
   MoveTo,
   TrackedChangeInfo,
+  TextFormatting,
   MathEquation,
 } from '../../types/document';
 import type { StyleMap } from '../styleParser';
@@ -40,7 +42,7 @@ import {
   elementToXml,
   type XmlElement,
 } from '../xmlParser';
-import { parseRun } from '../runParser';
+import { parseRun, parseRunProperties } from '../runParser';
 import { parseHyperlink as parseHyperlinkFromModule } from '../hyperlinkParser';
 import {
   parseBookmarkStart as parseBookmarkStartFromModule,
@@ -280,6 +282,39 @@ export function parseParagraphPropertyChanges(
         type: 'paragraphPropertyChange',
         info: parsePropertyChangeInfo(changeElement),
         previousFormatting: parseParagraphProperties(previousPPr, theme, styles ?? undefined),
+        currentFormatting,
+      };
+    })
+    .filter((change) => change.previousFormatting || change.currentFormatting);
+
+  return changes.length > 0 ? changes : undefined;
+}
+/**
+ * Parse paragraph-mark run-property changes (`w:pPr/w:rPr/w:rPrChange`,
+ * `CT_ParaRPrChange`, wml.xsd:938) — the prior formatting of the pilcrow
+ * glyph itself. This is a SEPARATE element from the regular run
+ * `w:rPrChange`: it lives inside the paragraph-mark `w:rPr` (alongside
+ * `w:ins` / `w:del`) and must not be routed through the run-rPrChange path.
+ *
+ * @param pPrRPr - The `<w:rPr>` element inside `<w:pPr>` (NOT a run's rPr)
+ * @param currentFormatting - The paragraph-mark rPr after the change
+ *   (`formatting.runProperties`), for editor-model convenience
+ */
+export function parseParagraphMarkPropertyChanges(
+  pPrRPr: XmlElement | null,
+  theme: Theme | null,
+  styles: StyleMap | null,
+  currentFormatting: TextFormatting | undefined
+): ParagraphMarkPropertyChange[] | undefined {
+  if (!pPrRPr) return undefined;
+
+  const changes = findChildren(pPrRPr, 'w', 'rPrChange')
+    .map((changeElement): ParagraphMarkPropertyChange => {
+      const previousRPr = findChild(changeElement, 'w', 'rPr');
+      return {
+        type: 'paragraphMarkPropertyChange',
+        info: parsePropertyChangeInfo(changeElement),
+        previousFormatting: parseRunProperties(previousRPr, theme, styles ?? undefined),
         currentFormatting,
       };
     })

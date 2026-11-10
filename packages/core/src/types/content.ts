@@ -79,6 +79,8 @@ export type {
   MoveToRangeEnd,
   TrackedRunChange,
   RunPropertyChange,
+  ParagraphMarkPropertyChange,
+  SectionPropertyChange,
   ParagraphPropertyChange,
   TablePropertyChange,
   TableRowPropertyChange,

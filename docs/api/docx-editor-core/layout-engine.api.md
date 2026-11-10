@@ -536,6 +536,10 @@ export type ParagraphAttrs = {
     suppressEmptyParagraphHeight?: boolean;
     pPrIns?: RevisionInfo | null;
     pPrDel?: RevisionInfo | null;
+    pPrChange?: ParagraphPropertyChange[] | null;
+    paraRPrChange?: ParagraphMarkPropertyChange[] | null;
+    sectPrChange?: SectionPropertyChange | null;
+    hasRevisionChange?: boolean;
 };
 
 // @public

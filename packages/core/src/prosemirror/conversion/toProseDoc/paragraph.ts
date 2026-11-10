@@ -453,6 +453,11 @@ function paragraphFormattingToAttrs(
   if (paragraph.propertyChanges && paragraph.propertyChanges.length > 0) {
     attrs.pPrChange = paragraph.propertyChanges;
   }
+  // Paragraph-mark run-property change history (w:pPr/w:rPr/w:rPrChange,
+  // CT_ParaRPrChange). Passed through as the model array, like pPrChange.
+  if (paragraph.paraRPrChange && paragraph.paraRPrChange.length > 0) {
+    attrs.paraRPrChange = paragraph.paraRPrChange;
+  }
 
   return attrs;
 }

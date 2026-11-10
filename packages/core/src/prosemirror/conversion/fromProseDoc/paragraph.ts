@@ -106,6 +106,10 @@ export function convertPMParagraph(node: PMNode): Paragraph {
   if (attrs.pPrChange && attrs.pPrChange.length > 0) {
     paragraph.propertyChanges = attrs.pPrChange;
   }
+  // Round-trip paragraph-mark run-property-change history.
+  if (attrs.paraRPrChange && attrs.paraRPrChange.length > 0) {
+    paragraph.paraRPrChange = attrs.paraRPrChange;
+  }
 
   // Restore full section properties (round-trip) or fallback to break type only
   if (attrs._sectionProperties) {

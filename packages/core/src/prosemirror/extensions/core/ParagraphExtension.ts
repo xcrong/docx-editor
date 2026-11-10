@@ -343,6 +343,9 @@ const paragraphNodeSpec: NodeSpec = {
     // entries. Parser/serializer already model this — schema attr lets
     // the data survive the toProseDoc → fromProseDoc round-trip.
     pPrChange: { default: null },
+    // Paragraph-mark run-property changes (w:pPr/w:rPr/w:rPrChange,
+    // CT_ParaRPrChange). Array of prior snapshots; separate from pPrChange.
+    paraRPrChange: { default: null },
   },
   parseDOM: [
     {
@@ -458,6 +461,14 @@ const paragraphNodeSpec: NodeSpec = {
       // Property-change-only paragraph (no structural pPrIns/pPrDel).
       // Surface the first entry's id so sidebar click-to-jump can anchor.
       const first = attrs.pPrChange[0];
+      domAttrs.class = (domAttrs.class ? domAttrs.class + ' ' : '') + 'ep-revision-prop-change';
+      domAttrs['data-revision-id'] = String(first.info.id);
+      domAttrs['data-revision-author'] = first.info.author;
+      if (first.info.date) domAttrs['data-revision-date'] = first.info.date;
+    } else if (Array.isArray(attrs.paraRPrChange) && attrs.paraRPrChange.length > 0) {
+      // Paragraph-mark rPr-change-only paragraph. Same anchoring treatment
+      // as pPrChange so sidebar click-to-jump can find the paragraph.
+      const first = attrs.paraRPrChange[0];
       domAttrs.class = (domAttrs.class ? domAttrs.class + ' ' : '') + 'ep-revision-prop-change';
       domAttrs['data-revision-id'] = String(first.info.id);
       domAttrs['data-revision-author'] = first.info.author;

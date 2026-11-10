@@ -6,43 +6,43 @@ Three landable phases. Each phase is a separate PR. Phase 1 includes the snapsho
 
 ### Schema
 
-- [ ] Add `pPrIns`, `pPrDel`, `pPrChange[]`, `paraRPrChange[]`, `sectPrChange`, `sectPrChangeBodyLevel` attrs to the paragraph node in `packages/core/src/prosemirror/schema/nodes.ts`. Default `null`.
-- [ ] Confirm `ParagraphAttrs` `@public` status; `bun run api:extract` after edits
+- [x] Add `pPrIns`, `pPrDel`, `pPrChange[]`, `paraRPrChange[]`, `sectPrChange`, `sectPrChangeBodyLevel` attrs to the paragraph node in `packages/core/src/prosemirror/schema/nodes.ts`. Default `null`. (T27-01: `pPrIns`/`pPrDel`/`pPrChange` pre-existed; added `paraRPrChange[]` PM attr. `sectPrChange` rides inside `_sectionProperties` — placement is structural (`Paragraph.sectionProperties` vs `DocumentBody.finalSectionProperties`), so no `sectPrChangeBodyLevel` flag; rationale in the T27-01 PR description.)
+- [x] Confirm `ParagraphAttrs` `@public` status; `bun run api:extract` after edits (T27-01: `api:extract` + `api:check` green)
 
 ### Parser
 
-- [ ] `paragraphParser/properties.ts` — `parseParagraphMarkRevision(rPrEl)` for `<w:ins/>` / `<w:del/>` inside `<w:pPr><w:rPr>`, expose as `pPrIns` / `pPrDel`
-- [ ] `paragraphParser/properties.ts` — `parseParagraphMarkRPrChange(rPrEl)` for `CT_ParaRPrChange` (last child of `<w:pPr><w:rPr>`); NOT the run-rPrChange path
-- [ ] Confirm `pPrChange` parses to `Paragraph.propertyChanges[]` (existing — verify wiring through `toProseDoc`)
-- [ ] Locate section parsing site (likely `documentParser.ts` or `paragraphParser/properties.ts` — `sectionParser.ts` does not currently exist; do not create a file unless refactor is wanted) — read `<w:sectPrChange>` at both `pPr/sectPr` and body-level placements
+- [x] `paragraphParser/properties.ts` — `parseParagraphMarkRevision(rPrEl)` for `<w:ins/>` / `<w:del/>` inside `<w:pPr><w:rPr>`, expose as `pPrIns` / `pPrDel` (T27-01: pre-existed in `paragraphParser.ts:129-140`; covered by `paragraph-mark-revision-roundtrip.test.ts`)
+- [x] `paragraphParser/properties.ts` — `parseParagraphMarkRPrChange(rPrEl)` for `CT_ParaRPrChange` (last child of `<w:pPr><w:rPr>`); NOT the run-rPrChange path (T27-01: implemented as `parseParagraphMarkPropertyChanges` in `paragraphParser/content.ts`, wired in `paragraphParser.ts`)
+- [x] Confirm `pPrChange` parses to `Paragraph.propertyChanges[]` (existing — verify wiring through `toProseDoc`) (T27-01: verified; round-trip asserted in `paragraph-mark-revision-roundtrip.test.ts`)
+- [x] Locate section parsing site (likely `documentParser.ts` or `paragraphParser/properties.ts` — `sectionParser.ts` does not currently exist; do not create a file unless refactor is wanted) — read `<w:sectPrChange>` at both `pPr/sectPr` and body-level placements (T27-01: `sectionParser.ts:parseSectionProperties` + prior-snapshot guard; both placements covered by round-trip test)
 
 ### Snapshot-and-restore infrastructure (shared across phases)
 
-- [ ] `packages/core/src/prosemirror/plugins/suggestionMode.ts` — add `withSuggestingSnapshot(commandImpl, snapshotter)` helper that wraps a property-edit command with snapshot-on-first-edit-per-(id,author,date) logic
-- [ ] After each property edit, compare snapshotted fields against current values; if all equal, clear the `*Change` attr (Word's "no-op net change ⇒ no revision")
-- [ ] `packages/core/src/prosemirror/utils/restorePriorProperties.ts` (new) — utility used by reject handlers to write `prior` back into node attrs / run rPr
+- [x] `packages/core/src/prosemirror/plugins/suggestionMode.ts` — add `withSuggestingSnapshot(commandImpl, snapshotter)` helper that wraps a property-edit command with snapshot-on-first-edit-per-(id,author,date) logic (T27-01: `plugins/suggestionMode/snapshot.ts`; `freezePriorEntry` + `sameRevisionSession`; unit-tested)
+- [x] After each property edit, compare snapshotted fields against current values; if all equal, clear the `*Change` attr (Word's "no-op net change ⇒ no revision") (T27-01: `clearNoOpEntries`; unit-tested)
+- [x] `packages/core/src/prosemirror/utils/restorePriorProperties.ts` (new) — utility used by reject handlers to write `prior` back into node attrs / run rPr (T27-01: paragraph/run/section restore; `comments.ts` reject path delegates to it; unit-tested)
 
 ### Cache key
 
-- [ ] `packages/core/src/layout-bridge/measuring/cache.ts` — extend `hashParagraphBlock` to include `pPrIns`/`pPrDel`/`pPrChange`/`paraRPrChange`/`sectPrChange` presence flags and `revision_change` mark presence on runs
-- [ ] If `hashTableBlock` (or equivalent) exists, mirror
+- [x] `packages/core/src/layout-bridge/measuring/cache.ts` — extend `hashParagraphBlock` to include `pPrIns`/`pPrDel`/`pPrChange`/`paraRPrChange`/`sectPrChange` presence flags and `revision_change` mark presence on runs (T27-01: `pins`/`pdel` pre-existed; added `pchg`/`mchg`/`schg`/`rchg`)
+- [x] If `hashTableBlock` (or equivalent) exists, mirror (T27-01: verified absent — no table-block measure cache exists)
 
 ### FlowBlock plumbing
 
-- [ ] `packages/core/src/layout-engine/toFlowBlocks*.ts` — pass the new revision attrs through into `ParagraphBlock.attrs` so measurement is consistent with the cache key
+- [x] `packages/core/src/layout-engine/toFlowBlocks*.ts` — pass the new revision attrs through into `ParagraphBlock.attrs` so measurement is consistent with the cache key (T27-01: `pPrChange`/`paraRPrChange`/`sectPrChange`/`hasRevisionChange` plumbed in `layout-bridge/toFlowBlocks.ts`; no new `FlowBlock` variant, so the 3 `assertExhaustiveFlowBlock` switches are untouched — full `typecheck` green)
 
 ### Conversion
 
-- [ ] `toProseDoc/paragraph.ts` — map model `pPrIns`/`pPrDel`/`pPrChange[]`/`paraRPrChange[]`/`sectPrChange` to PM node attrs
-- [ ] `fromProseDoc/paragraph.ts` — inverse, preserve array shapes
-- [ ] `packages/core/src/prosemirror/utils/extractTrackedChanges.ts` — walk node attrs in addition to text marks; emit one entry per `(id, author, date)` triple with multi-site sites collected under one entry
+- [x] `toProseDoc/paragraph.ts` — map model `pPrIns`/`pPrDel`/`pPrChange[]`/`paraRPrChange[]`/`sectPrChange` to PM node attrs (T27-01: `paraRPrChange` added; `sectPrChange` rides `_sectionProperties`; round-trip test asserts attr↔model correspondence)
+- [x] `fromProseDoc/paragraph.ts` — inverse, preserve array shapes (T27-01: `paraRPrChange` restored as array; covered by round-trip test)
+- [x] `packages/core/src/prosemirror/utils/extractTrackedChanges.ts` — walk node attrs in addition to text marks; emit one entry per `(id, author, date)` triple with multi-site sites collected under one entry (T27-01: pre-existing for `pPrIns`/`pPrDel`/`pPrChange`; added `paragraphMarkPropertiesChanged` + `sectionPropertiesChanged` entries; extraction test added)
 
 ### Serializer
 
-- [ ] `serializer/paragraphSerializer.ts` — emit `<w:pPr><w:rPr><w:ins/>` / `<w:del/>` from `pPrIns` / `pPrDel` in the **first** position inside `<w:rPr>` (per `EG_ParaRPrTrackChanges` ordering)
-- [ ] Emit `<w:rPrChange>` (from `paraRPrChange`) as the **last** child of `<w:pPr><w:rPr>` (per `EG_RPrContent` ordering)
-- [ ] Emit `<w:pPrChange>` as the **last** child of `<w:pPr>`
-- [ ] Section emission (in `documentSerializer.ts` or `paragraphSerializer.ts`, wherever section emission currently lives) — emit `<w:sectPrChange>` as the last child of `<w:sectPr>` in both pPr-level and body-level placements
+- [x] `serializer/paragraphSerializer.ts` — emit `<w:pPr><w:rPr><w:ins/>` / `<w:del/>` from `pPrIns` / `pPrDel` in the **first** position inside `<w:rPr>` (per `EG_ParaRPrTrackChanges` ordering) (T27-01: pre-existed; ordering asserted by round-trip test)
+- [x] Emit `<w:rPrChange>` (from `paraRPrChange`) as the **last** child of `<w:pPr><w:rPr>` (per `EG_RPrContent` ordering) (T27-01: implemented in `buildParagraphMarkRPr`; ordering asserted by round-trip test)
+- [x] Emit `<w:pPrChange>` as the **last** child of `<w:pPr>` (T27-01: pre-existed; asserted by round-trip test)
+- [x] Section emission (in `documentSerializer.ts` or `paragraphSerializer.ts`, wherever section emission currently lives) — emit `<w:sectPrChange>` as the last child of `<w:sectPr>` in both pPr-level and body-level placements (T27-01: implemented in `sectionPropertiesSerializer.ts`; both placements asserted by round-trip test)
 - [ ] `serializer/runSerializer.ts` (or wherever run rPr is emitted) — enforce `<w:rPrChange>` is the last child of `<w:rPr>`
 
 ### Suggesting-mode plugin

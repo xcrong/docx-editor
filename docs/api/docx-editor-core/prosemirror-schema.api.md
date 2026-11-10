@@ -193,6 +193,7 @@ export interface ParagraphAttrs {
     pageBreakBefore?: boolean;
     // (undocumented)
     paraId?: string;
+    paraRPrChange?: ParagraphMarkPropertyChange[] | null;
     pPrChange?: ParagraphPropertyChange[] | null;
     pPrDel?: RevisionInfo | null;
     pPrIns?: RevisionInfo | null;

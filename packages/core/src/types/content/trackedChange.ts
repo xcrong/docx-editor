@@ -14,6 +14,7 @@ import type {
 } from '../formatting';
 import type { Run } from './run';
 import type { Hyperlink } from './link';
+import type { SectionProperties } from './section';
 
 /**
  * Tracked change metadata (w:ins, w:del attributes)
@@ -158,6 +159,41 @@ export interface RunPropertyChange {
   previousFormatting?: TextFormatting;
   /** Run properties after the tracked change (editor model convenience) */
   currentFormatting?: TextFormatting;
+}
+
+/**
+ * Paragraph-mark run property change (`w:pPr/w:rPr/w:rPrChange`,
+ * `CT_ParaRPrChange`, wml.xsd:938). Tracks formatting of the paragraph-mark
+ * glyph itself ("the pilcrow used to be bold") — a SEPARATE element from the
+ * regular run `w:rPrChange`, living at the end of `CT_ParaRPr`. It needs its
+ * own model entry; wiring it to the inline `revision_change` mark would write
+ * to the wrong schema position.
+ */
+export interface ParagraphMarkPropertyChange {
+  type: 'paragraphMarkPropertyChange';
+  /** Tracked change metadata */
+  info: PropertyChangeInfo;
+  /** Paragraph-mark run properties before the tracked change */
+  previousFormatting?: TextFormatting;
+  /** Paragraph-mark run properties after the tracked change (editor model convenience) */
+  currentFormatting?: TextFormatting;
+}
+
+/**
+ * Section property change (`w:sectPrChange`) — full prior `w:sectPr`
+ * snapshot, not a diff. Legal as the last child of `w:sectPr` in BOTH
+ * placements: paragraph-level (`w:pPr/w:sectPr`) and body-level
+ * (`w:body/w:sectPr`). Placement is structural (see `Paragraph` vs
+ * `DocumentBody.finalSectionProperties`), so no placement flag is modeled.
+ */
+export interface SectionPropertyChange {
+  type: 'sectionPropertyChange';
+  /** Tracked change metadata */
+  info: PropertyChangeInfo;
+  /** Section properties before the tracked change */
+  previousSectionProperties?: SectionProperties;
+  /** Section properties after the tracked change (editor model convenience) */
+  currentSectionProperties?: SectionProperties;
 }
 
 /**

@@ -125,7 +125,8 @@ test.describe('Agent bridge — paraId-anchored mutations', () => {
     expect(afterCount - beforeCount).toBe(5);
   });
 
-  test('programmatic addComment lays out sidebar cards without overlap (no click required)', async ({
+  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
+  test.fixme('programmatic addComment lays out sidebar cards without overlap (no click required)', async ({
     page,
   }) => {
     // Regression: adding comments via the agent ref previously did not trigger

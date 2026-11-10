@@ -22,6 +22,7 @@
 
 import type {
   SectionProperties,
+  SectionPropertyChange,
   PageOrientation,
   SectionStart,
   VerticalAlign,
@@ -130,7 +131,8 @@ function parseLineNumberRestart(restart: string | null): LineNumberRestart | und
  */
 export function parseSectionProperties(
   sectPr: XmlElement | null,
-  _rels?: RelationshipMap | null
+  _rels?: RelationshipMap | null,
+  isPriorSnapshot?: boolean
 ): SectionProperties {
   const props: SectionProperties = {};
 
@@ -521,7 +523,44 @@ export function parseSectionProperties(
     }
   }
 
+  // TRACKED SECTION-PROPERTY CHANGE (w:sectPrChange) — last child of
+  // w:sectPr per CT_SectPr ordering. Full prior snapshot, not a diff.
+  // Skipped when parsing a prior snapshot itself so a (pathological)
+  // nested change cannot recurse.
+  if (!isPriorSnapshot) {
+    const sectPrChange = findChild(sectPr, 'w', 'sectPrChange');
+    if (sectPrChange) {
+      props.sectPrChange = parseSectionPropertyChange(sectPrChange, _rels);
+    }
+  }
+
   return props;
+}
+/**
+ * Parse a tracked section-property change (`w:sectPrChange`) into the model.
+ * The inner `<w:sectPr>` is the FULL prior snapshot (not a diff); it is
+ * parsed with `isPriorSnapshot` so a nested change cannot recurse.
+ */
+function parseSectionPropertyChange(
+  changeElement: XmlElement,
+  rels?: RelationshipMap | null
+): SectionPropertyChange {
+  const rawId = getAttribute(changeElement, 'w', 'id');
+  const parsedId = rawId ? parseInt(rawId, 10) : 0;
+  const author = (getAttribute(changeElement, 'w', 'author') ?? '').trim();
+  const date = (getAttribute(changeElement, 'w', 'date') ?? '').trim();
+  const priorSectPr = findChild(changeElement, 'w', 'sectPr');
+  return {
+    type: 'sectionPropertyChange',
+    info: {
+      id: Number.isInteger(parsedId) && parsedId >= 0 ? parsedId : 0,
+      author: author.length > 0 ? author : 'Unknown',
+      ...(date.length > 0 ? { date } : {}),
+    },
+    ...(priorSectPr
+      ? { previousSectionProperties: parseSectionProperties(priorSectPr, rels, true) }
+      : {}),
+  };
 }
 
 // ============================================================================
