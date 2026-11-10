@@ -142,30 +142,35 @@ export function UnifiedSidebar({
     return () => cancelAnimationFrame(raf);
   }, [expandedItem, remeasureAll]);
 
-  // Watch expanded card for ongoing size changes (e.g. typing in reply input)
+  // Watch all cards for ongoing size changes (font loads, wrap shifts,
+  // typing in a reply input). Previously only the expanded card was
+  // observed, so a collapsed card growing after measure (e.g. webfont
+  // swap) kept a stale height and overlaps stuck permanently.
   useEffect(() => {
-    if (!expandedItem) return;
-    const el = cardElsRef.current.get(expandedItem);
-    if (!el) {
-      // Card just expanded but element not measured yet — trigger one recalc
-      const raf = requestAnimationFrame(() => setPositionVersion((v) => v + 1));
-      return () => cancelAnimationFrame(raf);
-    }
-
+    const els = Array.from(cardElsRef.current.entries());
+    if (els.length === 0) return;
     let rafId: number;
-    const observer = new ResizeObserver(() => {
+    const observer = new ResizeObserver((entries) => {
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        cardHeightsRef.current.set(expandedItem, el.offsetHeight);
+        for (const entry of entries) {
+          const target = entry.target as HTMLElement;
+          for (const [id, el] of cardElsRef.current) {
+            if (el === target) {
+              cardHeightsRef.current.set(id, target.offsetHeight);
+              break;
+            }
+          }
+        }
         setPositionVersion((v) => v + 1);
       });
     });
-    observer.observe(el);
+    els.forEach(([, el]) => observer.observe(el));
     return () => {
       cancelAnimationFrame(rafId);
       observer.disconnect();
     };
-  }, [expandedItem]);
+  }, [expandedItem, items.length]);
 
   const getMeasureRef = useCallback((itemId: string): ((el: HTMLDivElement | null) => void) => {
     let fn = measureRefsRef.current.get(itemId);
