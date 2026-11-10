@@ -42,6 +42,8 @@ import type {
   FloatPageGeometry,
 } from '@xcrong/docx-editor-core/layout-bridge/measuring';
 import { measureTableBlock, resolveHeaderFooter } from '@xcrong/docx-editor-core/layout-bridge';
+import { computeCommentAnchorPositions } from '@xcrong/docx-editor-core/layout-bridge/anchorPositions';
+import { calibrateAnchorsToContainer } from './sidebarAnchorCalibration';
 import {
   applyScrollRestore,
   createRafFrameScheduler,
@@ -172,6 +174,8 @@ export interface UseDocxEditorOptions {
   readOnly?: MaybeRef<boolean>;
   /** Page gap in pixels */
   pageGap?: number;
+  /** Current zoom getter (sidebar anchor calibration needs it) */
+  getZoom?: () => number;
   /** Callback on document change */
   onChange?: (doc: Document) => void;
   /** Callback on error */
@@ -209,6 +213,11 @@ export interface UseDocxEditorReturn {
   documentFonts: Ref<FontOption[]>;
   /** Computed page layout. */
   layout: ShallowRef<Layout | null>;
+  /**
+   * Engine-computed sidebar anchors in pages-container coords. Primary
+   * source for UnifiedSidebar; DOM queries only fill missing keys.
+   */
+  engineAnchorPositions: ShallowRef<Map<string, number>>;
   /** Load a DOCX from a binary buffer. */
   loadBuffer: (buffer: ArrayBuffer | Uint8Array | Blob | File) => Promise<void>;
   /** Load a parsed `Document` directly. */
@@ -260,13 +269,13 @@ export interface UseDocxEditorReturn {
    */
   setSaveCommentsProvider: (provider: (() => Comment[]) | null) => void;
 }
-
 export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorReturn {
   const {
     hiddenContainer,
     pagesContainer,
     readOnly = false,
     pageGap = DEFAULT_PAGE_GAP,
+    getZoom,
     onChange,
     onError,
     onSelectionUpdate,
@@ -294,6 +303,13 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
    * Mirrors React's pagedEditorRef.current.getLayout().
    */
   const layout = shallowRef<Layout | null>(null);
+  /**
+   * Engine-computed sidebar anchors in pages-container coords (same space
+   * as UnifiedSidebar's DOM-derived positions). Primary source; the DOM
+   * query in UnifiedSidebar only fills keys missing here (e.g. HF scopes
+   * living in a different PM document). Empty until first layout.
+   */
+  const engineAnchorPositions = shallowRef<Map<string, number>>(new Map());
 
   // Use the singleton extension manager — same schema used by toProseDoc/commands
   const mgr = singletonManager;
@@ -344,6 +360,23 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     getScrollContainer: () => pagesContainer.value,
     onLayout: (newLayout) => {
       layout.value = newLayout;
+    },
+    // Sidebar anchors from PM+layout (no DOM dependency, so virtualized
+    // pages still anchor). Runs post-paint, so a painted page exists for
+    // screen-space calibration. DOM queries in UnifiedSidebar only fill
+    // keys missing here (HF scopes in another PM document).
+    computeAnchorPositions: (newLayout, newBlocks, newMeasures) => {
+      const raw = computeCommentAnchorPositions(
+        editorView.value,
+        newLayout,
+        newBlocks,
+        newMeasures,
+        0
+      );
+      return calibrateAnchorsToContainer(pagesContainer, newLayout, raw, getZoom?.() ?? 1);
+    },
+    onAnchorPositions: (positions) => {
+      engineAnchorPositions.value = positions;
     },
     onPaintContainer: () => {
       const container = pagesContainer.value;
@@ -746,6 +779,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     parseError,
     documentFonts,
     layout,
+    engineAnchorPositions,
 
     // Actions
     loadBuffer,

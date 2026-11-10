@@ -134,12 +134,20 @@
             :style="rulerRowStyle"
           >
             <HorizontalRuler
-              :section-props="currentSectionProps" :zoom="zoom" :editable="!readOnly"
-              :indent-left="rulerIndents.indentLeft" :indent-right="rulerIndents.indentRight"
-              :first-line-indent="rulerIndents.firstLineIndent" :hanging-indent="rulerIndents.hangingIndent" :tab-stops="rulerIndents.tabStops"
-              @left-margin-change="handleLeftMarginChange" @right-margin-change="handleRightMarginChange"
-              @indent-left-change="handleIndentLeftChange" @indent-right-change="handleIndentRightChange"
-              @first-line-indent-change="handleFirstLineIndentChange" @tab-stop-remove="handleTabStopRemove"
+              :section-props="currentSectionProps"
+              :zoom="zoom"
+              :editable="!readOnly"
+              :indent-left="rulerIndents.indentLeft"
+              :indent-right="rulerIndents.indentRight"
+              :first-line-indent="rulerIndents.firstLineIndent"
+              :hanging-indent="rulerIndents.hangingIndent"
+              :tab-stops="rulerIndents.tabStops"
+              @left-margin-change="handleLeftMarginChange"
+              @right-margin-change="handleRightMarginChange"
+              @indent-left-change="handleIndentLeftChange"
+              @indent-right-change="handleIndentRightChange"
+              @first-line-indent-change="handleFirstLineIndentChange"
+              @tab-stop-remove="handleTabStopRemove"
             />
           </div>
 
@@ -156,8 +164,11 @@
           >
             <div v-if="showRuler && currentSectionProps" class="docx-editor-vue__vertical-ruler">
               <VerticalRuler
-                :section-props="currentSectionProps" :zoom="zoom" :editable="!readOnly"
-                @top-margin-change="handleTopMarginChange" @bottom-margin-change="handleBottomMarginChange"
+                :section-props="currentSectionProps"
+                :zoom="zoom"
+                :editable="!readOnly"
+                @top-margin-change="handleTopMarginChange"
+                @bottom-margin-change="handleBottomMarginChange"
               />
             </div>
             <div
@@ -301,7 +312,7 @@
             :is-open="showSidebar"
             :comments="comments"
             :tracked-changes="trackedChanges"
-            :is-adding-comment="isAddingComment"
+            :engine-anchor-positions="engineAnchorPositions"
             :add-comment-y-position="addCommentYPosition"
             :show-resolved="true"
             :pages-container="pagesRef"
@@ -592,10 +603,12 @@ const {
   setHfTransactionListener,
   setSaveCommentsProvider,
   setDocument,
+  engineAnchorPositions,
 } = useDocxEditor({
   hiddenContainer: hiddenPmRef,
   pagesContainer: pagesRef,
   readOnly,
+  getZoom: () => zoom.value || 1,
   externalPlugins: props.externalPlugins,
   syncCoordinator,
   editorMode,
@@ -685,7 +698,11 @@ const hfSelectionRects = ref<Array<{ top: number; left: number; width: number; h
 // (mirror of React's `applyHfOverlay`). `computeHfCaretRectFromView` returns
 // null for a non-empty selection and `computeHfSelectionRectsFromView` returns
 // [] for a collapsed one, so the caret and highlight are mutually exclusive.
-function applyHfOverlay(view: EditorView, position: 'header' | 'footer', hostEl?: HTMLElement | null) {
+function applyHfOverlay(
+  view: EditorView,
+  position: 'header' | 'footer',
+  hostEl?: HTMLElement | null
+) {
   hfCaretRect.value = computeHfCaretRectFromView(view, position, document, hostEl);
   hfSelectionRects.value = computeHfSelectionRectsFromView(view, position, document, hostEl);
 }
@@ -796,7 +813,9 @@ const { minLayoutWidth, pagesContainerStyle, rulerRowStyle, pageWidthPx } = useS
   currentSectionPageWidthTwips: computed(() => currentSectionProps.value?.pageWidth),
 });
 
-const resolvedCommentIds = computed(() => new Set(comments.value.filter(c => c.parentId == null && c.done).map(c => c.id)));
+const resolvedCommentIds = computed(
+  () => new Set(comments.value.filter((c) => c.parentId == null && c.done).map((c) => c.id))
+);
 
 const bookmarkOptions = computed(() => {
   void stateTick.value;

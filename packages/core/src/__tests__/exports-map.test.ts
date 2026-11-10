@@ -135,6 +135,7 @@ describe('package.json exports map', () => {
       './utils/units',
       './docx/parser',
       './docx/rezip',
+      './layout-bridge/anchorPositions',
       './layout-bridge/clickToPositionDom',
       './layout-bridge/measuring',
       './layout-bridge/tableInsertHover',
