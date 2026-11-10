@@ -381,10 +381,12 @@ test.describe('Border Color Picker', () => {
     await page.waitForTimeout(500);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('border color picker shows theme matrix in table context', async ({ page }) => {
-    // Find and click the border color picker button in the toolbar
-    const borderColorBtn = page.locator('.docx-color-picker-button[title="Border Color"]');
+  test('border color picker shows theme matrix in table context', async ({ page }) => {
+    // The dropdown trigger is the arrow half of the split button
+    // (class renamed from docx-color-picker-button at some point).
+    const borderColorBtn = page
+      .locator('button.docx-color-picker-arrow[title="Border Color"]')
+      .first();
     await expect(borderColorBtn).toBeVisible({ timeout: 5000 });
     await borderColorBtn.click();
 
@@ -399,10 +401,11 @@ test.describe('Border Color Picker', () => {
     await expect(dropdown.getByText('Automatic')).toBeVisible();
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('apply border color from standard colors', async ({ page }) => {
-    // Open border color picker
-    const borderColorBtn = page.locator('.docx-color-picker-button[title="Border Color"]');
+  test('apply border color from standard colors', async ({ page }) => {
+    // Open border color picker (arrow half of the split button).
+    const borderColorBtn = page
+      .locator('button.docx-color-picker-arrow[title="Border Color"]')
+      .first();
     await expect(borderColorBtn).toBeVisible({ timeout: 5000 });
     await borderColorBtn.click();
 
