@@ -39,14 +39,7 @@ test.describe('HF inline editor: toolbar + context menu + z-index (#384, #385)',
     await expect(page.locator('.layout-page-header').first()).toBeVisible();
   });
 
-  // TODO(unify-hf-editing): post-unification the painter renders HF cells
-  // (`.layout-table-cell`) instead of native `<td>`s; the toolbar's
-  // table-context selection routing through useSelectionTracker isn't
-  // hooked up for HF transactions on every click. Re-enable once the HF
-  // selection feeds tableContext directly.
-  test.fixme('clicking a header table cell shows the Table toolbar group (#384)', async ({
-    page,
-  }) => {
+  test('clicking a header table cell shows the Table toolbar group (#384)', async ({ page }) => {
     const editor = new EditorPage(page);
     await editor.goto();
     await editor.waitForReady();
@@ -75,9 +68,7 @@ test.describe('HF inline editor: toolbar + context menu + z-index (#384, #385)',
     await expect(page.locator('[role="group"][aria-label="Table"]')).toHaveCount(1);
   });
 
-  // TODO(unify-hf-editing): see fixme above. Context menu routing depends
-  // on the same selection tracker that the table toolbar group does.
-  test.fixme('right-click in a header table cell shows context menu with table actions (#384)', async ({
+  test('right-click in a header table cell shows context menu with table actions (#384)', async ({
     page,
   }) => {
     const editor = new EditorPage(page);
