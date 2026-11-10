@@ -1,12 +1,16 @@
 import { test, expect } from '@playwright/test';
 
+// QUARANTINE (#99): flakes in CI (typed marker intermittently never paints —
+// focus/timing race). Passes locally and usually on retry. #99 owns root-cause.
 // Regression for #736 — Vue: the blinking text caret disappeared while typing
 // (and only came back on a click). The caret/selection overlay was repainted
 // synchronously on every transaction, before the rAF-coalesced layout repaint,
 // so it resolved against stale painted DOM and vanished. It now runs through
 // the layout gate (`syncCoordinator.onRender` + `requestRender`), painting only
 // once the layout is current. React was never affected (different overlay path).
-test('Vue: caret stays visible and follows the text while typing (#736)', async ({ page }) => {
+test.fixme('Vue: caret stays visible and follows the text while typing (#736)', async ({
+  page,
+}) => {
   await page.goto('http://localhost:5174/?e2e=1');
   await page.locator('.docx-editor-vue').waitFor();
   await page.locator('.paged-editor__pages').waitFor();
