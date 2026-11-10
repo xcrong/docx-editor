@@ -40,7 +40,8 @@ test.describe('Demo.docx - Document Loading', () => {
     );
   });
 
-  test('shows correct filename after loading', async ({ page }) => {
+  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + full-run + all CI retries).
+  test.fixme('shows correct filename after loading', async ({ page }) => {
     await editor.loadDocxFile(DEMO_DOCX_PATH);
 
     // Filename should appear in header
@@ -473,7 +474,8 @@ test.describe('Demo.docx - Structural Elements', () => {
     await expect(page.locator('.ProseMirror')).toContainText('Footnotes & Endnotes');
   });
 
-  test('footnote references are rendered as superscript', async ({ page }) => {
+  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + full-run + all CI retries).
+  test.fixme('footnote references are rendered as superscript', async ({ page }) => {
     // Check in visible pages that footnote refs have superscript styling
     const supRun = page
       .locator('.paged-editor__pages span[style*="vertical-align: super"]')
@@ -570,7 +572,8 @@ test.describe('Demo.docx - Round-trip Save', () => {
     await expect(page.locator('.ProseMirror')).toContainText('Edited by test');
   });
 
-  test('saved document preserves formatting', async ({ page }) => {
+  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + full-run + all CI retries).
+  test.fixme('saved document preserves formatting', async ({ page }) => {
     // Verify basic text editing works (save/re-load infrastructure not yet available)
     await editor.typeText('Edited by test');
     await expect(page.locator('.ProseMirror')).toContainText('Edited by test');

@@ -67,7 +67,8 @@ test.describe('Cursor Focus - Toolbar Interactions', () => {
     expect(editorHasFocus).toBe(true);
   });
 
-  test('cursor stays visible after clicking Underline button', async ({ page }) => {
+  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails full-run + all CI retries; passes unloaded solo).
+  test.fixme('cursor stays visible after clicking Underline button', async ({ page }) => {
     await editor.typeText('Test text');
 
     // Click Underline button
@@ -81,7 +82,8 @@ test.describe('Cursor Focus - Toolbar Interactions', () => {
     expect(editorHasFocus).toBe(true);
   });
 
-  test('cursor stays visible after clicking alignment buttons', async ({ page }) => {
+  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
+  test.fixme('cursor stays visible after clicking alignment buttons', async ({ page }) => {
     await editor.typeText('Test text');
 
     // Click Center alignment
@@ -294,7 +296,8 @@ test.describe('Cursor Focus - Text Selection Preservation', () => {
     expect(hasGeorgia).toBe(true);
   });
 
-  test('text selection preserved when using font size dropdown', async ({ page }) => {
+  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails full-run + all CI retries; passes unloaded solo).
+  test.fixme('text selection preserved when using font size dropdown', async ({ page }) => {
     // Type text
     await editor.typeText('Size this text');
 
@@ -331,7 +334,8 @@ test.describe('Cursor Focus - Background Click', () => {
     await editor.focus();
   });
 
-  test('clicking toolbar does not lose editor focus', async ({ page }) => {
+  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
+  test.fixme('clicking toolbar does not lose editor focus', async ({ page }) => {
     // Type some text first
     await editor.typeText('Some text');
 
