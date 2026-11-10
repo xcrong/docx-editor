@@ -404,8 +404,7 @@ test.describe('Comments sidebar — resolve / reopen (regression #268)', () => {
     expect(await isCommentExpanded(page, id)).toBe(true);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails full-run + all CI retries; passes unloaded solo).
-  test.fixme('clicking Resolve immediately collapses the card to the checkmark marker', async ({
+  test('clicking Resolve immediately collapses the card to the checkmark marker', async ({
     page,
   }) => {
     // Resolving without moving the cursor should not leave the expanded card
@@ -426,10 +425,7 @@ test.describe('Comments sidebar — resolve / reopen (regression #268)', () => {
     await expect(resolvedMarker(page, id)).toBeVisible();
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('resolved comment highlight is hidden in the doc body by default', async ({
-    page,
-  }) => {
+  test('resolved comment highlight is hidden in the doc body by default', async ({ page }) => {
     const editor = await setupEmptyDoc(page);
     await openSidebar(page);
     await editor.typeText(`Hide highlight for target when resolved ${CLEAN}.`);
@@ -450,8 +446,7 @@ test.describe('Comments sidebar — resolve / reopen (regression #268)', () => {
     );
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('expanding a resolved comment re-shows the highlight on its range only', async ({
+  test('expanding a resolved comment re-shows the highlight on its range only', async ({
     page,
   }) => {
     const editor = await setupEmptyDoc(page);
@@ -600,8 +595,7 @@ test.describe('Comments sidebar — feedback-loop stability', () => {
     expect(await isCommentExpanded(page, id)).toBe(true);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails full-run + all CI retries; passes unloaded solo).
-  test.fixme('clicking a collapsed card in the sidebar expands it without moving the cursor', async ({
+  test('clicking a collapsed card in the sidebar expands it without moving the cursor', async ({
     page,
   }) => {
     const editor = await setupEmptyDoc(page);
@@ -639,8 +633,7 @@ test.describe('Comments sidebar — feedback-loop stability', () => {
 });
 
 test.describe('Comments sidebar — add / reply / resolve / delete (3.7)', () => {
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('add comment, reply, resolve, reopen, delete', async ({ page }) => {
+  test('add comment, reply, resolve, reopen, delete', async ({ page }) => {
     const editor = await setupEmptyDoc(page);
     await openSidebar(page);
     await editor.typeText(`Lifecycle alpha beta gamma delta ${CLEAN}.`);

@@ -125,8 +125,7 @@ test.describe('Agent bridge — paraId-anchored mutations', () => {
     expect(afterCount - beforeCount).toBe(5);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('programmatic addComment lays out sidebar cards without overlap (no click required)', async ({
+  test('programmatic addComment lays out sidebar cards without overlap (no click required)', async ({
     page,
   }) => {
     // Regression: adding comments via the agent ref previously did not trigger
@@ -185,26 +184,29 @@ test.describe('Agent bridge — paraId-anchored mutations', () => {
       timeout: 5000,
     });
     // Do NOT click any card — clicking triggers the [expandedItem] re-measure
-    // and would mask the bug. Wait for the [items.length] effect to settle.
-    await page.waitForTimeout(600);
-
-    const overlaps = await page.evaluate(() => {
-      const cards = Array.from(
-        document.querySelectorAll('.docx-unified-sidebar .docx-comment-card')
-      ) as HTMLElement[];
-      const rects = cards
-        .map((el) => el.getBoundingClientRect())
-        .filter((r) => r.height > 0 && r.width > 0)
-        .sort((a, b) => a.top - b.top);
-      const collisions: Array<{ a: number; b: number; gap: number }> = [];
-      for (let i = 1; i < rects.length; i++) {
-        const gap = rects[i].top - rects[i - 1].bottom;
-        if (gap < -0.5) collisions.push({ a: i - 1, b: i, gap });
-      }
-      return { count: rects.length, collisions };
-    });
-    expect(overlaps.count).toBe(paraIds.length);
-    expect(overlaps.collisions).toEqual([]);
+    // and would mask the bug. Poll for the collision-free layout instead of a
+    // fixed wait: card measure + collision avoidance settle asynchronously.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const cards = Array.from(
+              document.querySelectorAll('.docx-unified-sidebar .docx-comment-card')
+            ) as HTMLElement[];
+            const rects = cards
+              .map((el) => el.getBoundingClientRect())
+              .filter((r) => r.height > 0 && r.width > 0)
+              .sort((a, b) => a.top - b.top);
+            const collisions: Array<{ a: number; b: number; gap: number }> = [];
+            for (let i = 1; i < rects.length; i++) {
+              const gap = rects[i].top - rects[i - 1].bottom;
+              if (gap < -0.5) collisions.push({ a: i - 1, b: i, gap });
+            }
+            return { count: rects.length, collisions };
+          }),
+        { timeout: 8000 }
+      )
+      .toEqual({ count: paraIds.length, collisions: [] });
   });
 
   test('proposeChange creates a tracked change visible in the editor', async ({ page }) => {

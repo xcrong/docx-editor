@@ -4,6 +4,8 @@ import type { ContentBlock } from '@xcrong/docx-editor-agents';
 declare global {
   interface Window {
     __DOCX_EDITOR_E2E__?: {
+      // Raw body EditorView — lets specs build precise PM states without driving the toolbar UI.
+      getView: () => unknown;
       getPmStartForParaId: (paraId: string) => number | null;
       getSelectionAnchor: () => number | null;
       getTextblockEndForParaId: (paraId: string) => number | null;
@@ -94,6 +96,9 @@ declare global {
         paragraphs: Array<{ paraId: string; text: string; styleId?: string }>;
       } | null;
       agentGetDocumentText: () => string;
+      getDocument: () => {
+        package?: { styles?: { styles?: Array<{ styleId: string; type: string }> } };
+      } | null;
       // Review-plugin bridge surface (review-plugin 9.2) — backed by the real
       // `createReviewBridge`, not direct ref calls.
       agentBridgeGetContent: () => ContentBlock[];

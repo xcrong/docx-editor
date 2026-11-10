@@ -1,6 +1,12 @@
 <template>
   <div class="preview-banner" role="status">
-    <span>{{ PREVIEW_BANNER_LEAD }}<a :href="PREVIEW_BANNER_HREF" target="_blank" rel="noopener">{{ PREVIEW_BANNER_FORK_LABEL }}</a>{{ PREVIEW_BANNER_TRAIL }}</span>
+    <span
+      >{{ PREVIEW_BANNER_LEAD
+      }}<a :href="PREVIEW_BANNER_HREF" target="_blank" rel="noopener">{{
+        PREVIEW_BANNER_FORK_LABEL
+      }}</a
+      >{{ PREVIEW_BANNER_TRAIL }}</span
+    >
   </div>
   <div class="app">
     <main class="main">
@@ -32,12 +38,7 @@
           </div>
         </template>
         <template #title-bar-right>
-          <div
-            class="theme-toggle"
-            role="radiogroup"
-            aria-label="Color theme"
-            @mousedown.stop
-          >
+          <div class="theme-toggle" role="radiogroup" aria-label="Color theme" @mousedown.stop>
             <button
               type="button"
               role="radio"
@@ -47,9 +48,20 @@
               title="Light mode"
               @click="colorMode = 'light'"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                <path
+                  d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+                />
               </svg>
             </button>
             <button
@@ -61,18 +73,22 @@
               title="Dark mode"
               @click="colorMode = 'dark'"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
               </svg>
             </button>
           </div>
           <label class="btn btn-primary">
-            <input
-              type="file"
-              accept=".docx"
-              @change="handleFileSelect"
-              class="file-input"
-            />
+            <input type="file" accept=".docx" @change="handleFileSelect" class="file-input" />
             Open
           </label>
           <button class="btn" @click="handleNew">New</button>
@@ -80,11 +96,7 @@
           <span v-if="status" class="status">{{ status }}</span>
         </template>
       </DocxEditor>
-      <AgentPanel
-        v-if="showAgentPanel"
-        :closed="agentClosed"
-        @close="agentClosed = true"
-      >
+      <AgentPanel v-if="showAgentPanel" :closed="agentClosed" @close="agentClosed = true">
         <div data-testid="agent-panel-content" class="agent-panel-body">
           <AgentChatLog
             :messages="messages"
@@ -92,11 +104,7 @@
             :humanize-tool-name="getToolDisplayName"
             :auto-scroll="true"
           />
-          <AgentComposer
-            v-model="input"
-            :disabled="loading"
-            @submit="sendMessage"
-          />
+          <AgentComposer v-model="input" :disabled="loading" @submit="sendMessage" />
         </div>
       </AgentPanel>
     </main>
@@ -331,12 +339,13 @@ onMounted(async () => {
         const view = (editorRef.value?.getEditorRef() as any)?.getView?.();
         if (!view) return null;
         let found: string | null = null;
+        // NOTE: returning false from descendants does NOT stop traversal
+        // (it only skips the node's children), so guard with found == null
+        // to actually keep the FIRST match.
         view.state.doc.descendants((node: any) => {
-          if (node.isTextblock && node.attrs?.paraId) {
+          if (found == null && node.isTextblock && node.attrs?.paraId) {
             found = String(node.attrs.paraId);
-            return false;
           }
-          return true;
         });
         return found;
       },
@@ -354,7 +363,11 @@ onMounted(async () => {
       scrollToPosition: (pmPos: number) => {
         const view = (editorRef.value?.getEditorRef() as any)?.getView?.();
         if (!view) return;
-        view.dispatch(view.state.tr.setSelection(view.state.selection.constructor.near(view.state.doc.resolve(pmPos))));
+        view.dispatch(
+          view.state.tr.setSelection(
+            view.state.selection.constructor.near(view.state.doc.resolve(pmPos))
+          )
+        );
       },
       getDocSize: () => {
         const state = (editorRef.value?.getEditorRef() as any)?.getState?.();
@@ -431,7 +444,8 @@ onMounted(async () => {
       },
       agentApplyFormatting: (opts) => editorRef.value?.applyFormatting(opts) ?? false,
       agentSetParagraphStyle: (opts) => editorRef.value?.setParagraphStyle(opts) ?? false,
-      agentGetPageContent: (pageNumber: number) => editorRef.value?.getPageContent(pageNumber) ?? null,
+      agentGetPageContent: (pageNumber: number) =>
+        editorRef.value?.getPageContent(pageNumber) ?? null,
       agentGetDocumentText: () => extractDocumentText(editorRef.value?.getDocument()),
       // Tracked structural revisions (#614) — mirror of the React demo hooks
       // so the same Playwright spec can run against this adapter.

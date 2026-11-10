@@ -544,6 +544,19 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     engineRef.current!.handleHfTransaction(rId, view, docChanged);
   }, []);
 
+  // Resolving/unresolving a comment changes highlight rendering without a
+  // PM transaction, so the engine would never repaint and the stale
+  // highlight would stick. Request a layout pass when the resolved set
+  // changes (measure cache makes this a cheap repaint, not a re-measure).
+  const resolvedKey = useMemo(
+    () => [...(resolvedCommentIds ?? [])].sort((a, b) => a - b).join(','),
+    [resolvedCommentIds]
+  );
+  useEffect(() => {
+    const view = hiddenPMRef.current?.getView();
+    if (view && engineRef.current) engineRef.current.scheduleLayout(view.state);
+  }, [resolvedKey, hiddenPMRef]);
+
   // Clean up pending rAF + in-flight loads on unmount
   useEffect(() => {
     const engine = engineRef.current;

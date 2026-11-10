@@ -1002,6 +1002,13 @@ export const ParagraphExtension = createNodeExtension({
           };
         },
       },
+      keyboardShortcuts: {
+        // Word-compatible alignment shortcuts (advertised in the alignment dropdown).
+        'Mod-l': makeSetAlignment('left'),
+        'Mod-e': makeSetAlignment('center'),
+        'Mod-r': makeSetAlignment('right'),
+        'Mod-j': makeSetAlignment('both'),
+      },
     };
   },
 });

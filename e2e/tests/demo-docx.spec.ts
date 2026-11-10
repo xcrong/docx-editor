@@ -40,12 +40,11 @@ test.describe('Demo.docx - Document Loading', () => {
     );
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + full-run + all CI retries).
-  test.fixme('shows correct filename after loading', async ({ page }) => {
+  test('shows correct filename after loading', async ({ page }) => {
     await editor.loadDocxFile(DEMO_DOCX_PATH);
-
-    // Filename should appear in header
-    await expect(page.locator('text=demo.docx')).toBeVisible();
+    // The title bar strips the extension (DocumentName renders an input
+    // whose value is the bare name), so assert on value, not page text.
+    await expect(page.getByLabel('Document name')).toHaveValue('demo');
   });
 });
 
@@ -474,18 +473,22 @@ test.describe('Demo.docx - Structural Elements', () => {
     await expect(page.locator('.ProseMirror')).toContainText('Footnotes & Endnotes');
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + full-run + all CI retries).
-  test.fixme('footnote references are rendered as superscript', async ({ page }) => {
-    // Check in visible pages that footnote refs have superscript styling
+  test('footnote references are rendered as superscript', async ({ page }) => {
+    // The painter deliberately avoids `vertical-align: super` (it grows the
+    // line box beyond Word's metrics) and raises the glyph with a paint-only
+    // relative offset instead. Assert the raised offset on a digit ref run.
     const supRun = page
-      .locator('.paged-editor__pages span[style*="vertical-align: super"]')
+      .locator('.paged-editor__pages span[style*="position: relative"][style*="top: -0.4em"]')
+      .filter({ hasText: /^\d+\s*$/ })
       .first();
     await expect(supRun).toBeVisible();
-
-    const display = await supRun.evaluate((el) => {
-      return window.getComputedStyle(el).verticalAlign;
-    });
-    expect(display).toContain('super');
+    // Assert on the inline style (not getComputedStyle): scrolling the ref
+    // into view can park it in a virtualized-hidden page where computed
+    // style no longer reflects the specified values.
+    const inlineStyle = await supRun.getAttribute('style');
+    expect(inlineStyle).toContain('position: relative');
+    expect(inlineStyle).toContain('top: -0.4em');
+    expect(inlineStyle).toContain('font-size: 0.75em');
   });
 
   test('endnote references are rendered as superscript', async ({ page }) => {
@@ -572,9 +575,9 @@ test.describe('Demo.docx - Round-trip Save', () => {
     await expect(page.locator('.ProseMirror')).toContainText('Edited by test');
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + full-run + all CI retries).
-  test.fixme('saved document preserves formatting', async ({ page }) => {
+  test('saved document preserves formatting', async ({ page }) => {
     // Verify basic text editing works (save/re-load infrastructure not yet available)
+    await editor.focus();
     await editor.typeText('Edited by test');
     await expect(page.locator('.ProseMirror')).toContainText('Edited by test');
   });

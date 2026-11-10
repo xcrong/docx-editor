@@ -602,6 +602,7 @@ const {
   syncHfPMs,
   setHfTransactionListener,
   setSaveCommentsProvider,
+  setResolvedCommentIdsProvider,
   setDocument,
   engineAnchorPositions,
 } = useDocxEditor({
@@ -816,6 +817,11 @@ const { minLayoutWidth, pagesContainerStyle, rulerRowStyle, pageWidthPx } = useS
 const resolvedCommentIds = computed(
   () => new Set(comments.value.filter((c) => c.parentId == null && c.done).map((c) => c.id))
 );
+// Highlight rendering reads the resolved set through the engine host.
+// Repaint when it changes: resolving leaks no PM transaction, so without
+// this the stale highlight sticks (mirrors React's resolvedKey effect).
+setResolvedCommentIdsProvider(() => resolvedCommentIds.value);
+watch(resolvedCommentIds, () => reLayout());
 
 const bookmarkOptions = computed(() => {
   void stateTick.value;

@@ -81,17 +81,16 @@ test.describe('Boundary Conditions', () => {
     await editor.focus();
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + full-run + all CI retries).
-  test.fixme('empty document operations', async ({ page }) => {
-    // Operations on empty document should not crash
+  test('empty document operations', async ({ page }) => {
+    // Operations on empty document should not crash. All of these are
+    // no-ops, so no history entries exist and undo/redo stay disabled.
     await editor.selectAll();
     await editor.applyBold();
     await editor.applyItalic();
     await editor.pressBackspace();
     await editor.pressDelete();
-    await editor.undo();
-    await editor.redo();
-
+    await expect(page.getByTestId('toolbar-undo')).toBeDisabled();
+    await expect(page.getByTestId('toolbar-redo')).toBeDisabled();
     await editor.expectReady();
   });
 

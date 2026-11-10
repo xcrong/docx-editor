@@ -73,10 +73,7 @@ test.describe('Agent bridge — formatting + paged reads', () => {
     expect(ok).toBe(false);
   });
 
-  // QUARANTINE (#107): fails all CI retries (CI-env-specific; passes locally solo). Pre-existing on main.
-  test.fixme('setParagraphStyle applies a known styleId to the first paragraph', async ({
-    page,
-  }) => {
+  test('setParagraphStyle applies a known styleId to the first paragraph', async ({ page }) => {
     const paraId = await getFirstParaId(page);
     test.skip(!paraId, 'Fixture has no paraIds');
 
@@ -87,12 +84,12 @@ test.describe('Agent bridge — formatting + paged reads', () => {
       const styles = (
         window.__DOCX_EDITOR_E2E__ as unknown as {
           getDocument?: () => {
-            package?: { styles?: { styles?: Array<{ id: string; type: string }> } };
+            package?: { styles?: { styles?: Array<{ styleId: string; type: string }> } };
           };
         }
       )?.getDocument?.()?.package?.styles?.styles;
       const candidate = styles?.find((s) => s.type === 'paragraph');
-      return candidate?.id ?? null;
+      return candidate?.styleId ?? null;
     });
     test.skip(!styleId, 'Fixture has no defined paragraph styles');
 
@@ -120,8 +117,7 @@ test.describe('Agent bridge — formatting + paged reads', () => {
     expect(styleIdAfter).toBe(styleId);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails full-run + all CI retries; passes unloaded solo).
-  test.fixme('setParagraphStyle returns false for unknown styleId (no silent corruption)', async ({
+  test('setParagraphStyle returns false for unknown styleId (no silent corruption)', async ({
     page,
   }) => {
     const paraId = await getFirstParaId(page);
@@ -138,10 +134,9 @@ test.describe('Agent bridge — formatting + paged reads', () => {
     expect(ok).toBe(false);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails solo + all CI retries).
-  test.fixme('getPageContent returns paragraphs on page 1 with stable paraIds', async ({
-    page,
-  }) => {
+  // The loadDocxFile settle-wait (first-paraId identity change) fixed the
+  // default-doc vs fixture race that quarantined this test (#107).
+  test('getPageContent returns paragraphs on page 1 with stable paraIds', async ({ page }) => {
     const paraId = await getFirstParaId(page);
     test.skip(!paraId, 'Fixture has no paraIds');
 
