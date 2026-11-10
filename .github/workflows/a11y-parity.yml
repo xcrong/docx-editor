@@ -48,6 +48,7 @@ jobs:
         id: check
         run: |
           set +e
+          mkdir -p test-results
           NO_NUXT=1 bun run check:a11y-parity --report test-results/a11y-parity-report.md > test-results/a11y-parity.log 2>&1
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
           cat test-results/a11y-parity-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || tail -40 test-results/a11y-parity.log >> "$GITHUB_STEP_SUMMARY"
