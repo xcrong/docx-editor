@@ -344,8 +344,7 @@ test.describe('Color Edge Cases', () => {
     await assertions.assertDocumentContainsText(page, 'Unicode:');
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails full-run + all CI retries; passes unloaded solo).
-  test.fixme('alternating colors per word', async ({ page }) => {
+  test('alternating colors per word', async ({ page }) => {
     // Type all words first, then color them individually
     await editor.typeText('Red Blue Green');
 

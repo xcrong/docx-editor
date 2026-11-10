@@ -67,19 +67,21 @@ test.describe('Cursor Focus - Toolbar Interactions', () => {
     expect(editorHasFocus).toBe(true);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails full-run + all CI retries; passes unloaded solo).
-  test.fixme('cursor stays visible after clicking Underline button', async ({ page }) => {
+  test('cursor stays visible after clicking Underline button', async ({ page }) => {
     await editor.typeText('Test text');
-
     // Click Underline button
     await page.getByTestId('toolbar-underline').click();
-
-    // Verify focus is maintained
-    const editorHasFocus = await page.evaluate(() => {
-      const editor = document.querySelector('.ProseMirror');
-      return document.activeElement === editor || editor?.contains(document.activeElement);
-    });
-    expect(editorHasFocus).toBe(true);
+    // Verify focus is maintained (poll: toolbar interaction briefly moves focus)
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const editor = document.querySelector('.ProseMirror');
+            return document.activeElement === editor || editor?.contains(document.activeElement);
+          }),
+        { timeout: 3000 }
+      )
+      .toBe(true);
   });
 
   test('cursor stays visible after clicking alignment buttons', async ({ page }) => {
@@ -308,8 +310,7 @@ test.describe('Cursor Focus - Text Selection Preservation', () => {
     expect(hasGeorgia).toBe(true);
   });
 
-  // QUARANTINE (#107): deterministic failure, pre-existing on main (fails full-run + all CI retries; passes unloaded solo).
-  test.fixme('text selection preserved when using font size dropdown', async ({ page }) => {
+  test('text selection preserved when using font size dropdown', async ({ page }) => {
     // Type text
     await editor.typeText('Size this text');
 
@@ -326,12 +327,17 @@ test.describe('Cursor Focus - Text Selection Preservation', () => {
     // Change font size
     await editor.setFontSize(18);
 
-    // Verify editor still has focus
-    const editorHasFocus = await page.evaluate(() => {
-      const editor = document.querySelector('.ProseMirror');
-      return document.activeElement === editor || editor?.contains(document.activeElement);
-    });
-    expect(editorHasFocus).toBe(true);
+    // Verify editor still has focus (poll: the dropdown briefly takes focus)
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const editor = document.querySelector('.ProseMirror');
+            return document.activeElement === editor || editor?.contains(document.activeElement);
+          }),
+        { timeout: 3000 }
+      )
+      .toBe(true);
   });
 });
 
@@ -352,22 +358,35 @@ test.describe('Cursor Focus - Background Click', () => {
 
     // Click on the toolbar area (but not on a button). The demo renders
     // FormattingBar (data-testid="formatting-bar"), not the legacy Toolbar.
+    // Button layout shifts with viewport/features, so scan for a dead spot
+    // at runtime instead of assuming the far right is empty.
     const toolbar = editor.toolbar;
     const box = await toolbar.boundingBox();
     if (box) {
-      // Click on empty area of toolbar (far right where there are no buttons)
-      await page.mouse.click(box.x + box.width - 10, box.y + box.height / 2);
+      const deadX = await page.evaluate(
+        (b: { x: number; y: number; width: number; height: number }) => {
+          const y = b.y + b.height / 2;
+          for (let x = b.x + 4; x < b.x + b.width - 2; x += 8) {
+            const el = document.elementFromPoint(x, y) as HTMLElement | null;
+            if (el && !el.closest('button,[role="button"],input,select,textarea,a[href]')) return x;
+          }
+          return null;
+        },
+        box
+      );
+      if (deadX != null) await page.mouse.click(deadX, box.y + box.height / 2);
     }
-
-    // Small delay to allow focus to settle
-    await page.waitForTimeout(50);
-
-    // Verify editor still has focus
-    const editorHasFocus = await page.evaluate(() => {
-      const editor = document.querySelector('.ProseMirror');
-      return document.activeElement === editor || editor?.contains(document.activeElement);
-    });
-    expect(editorHasFocus).toBe(true);
+    // Verify editor still has focus (poll: the mousedown may briefly blur)
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const editor = document.querySelector('.ProseMirror');
+            return document.activeElement === editor || editor?.contains(document.activeElement);
+          }),
+        { timeout: 3000 }
+      )
+      .toBe(true);
 
     // Should be able to type immediately
     await page.keyboard.type(' more');
