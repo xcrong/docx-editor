@@ -1,4 +1,5 @@
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
+import { describeRunPropertyChange } from '@xcrong/docx-editor-core/utils/comments';
 import { MaterialSymbol } from '../ui/Icons';
 import type { SidebarItemRenderProps } from '../../plugin-api/types';
 import type { TrackedChangeEntry } from './cardUtils';
@@ -188,6 +189,20 @@ export function TrackedChangeCard({
         ) : change.type === 'sectionPropertiesChanged' ? (
           <>
             {t('revisions.sectionPropertiesChanged')}
+            {change.text ? (
+              <>
+                {': '}
+                <span style={{ color: 'var(--doc-text-muted)', fontWeight: 500 }}>
+                  &quot;{truncateText(change.text)}&quot;
+                </span>
+              </>
+            ) : null}
+          </>
+        ) : change.type === 'runPropertiesChanged' ? (
+          <>
+            {describeRunPropertyChange(change.priorFormatting, change.currentFormatting, (k, p) =>
+              t(k as 'revisions.runPropertiesChanged', p)
+            )}
             {change.text ? (
               <>
                 {': '}

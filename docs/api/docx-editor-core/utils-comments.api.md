@@ -4,6 +4,9 @@
 
 ```ts
 
+// @public
+export function describeRunPropertyChange(prior: TextFormatting | RunPriorLike | undefined, current: TextFormatting | RunPriorLike | undefined, t: TranslateFn): string;
+
 // @public (undocumented)
 export function formatDate(dateStr?: string): string;
 
@@ -20,15 +23,20 @@ export function getInitials(name: string): string;
 export interface TrackedChangeEntry {
     author: string;
     coalescedRevisionIds?: number[];
+    currentFormatting?: TextFormatting;
     date?: string;
     deletedText?: string;
     from: number;
     insertionRevisionId?: number;
+    priorFormatting?: TextFormatting;
     revisionId: number;
     text: string;
     to: number;
-    type: 'insertion' | 'deletion' | 'replacement' | 'paragraphMarkInsertion' | 'paragraphMarkDeletion' | 'paragraphPropertiesChanged' | 'rowInserted' | 'rowDeleted' | 'rowPropertiesChanged' | 'cellInserted' | 'cellDeleted' | 'cellMerged' | 'cellPropertiesChanged' | 'tableInserted' | 'tableDeleted' | 'tablePropertiesChanged' | 'tableExceptionsChanged' | 'tableGridChanged' | 'paragraphMarkPropertiesChanged' | 'sectionPropertiesChanged';
+    type: 'insertion' | 'deletion' | 'replacement' | 'paragraphMarkInsertion' | 'paragraphMarkDeletion' | 'paragraphPropertiesChanged' | 'runPropertiesChanged' | 'rowInserted' | 'rowDeleted' | 'rowPropertiesChanged' | 'cellInserted' | 'cellDeleted' | 'cellMerged' | 'cellPropertiesChanged' | 'tableInserted' | 'tableDeleted' | 'tablePropertiesChanged' | 'tableExceptionsChanged' | 'tableGridChanged' | 'paragraphMarkPropertiesChanged' | 'sectionPropertiesChanged';
 }
+
+// @public
+export type TranslateFn = (key: string, params?: Record<string, string | number>) => string;
 
 // @public (undocumented)
 export function truncateText(text: string, maxLength?: number): string;

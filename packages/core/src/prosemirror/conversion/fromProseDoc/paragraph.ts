@@ -37,6 +37,7 @@ import {
   createMathFromNode,
   createImageRun,
   createShapeRun,
+  revisionChangeFromMarks,
 } from './runs';
 
 /**
@@ -662,6 +663,12 @@ function extractParagraphContent(paragraph: PMNode): ParagraphContent[] {
           content: node.isText && node.text ? [{ type: 'text', text: node.text }] : [],
           ...(Object.keys(formatting).length > 0 ? { formatting } : {}),
         };
+        // A text node can carry BOTH an insertion/deletion mark and a
+        // `revision_change` mark (typed in suggesting mode, then formatted in
+        // suggesting mode). The formatting revision must survive the save —
+        // re-attach it from the surviving marks.
+        const propertyChanges = revisionChangeFromMarks(node.marks, formatting);
+        if (propertyChanges) run.propertyChanges = propertyChanges;
       }
 
       const info: TrackedChangeInfo = {

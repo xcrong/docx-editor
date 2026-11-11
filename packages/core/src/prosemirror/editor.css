@@ -862,6 +862,18 @@
   padding-left: 0;
 }
 
+/* Run property revision (`w:rPrChange` → `revision_change` mark, Phase 3).
+   A run formatted under suggesting mode shows a subtle wavy underline in
+   the neutral property-change gray plus a faint tint — visible, but quieter
+   than the green/red insertion/deletion treatments. The hidden-PM toDOM
+   path emits the same class (see TrackedChangeExtensions). */
+.ep-revision-change {
+  text-decoration: underline wavy rgba(95, 99, 104, 0.85);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  background-color: rgba(95, 99, 104, 0.08);
+}
+
 /* Property-change paragraphs/blocks — quiet left margin bar in a neutral
    color so the change is visible without being loud. */
 .ep-revision-prop-change {

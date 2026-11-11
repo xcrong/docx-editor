@@ -21,6 +21,7 @@
 
 import { isHistoryTransaction } from 'prosemirror-history';
 import { Plugin, TextSelection } from 'prosemirror-state';
+import type { Command } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
 import { findAdjacentRevisionForRange } from './adjacency';
@@ -33,6 +34,14 @@ import {
   handleSuggestionEnter,
 } from './handlers/structural';
 import { makeMarkAttrs } from './markAttrs';
+// Formatting keyboard shortcuts (`Mod-b` / `Mod-i` / `Mod-u`) are registered
+// on the mark extensions as raw `toggleMark` commands. In suggesting mode the
+// plugin intercepts them FIRST (this plugin precedes the keymap in both
+// adapters) and routes them through the suggesting-aware wrapped commands so
+// they mint `revision_change` marks instead of editing `w:rPr` directly
+// (Phase 3, issue #83). Imported from the commands layer — not the reverse —
+// so there is no cycle (commands/* never import this plugin index).
+import { toggleBold, toggleItalic, toggleUnderline } from '../../commands/formatting';
 import {
   suggestionModeKey,
   SUGGESTION_BYPASS_META,
@@ -208,6 +217,10 @@ export function createSuggestionModePlugin(initialActive = false, author = 'User
       },
       // Intercept Backspace and Delete to mark as deletion.
       // Enter splits the paragraph and marks the FIRST paragraph's pPrIns.
+      // Formatting shortcuts route through the suggesting-aware commands
+      // (revision_change marks, Phase 3) instead of the extensions' raw
+      // toggleMark keybindings. This plugin precedes the keymap in both
+      // adapters, so returning true here wins.
       handleKeyDown(view: EditorView, event: KeyboardEvent): boolean {
         const pluginState = suggestionModeKey.getState(view.state);
         if (!pluginState?.active) return false;
@@ -224,6 +237,17 @@ export function createSuggestionModePlugin(initialActive = false, author = 'User
         if (event.key === 'Delete') {
           if (handleSuggestionDeleteAtEnd(view.state, view.dispatch)) return true;
           return handleSuggestionDelete(view.state, view.dispatch, 'forward');
+        }
+        if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey) {
+          const key = event.key.toLowerCase();
+          let cmd: Command | null = null;
+          if (key === 'b') cmd = toggleBold;
+          else if (key === 'i') cmd = toggleItalic;
+          else if (key === 'u') cmd = toggleUnderline;
+          if (cmd) {
+            event.preventDefault();
+            return cmd(view.state, view.dispatch);
+          }
         }
         return false;
       },

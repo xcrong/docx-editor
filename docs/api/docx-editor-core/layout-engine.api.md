@@ -639,6 +639,11 @@ export type RunFormatting = {
     changeAuthor?: string;
     changeDate?: string;
     changeRevisionId?: number;
+    revisionChange?: {
+        revisionId: number;
+        author: string;
+        date?: string;
+    };
 };
 
 // @public

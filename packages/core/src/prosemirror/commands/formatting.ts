@@ -11,6 +11,8 @@
 import type { Command, EditorState, Transaction } from 'prosemirror-state';
 import { singletonManager, schema } from '../schema';
 import type { TextColorAttrs } from '../schema';
+import { withSuggestingSnapshot } from '../plugins/suggestionMode/snapshot';
+import { runPropertySnapshotter } from '../plugins/suggestionMode/runSnapshot';
 
 // Utility re-exports from markUtils (used by toolbar, conversion, etc.)
 export {
@@ -55,37 +57,57 @@ export function textFormattingToMarks(formatting: TextFormatting): Mark[] {
 
 const cmds = singletonManager.getCommands();
 
-// Toggle marks (simple on/off)
-export const toggleBold: Command = cmds.toggleBold();
-export const toggleItalic: Command = cmds.toggleItalic();
-export const toggleUnderline: Command = cmds.toggleUnderline();
-export const toggleStrike: Command = cmds.toggleStrike();
-export const toggleSuperscript: Command = cmds.toggleSuperscript();
-export const toggleSubscript: Command = cmds.toggleSubscript();
+// Toggle marks (simple on/off). Wrapped with the run-property snapshotter so
+// suggesting mode mints a `revision_change` mark instead of editing the run's
+// `w:rPr` directly (Phase 3, issue #83) — one transaction, one undo step.
+export const toggleBold: Command = withSuggestingSnapshot(
+  cmds.toggleBold(),
+  runPropertySnapshotter
+);
+export const toggleItalic: Command = withSuggestingSnapshot(
+  cmds.toggleItalic(),
+  runPropertySnapshotter
+);
+export const toggleUnderline: Command = withSuggestingSnapshot(
+  cmds.toggleUnderline(),
+  runPropertySnapshotter
+);
+export const toggleStrike: Command = withSuggestingSnapshot(
+  cmds.toggleStrike(),
+  runPropertySnapshotter
+);
+export const toggleSuperscript: Command = withSuggestingSnapshot(
+  cmds.toggleSuperscript(),
+  runPropertySnapshotter
+);
+export const toggleSubscript: Command = withSuggestingSnapshot(
+  cmds.toggleSubscript(),
+  runPropertySnapshotter
+);
 
 // Set marks (with attributes)
 export function setTextColor(attrs: TextColorAttrs): Command {
-  return cmds.setTextColor(attrs);
+  return withSuggestingSnapshot(cmds.setTextColor(attrs), runPropertySnapshotter);
 }
 export const clearTextColor: Command = cmds.clearTextColor();
 
 export function setHighlight(color: string): Command {
-  return cmds.setHighlight(color);
+  return withSuggestingSnapshot(cmds.setHighlight(color), runPropertySnapshotter);
 }
 export const clearHighlight: Command = cmds.clearHighlight();
 
 export function setFontSize(size: number): Command {
-  return cmds.setFontSize(size);
+  return withSuggestingSnapshot(cmds.setFontSize(size), runPropertySnapshotter);
 }
 export const clearFontSize: Command = cmds.clearFontSize();
 
 export function setFontFamily(fontName: string): Command {
-  return cmds.setFontFamily(fontName);
+  return withSuggestingSnapshot(cmds.setFontFamily(fontName), runPropertySnapshotter);
 }
 export const clearFontFamily: Command = cmds.clearFontFamily();
 
 export function setUnderlineStyle(style: string, color?: TextColorAttrs): Command {
-  return cmds.setUnderlineStyle(style, color);
+  return withSuggestingSnapshot(cmds.setUnderlineStyle(style, color), runPropertySnapshotter);
 }
 
 // Hyperlink commands

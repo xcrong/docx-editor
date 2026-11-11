@@ -110,6 +110,16 @@ export type RunFormatting = {
   changeDate?: string;
   /** Revision ID of the tracked change (for sidebar matching) */
   changeRevisionId?: number;
+  /**
+   * Run property revision (`w:rPrChange` → `revision_change` mark, Phase 3).
+   * Separate from the insertion/deletion triple above so a run carrying
+   * both (typed then formatted in suggesting mode) keeps both anchors.
+   */
+  revisionChange?: {
+    revisionId: number;
+    author: string;
+    date?: string;
+  };
 };
 
 /**

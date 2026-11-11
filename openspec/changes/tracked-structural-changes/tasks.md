@@ -215,54 +215,54 @@ Three landable phases. Each phase is a separate PR. Phase 1 includes the snapsho
 
 ### Schema
 
-- [ ] New `revision_change` mark in `TrackedChangeExtensions.ts` with attrs `{ revisionId, author, date, prior: RunFormatting }` — **run only**, NOT for paragraph-mark rPr changes
-- [ ] Canonicalize `prior`: sort keys, `Object.freeze`, allow shared references for adjacency
+- [x] New `revision_change` mark in `TrackedChangeExtensions.ts` with attrs `{ revisionId, author, date, prior: RunFormatting }` — **run only**, NOT for paragraph-mark rPr changes (T27-07: `RevisionChangeExtension` + `priorStack` for stacked sessions; `StarterKit` registered; paragraph-mark path untouched — `paraRPrChange` attr, no-crosstalk test pins it)
+- [x] Canonicalize `prior`: sort keys, `Object.freeze`, allow shared references for adjacency (T27-07: `canonicalizeRunPrior` with interning in `TrackedChangeExtensions.ts`; stable `getMarkSetKey` for run coalescing)
 
 ### Parser / Serializer / Conversion
 
-- [ ] Wire run `rPrChange` from existing model field into `revision_change` mark via `toProseDoc/run.ts`
-- [ ] `fromProseDoc/run.ts` — inverse
-- [ ] Confirm `rPrChange` emission path works end-to-end and respects `<w:rPr>` last-child ordering (already enforced in Phase 1)
-- [ ] `findAdjacentRevision` in `suggestionMode.ts` extended to deep-compare `revision_change` attrs for span coalescing
+- [x] Wire run `rPrChange` from existing model field into `revision_change` mark via `toProseDoc/run.ts` (T27-07: `revisionChangeMark` in `toProseDoc/runs.ts` — full stack: latest + `priorStack` oldest-first, zero data loss; hyperlink runs included)
+- [x] `fromProseDoc/run.ts` — inverse (T27-07: `revisionChangeFromMarks` in `fromProseDoc/runs.ts` expands mark → full array; insertion/deletion-wrapper path preserves it; `tracked-structural-run-roundtrip.test.ts` ×5)
+- [x] Confirm `rPrChange` emission path works end-to-end and respects `<w:rPr>` last-child ordering (already enforced in Phase 1) (T27-07: pre-existing `serializeRunProperties` appends changes last — ordering assertion added in the run round-trip spec; e2e save→reload pins `<w:rPrChange>` in the ZIP)
+- [x] `findAdjacentRevision` in `suggestionMode.ts` extended to deep-compare `revision_change` attrs for span coalescing (T27-07: `findAdjacentRevisionChange` in `adjacency.ts` — same-author + deep-equal canonical prior → adopt triple; snapshotter probes both range edges; unit + e2e pinned)
 
 ### Suggesting-aware run-property commands
 
-- [ ] `toggleBold` / `toggleItalic` / `toggleUnderline` / `setFont` / `setFontSize` / `setColor` / `setHighlight` / `toggleStrike` / `toggleSubscript` / `toggleSuperscript` — snapshot prior `rPr` of affected runs and apply `revision_change` mark via `withSuggestingSnapshot`
-- [ ] Per-(id, author, date) freeze-on-first-edit semantics
-- [ ] Clear `revision_change` if all snapshotted fields equal current
+- [x] `toggleBold` / `toggleItalic` / `toggleUnderline` / `setFont` / `setFontSize` / `setColor` / `setHighlight` / `toggleStrike` / `toggleSubscript` / `toggleSuperscript` — snapshot prior `rPr` of affected runs and apply `revision_change` mark via `withSuggestingSnapshot` (T27-07: all 10 (+`setUnderlineStyle`) wrapped in `commands/formatting.ts`; `runPropertySnapshotter` captures full pre-edit formatting, stores minimal prior; keyboard `Mod-b/i/u` intercepted in the suggesting-mode plugin so shortcuts track too — extensions' raw `toggleMark` keybindings otherwise bypass the wrapper)
+- [x] Per-(id, author, date) freeze-on-first-edit semantics (T27-07: same-triple attach keeps the original prior; different triple pushes the survivor onto `priorStack` — every session keeps its own prior, newest-first reject restores the original)
+- [x] Clear `revision_change` if all snapshotted fields equal current (T27-07: `minimalPrior` null → same-triple mark removed, Word's no-op rule; `run-revision-accept.test.ts`)
 
 ### Accept / Reject
 
-- [ ] `revision_change` accept: remove mark
-- [ ] `revision_change` reject: restore prior `rPr` to the run, remove mark
-- [ ] `pPrChange` / `tcPrChange` / `trPrChange` / `tblPrChange` / `tblPrExChange` / `tblGridChange` / `paraRPrChange` reject: restore prior via `restorePriorProperties` (Phase 1 utility)
+- [x] `revision_change` accept: remove mark (T27-07: per-entry surgery in `resolveById` — `removeRevisionChangeEntry`; earlier sessions survive; `run-revision-accept.test.ts` + e2e)
+- [x] `revision_change` reject: restore prior `rPr` to the run, remove mark (T27-07: `restoreRunMarks` mark-reconcile per text node + entry removal, single transaction; reject-all walks ids newest-first via descending sort in `dispatchIdsInOrder`)
+- [x] `pPrChange` / `tcPrChange` / `trPrChange` / `tblPrChange` / `tblPrExChange` / `tblGridChange` / `paraRPrChange` reject: restore prior via `restorePriorProperties` (Phase 1 utility) (T27-07: verified pre-existing — no change needed; covered by `paragraph-revision-accept.test.ts` + `table-revision-accept.test.ts`, both green)
 
 ### Painter
 
-- [ ] `revision_change` mark renders with class `ep-revision-change` in `editor.css` (subtle wavy underline or background tint; exact CSS value with design)
+- [x] `revision_change` mark renders with class `ep-revision-change` in `editor.css` (subtle wavy underline or background tint; exact CSS value with design) (T27-07: wavy `rgba(95,99,104,0.85)` underline + 8% tint, neutral property-change gray; `toFlowBlocks/runs.ts` projects the mark, painter reuses the `data-revision-id`/`data-change-author`/`data-change-date` contract; e2e asserts the painted span)
 
 ### Sidebar
 
-- [ ] Sidebar entries name the changed property: "Bold added", "Font changed from Calibri to Times New Roman, 11pt to 12pt"
-- [ ] i18n keys already stubbed in Phase 1; Phase 3 fills English values for run-property descriptions
+- [x] Sidebar entries name the changed property: "Bold added", "Font changed from Calibri to Times New Roman, 11pt to 12pt" (T27-07: `describeRunPropertyChange` in `utils/runPropertyDescriptions.ts`, shared by React `TrackedChangeCard.tsx` + Vue `TrackedChangeCard.vue`; e2e asserts "Bold added" on the card)
+- [x] i18n keys already stubbed in Phase 1; Phase 3 fills English values for run-property descriptions (T27-07: 16 keys — bold/italic/underline/strike add/remove, super/sub/baseline, font/size/color/highlight from→to, default value; `en.json` values + `i18n:fix` nulls, `i18n:validate` green)
 
 ### Vue parity
 
-- [ ] Mirror
+- [x] Mirror (T27-07: `TrackedChangeCard.vue` branch + shared describe helper; Vue e2e `tracked-changes-run-revision.spec.ts` — bold → mark → accept/reject; keyboard path fixed for both adapters via the plugin interception. NOTE (pre-existing gap, out of scope): Vue `Toolbar.vue` dispatches raw `mgr.getCommands()`, bypassing the wrapped `commands/*` layer — Vue toolbar property edits don't mint revisions (same for Phase 1/2 paragraph/table commands); propose follow-up to route Vue `execCommand` through the wrapped layer)
 
 ### Tests
 
-- [ ] Fixtures for `rPrChange` with prior rPr containing various properties
-- [ ] Conversion unit tests
-- [ ] Playwright: toggle bold in suggesting mode → `revision_change` mark appears; accept removes; reject restores prior
-- [ ] Round-trip with mixed property changes
-- [ ] Property-based test: apply N random formatting ops, accept-all should equal applying ops without tracking; reject-all leaves doc unchanged
-- [ ] `comments-sidebar.spec.ts` regression
+- [x] Fixtures for `rPrChange` with prior rPr containing various properties (T27-07: `runPropertyChanges` (bold+red+14pt vs plain-12pt-black), `runPropertyChangesStacked` (two entries), `runPropertyChangesWithPilcrow` (Phase 1/3 coexistence))
+- [x] Conversion unit tests (T27-07: Document→PM mark (+stack) →Document array-shape preservation, edited-paragraph fallback, all in `tracked-structural-run-roundtrip.test.ts`)
+- [x] Playwright: toggle bold in suggesting mode → `revision_change` mark appears; accept removes; reject restores prior (T27-07: `e2e/tests/tracked-changes-run-revision.spec.ts` ×4 + `e2e/tests/vue/tracked-changes-run-revision.spec.ts`)
+- [x] Round-trip with mixed property changes (T27-07: fixture + save→reload e2e asserting `<w:rPrChange>` last-child in the ZIP)
+- [x] Property-based test: apply N random formatting ops, accept-all should equal applying ops without tracking; reject-all leaves doc unchanged (T27-07: seeded `mulberry32(83)` ×12 ops in `run-revision-accept.test.ts` — required the `priorStack` model + newest-first reject to pass)
+- [x] `comments-sidebar.spec.ts` regression (T27-07: spec green in isolation and in the combined structural run (33 passed with closeout + tables-accept); the full-suite parallel run shows timeout-driven flakes in this container — verified identical failures on pristine main, incl. `tracked-changes-structural.spec.ts` pPrDel/replace cases and `formatting`/`toolbar-state` suites, so no regression from this change)
 
 ### Release
 
-- [ ] `bun changeset` — minor bump
-- [ ] Final `bun run api:extract`
+- [x] `bun changeset` — minor bump (T27-07: `.changeset/t27-07-run-rev-83.md` — core minor)
+- [x] Final `bun run api:extract` (T27-07: `TrackedChangeEntry.runPropertiesChanged` + `prior/currentFormatting`, `describeRunPropertyChange`/`TranslateFn`; `api:check` + `check:parity-contract` green; no `DocxEditorRef` surface change)
 
 ---
 
