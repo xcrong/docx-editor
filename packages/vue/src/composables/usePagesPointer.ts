@@ -31,6 +31,7 @@ import type { ImageSelectionInfo } from '../components/imageSelectionTypes';
 import type { Layout } from '@xcrong/docx-editor-core/layout-engine';
 import type { HyperlinkPopupData } from '../components/ui/hyperlinkPopupTypes';
 import { useDragAutoScroll } from './useDragAutoScroll';
+import { findBookmarkPos } from '@xcrong/docx-editor-core/prosemirror/paraText';
 import {
   createCellDragTracker,
   findCellPosFromPmPos,
@@ -116,7 +117,7 @@ export interface UsePagesPointerReturn {
   resolvePos: (clientX: number, clientY: number) => number | null;
   setPmSelection: (anchor: number, head?: number) => void;
   scrollVisiblePositionIntoView: (pmPos: number) => void;
-  navigateToBookmark: (bookmarkName: string) => void;
+  navigateToBookmark: (bookmarkName: string) => boolean;
   handlePagesMouseDown: (event: MouseEvent) => void;
   handlePagesMouseMove: (event: MouseEvent) => void;
   handlePagesClick: (event: MouseEvent) => void;
@@ -226,20 +227,12 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
     selectParagraphImpl(opts.pagesRef.value, pos, setPmSelection, hfEdit.value?.position);
   }
 
-  function navigateToBookmark(bookmarkName: string) {
+  function navigateToBookmark(bookmarkName: string): boolean {
     const view = opts.editorView.value;
-    if (!view) return;
-    let targetPos: number | null = null;
-    view.state.doc.descendants((node, pos) => {
-      if (targetPos !== null) return false;
-      const bookmarks = node.attrs?.bookmarks as Array<{ name?: string }> | undefined;
-      if (bookmarks?.some((b) => b.name === bookmarkName)) {
-        targetPos = pos;
-        return false;
-      }
-      return true;
-    });
-    if (targetPos === null) return;
+    if (!view) return false;
+    // Shared core lookup so both adapters resolve the same target (#88).
+    const targetPos = findBookmarkPos(view.state.doc, bookmarkName);
+    if (targetPos === null) return false;
     scrollVisiblePositionIntoView(targetPos);
     try {
       setPmSelection(Math.min(targetPos + 1, view.state.doc.content.size));
@@ -248,6 +241,7 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
       // start position so the click still moves the editor near the target.
       setPmSelection(targetPos);
     }
+    return true;
   }
 
   /**

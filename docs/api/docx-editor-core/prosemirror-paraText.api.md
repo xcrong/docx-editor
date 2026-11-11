@@ -7,6 +7,9 @@
 import { Node as Node_2 } from 'prosemirror-model';
 
 // @public
+export function findBookmarkPos(doc: Node_2, bookmarkName: string): number | null;
+
+// @public
 export function findParaIdRange(doc: Node_2, paraId: string): {
     from: number;
     to: number;

@@ -712,7 +712,8 @@ export const wordFeatures: WordFeature[] = [
     rendering: 'partial',
     roundTrip: 'full',
     tier: 'community',
-    notes: 'Parsed and preserved losslessly; bookmark editing UI is deferred.',
+    notes:
+      'Parsed and preserved losslessly; clicking an internal link scrolls to its bookmark. Bookmark editing UI is deferred.',
   },
   {
     id: 'fields.page-numbers',

@@ -820,8 +820,17 @@ const resolvedCommentIds = computed(
 // Highlight rendering reads the resolved set through the engine host.
 // Repaint when it changes: resolving leaks no PM transaction, so without
 // this the stale highlight sticks (mirrors React's resolvedKey effect).
+// The key is a content string, not the Set itself: `extractCommentsAndChanges`
+// reassigns `comments` (fresh array + fresh Set) on every PM transaction,
+// including selection-only ones, so watching the Set identity would relayout
+// on every click — the repaint replaces the painted anchor between mousedown
+// and mouseup and the browser suppresses the click (#88: internal links and
+// external-link popups never fired in Vue).
 setResolvedCommentIdsProvider(() => resolvedCommentIds.value);
-watch(resolvedCommentIds, () => reLayout());
+const resolvedCommentIdsKey = computed(() =>
+  [...resolvedCommentIds.value].sort((a, b) => a - b).join(',')
+);
+watch(resolvedCommentIdsKey, () => reLayout());
 
 const bookmarkOptions = computed(() => {
   void stateTick.value;
@@ -917,7 +926,14 @@ const {
   handleHyperlinkPopupNavigate,
   handleHyperlinkPopupEdit,
   handleHyperlinkPopupRemove,
-} = useHyperlinkManagement({ editorView, getCommands });
+} = useHyperlinkManagement({
+  editorView,
+  getCommands,
+  // Deferred: `navigateToBookmark` is returned by `usePagesPointer` below,
+  // which itself consumes `hyperlinkPopupData` — this arrow only resolves
+  // the binding when a popup action fires, long after setup completes.
+  navigateToBookmark: (name: string) => navigateToBookmark(name),
+});
 
 const {
   handleClearFormatting,
@@ -1031,6 +1047,7 @@ const {
   resolvePos,
   setPmSelection,
   scrollVisiblePositionIntoView,
+  navigateToBookmark,
   handlePagesMouseDown,
   handlePagesMouseMove,
   handlePagesClick,
@@ -1089,6 +1106,7 @@ const {
   resolvePos,
   openHyperlinkDialog: () => void (showHyperlink.value = true),
   startAddComment: handleStartAddComment,
+  navigateToBookmark,
 });
 
 const { handleMenuAction, handleMenuTableInsert } = useMenuActions({

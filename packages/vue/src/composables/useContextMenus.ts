@@ -66,6 +66,12 @@ export interface UseContextMenusOptions {
   openHyperlinkDialog: () => void;
   /** Start the add-comment flow for the current selection. */
   startAddComment: () => void;
+  /**
+   * Internal-bookmark navigation (`#name` hrefs). Returns true when the
+   * bookmark resolved and the viewport moved; a missing bookmark is a
+   * silent no-op (never a blank tab, #88).
+   */
+  navigateToBookmark?: (bookmarkName: string) => boolean;
 }
 
 export interface UseContextMenusReturn {
@@ -322,7 +328,15 @@ export function useContextMenus(opts: UseContextMenusOptions): UseContextMenusRe
         removeHyperlink(view.state, view.dispatch, view);
         break;
       case 'openLink': {
-        const href = sanitizeHref(contextMenu.value.linkHref);
+        const raw = (contextMenu.value.linkHref ?? '').trim();
+        // Internal bookmark anchor (w:anchor) — scroll to the bookmark
+        // instead of opening a blank tab. A missing bookmark is a
+        // silent no-op (#88).
+        if (raw.startsWith('#')) {
+          opts.navigateToBookmark?.(raw.substring(1));
+          break;
+        }
+        const href = sanitizeHref(raw);
         if (href) window.open(href, '_blank', 'noopener,noreferrer');
         break;
       }

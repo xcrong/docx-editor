@@ -42,6 +42,7 @@ import {
 } from '@xcrong/docx-editor-core/layout-painter';
 import type { WrapType } from '@xcrong/docx-editor-core/docx/wrapTypes';
 import { findWordBoundaries } from '@xcrong/docx-editor-core/utils';
+import { findBookmarkPos } from '@xcrong/docx-editor-core/prosemirror/paraText';
 
 import type { HiddenProseMirrorRef } from '../HiddenProseMirror';
 import type { ImageSelectionInfo } from '../overlays/ImageSelectionOverlay';
@@ -646,19 +647,10 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
         if (href.startsWith('#')) {
           const bookmarkName = href.substring(1);
           if (bookmarkName && view) {
-            let targetPos: number | null = null;
-            view.state.doc.descendants((node, pos) => {
-              if (targetPos !== null) return false;
-              if (node.type.name === 'paragraph') {
-                const bookmarks = node.attrs.bookmarks as
-                  | Array<{ id: number; name: string }>
-                  | undefined;
-                if (bookmarks?.some((b) => b.name === bookmarkName)) {
-                  targetPos = pos;
-                  return false;
-                }
-              }
-            });
+            // Internal bookmark link (w:anchor) — scroll to the bookmarked
+            // paragraph instead of opening a popup. Shared core lookup so
+            // both adapters resolve the same target (#88).
+            const targetPos = findBookmarkPos(view.state.doc, bookmarkName);
             if (targetPos !== null) {
               scrollToPositionImpl(targetPos);
               surface.setSelection(targetPos + 1);
