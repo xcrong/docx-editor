@@ -62,6 +62,67 @@ async function rejectById(page: import('@playwright/test').Page, id: number) {
   return page.evaluate((rid) => window.__DOCX_EDITOR_E2E__?.rejectChangeById(rid) ?? false, id);
 }
 
+// Deterministic Backspace-at-paragraph-start (`selectRange` caret + polled
+// marker — `Home` races focus restoration, fixed waits race the paint flush).
+// Shared with the T27-03 suite below.
+async function backspaceForPPrDel(page: import('@playwright/test').Page, editor: EditorPage) {
+  await editor.selectRange(1, 0, 0);
+  await page.keyboard.press('Backspace');
+  await expect(async () => {
+    expect((await getParaRevision(page, 0))?.pPrDel).not.toBeNull();
+  }).toPass({ timeout: 10000 });
+}
+
+// Deterministic select-all: Meta+a can race `setSuggestionMode`'s repaint
+// (focus restore collapses the selection before the first typed char, so
+// the baseline survives untracked). Re-press inside the poll; read the raw
+// PM selection (`agentSelection()` is null for doc-spanning selections).
+async function selectAllSingleParagraph(
+  page: import('@playwright/test').Page,
+  expectedText: string
+) {
+  await expect(async () => {
+    await page.keyboard.press('Meta+a');
+    const sel = await page.evaluate(() => {
+      const view = window.__DOCX_EDITOR_E2E__?.getView?.() as
+        | {
+            state: {
+              selection: { from: number; to: number; empty: boolean };
+              doc: { textBetween: (from: number, to: number) => string };
+            };
+          }
+        | undefined;
+      if (!view) return null;
+      const { selection, doc } = view.state;
+      return { empty: selection.empty, text: doc.textBetween(selection.from, selection.to) };
+    });
+    expect(sel?.empty).toBe(false);
+    expect(sel?.text).toBe(expectedText);
+  }).toPass({ timeout: 10000 });
+}
+
+// Distinct painted revision ids authored by `author`. The painter exposes
+// the author as `data-revision-author` on paragraph fragments/glyphs but
+// as `data-change-author` on inline insertion/deletion runs — match both.
+// Filtering on `revisionAuthor` alone silently drops every inline run.
+async function getAuthoredRevisionIds(page: import('@playwright/test').Page, author: string) {
+  return page.$$eval(
+    '[data-revision-id]',
+    (els, a) => [
+      ...new Set(
+        els
+          .filter(
+            (el) =>
+              ((el as HTMLElement).dataset.revisionAuthor ??
+                (el as HTMLElement).dataset.changeAuthor) === a
+          )
+          .map((el) => (el as HTMLElement).dataset.revisionId)
+      ),
+    ],
+    author
+  );
+}
+
 test.describe('Tracked paragraph-mark revisions (issue #614)', () => {
   let editor: EditorPage;
 
@@ -102,13 +163,9 @@ test.describe('Tracked paragraph-mark revisions (issue #614)', () => {
     await editor.typeText('Hello');
     await editor.pressEnter();
     await editor.typeText('world');
-    // Place caret at start of "world".
-    await page.keyboard.press('Home');
 
     expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
-    await page.keyboard.press('Backspace');
-    // Wait for React/PM to flush the Backspace transaction before reading attrs.
-    await page.waitForTimeout(150);
+    await backspaceForPPrDel(page, editor);
 
     // Paragraphs still split — the join is DEFERRED until accept.
     const first = await getParaRevision(page, 0);
@@ -175,13 +232,9 @@ test.describe('Tracked paragraph-mark revisions (issue #614)', () => {
     await editor.typeText('Hello');
     await editor.pressEnter();
     await editor.typeText('world');
-    await page.keyboard.press('Home');
 
     await setSuggestionMode(page, true, 'Jane');
-    await page.keyboard.press('Backspace');
-    // Wait for React to flush the Backspace transaction. Without this the
-    // `getParaRevision` read can race against the dispatch and see stale attrs.
-    await page.waitForTimeout(150);
+    await backspaceForPPrDel(page, editor);
 
     const before = await getParaRevision(page, 0);
     expect(before?.pPrDel, 'Backspace must set pPrDel on previous paragraph').not.toBeNull();
@@ -199,11 +252,9 @@ test.describe('Tracked paragraph-mark revisions (issue #614)', () => {
     await editor.typeText('Hello');
     await editor.pressEnter();
     await editor.typeText('world');
-    await page.keyboard.press('Home');
 
     await setSuggestionMode(page, true, 'Jane');
-    await page.keyboard.press('Backspace');
-    await page.waitForTimeout(150);
+    await backspaceForPPrDel(page, editor);
 
     const before = await getParaRevision(page, 0);
     expect(before?.pPrDel, 'Backspace must set pPrDel on previous paragraph').not.toBeNull();
@@ -461,20 +512,20 @@ test.describe('Tracked paragraph-mark revisions (issue #614)', () => {
     // whole continuous edit (matches Word's grouping by author + session).
     await editor.typeText('original text here');
     expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
-    await page.keyboard.press('Meta+a');
+    await selectAllSingleParagraph(page, 'original text here');
     await editor.typeText('replacement');
     await editor.pressEnter();
     await editor.typeText('paragraph two');
     await editor.pressEnter();
     await editor.typeText('paragraph three');
-    await page.waitForTimeout(100);
 
-    const distinctIds = await page.$$eval('[data-revision-id]', (els) => {
-      const ids = els
-        .filter((el) => (el as HTMLElement).dataset.revisionAuthor === 'Jane')
-        .map((el) => (el as HTMLElement).dataset.revisionId);
-      return [...new Set(ids)];
-    });
+    // Poll the rAF-flushed paint via the painter's author contract
+    // (inline runs carry `data-change-author`, not `data-revision-author`).
+    let distinctIds: (string | undefined)[] = [];
+    await expect(async () => {
+      distinctIds = await getAuthoredRevisionIds(page, 'Jane');
+      expect(distinctIds.length).toBe(1);
+    }).toPass({ timeout: 10000 });
     expect(
       distinctIds.length,
       'one continuous editing run by one author should produce one revisionId'
@@ -489,13 +540,17 @@ test.describe('Tracked paragraph-mark revisions (issue #614)', () => {
     // a second time. By-id dispatch clears every site in one pass.
     await editor.typeText('baseline text');
     expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
-    await page.keyboard.press('Meta+a');
+    await selectAllSingleParagraph(page, 'baseline text');
     await editor.typeText('replaced');
     await editor.pressEnter();
     await editor.typeText('second');
     await editor.pressEnter();
     await editor.typeText('third');
-    await page.waitForTimeout(100);
+
+    // Poll for the painted revision sites (fixed waits race the rAF flush).
+    await expect(async () => {
+      expect(await page.locator('[data-revision-id]').count()).toBeGreaterThan(0);
+    }).toPass({ timeout: 10000 });
 
     const toggle = page.locator('[aria-label="Toggle comments sidebar"]');
     if ((await toggle.getAttribute('aria-pressed')) !== 'true') {
@@ -505,11 +560,16 @@ test.describe('Tracked paragraph-mark revisions (issue #614)', () => {
 
     await expect(page.locator('.docx-tracked-change-card')).toHaveCount(1);
 
-    await page.locator('.docx-tracked-change-card button[title="Accept"]').first().click();
-    await page.waitForTimeout(200);
+    // Card buttons render only when expanded — expand first (T27-03 pattern).
+    const card = page.locator('.docx-tracked-change-card').first();
+    const acceptBtn = card.getByTitle('Accept');
+    if (!(await acceptBtn.isVisible())) {
+      await card.click();
+    }
+    await acceptBtn.click();
 
     await expect(page.locator('.docx-tracked-change-card')).toHaveCount(0);
-    expect(await page.locator('[data-revision-id]').count()).toBe(0);
+    await expect(page.locator('[data-revision-id]')).toHaveCount(0);
   });
 
   test('Reject of a list created in suggesting mode leaves no lingering item (issue #634)', async ({
@@ -957,19 +1017,6 @@ test.describe('T27-03 paragraph accept/reject + painter + sidebar (issue #79)', 
     }
   }
 
-  // Backspace at the start of the second paragraph in suggesting mode marks
-  // `pPrDel` on the first paragraph. The caret is placed deterministically
-  // via `selectRange` (Home-key placement races focus restoration and a
-  // blind retry would delete text), then a single Backspace is dispatched
-  // and the marker is polled — no repeated keypresses.
-  async function backspaceForPPrDel(page: import('@playwright/test').Page) {
-    await editor.selectRange(1, 0, 0);
-    await page.keyboard.press('Backspace');
-    await expect(async () => {
-      expect((await getParaRevision(page, 0))?.pPrDel).not.toBeNull();
-    }).toPass({ timeout: 10000 });
-  }
-
   test('Sidebar accept joins split paragraphs with no residual markers; undo restores', async ({
     page,
   }) => {
@@ -977,7 +1024,7 @@ test.describe('T27-03 paragraph accept/reject + painter + sidebar (issue #79)', 
     await editor.pressEnter();
     await editor.typeText('world');
     expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
-    await backspaceForPPrDel(page);
+    await backspaceForPPrDel(page, editor);
     expect(await setSuggestionMode(page, false)).toBe(true);
 
     const before = await getParaRevision(page, 0);
@@ -1029,7 +1076,7 @@ test.describe('T27-03 paragraph accept/reject + painter + sidebar (issue #79)', 
     }));
 
     expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
-    await backspaceForPPrDel(page);
+    await backspaceForPPrDel(page, editor);
     expect(await setSuggestionMode(page, false)).toBe(true);
     const revId = (await getParaRevision(page, 0))?.pPrDel?.revisionId as number;
 
@@ -1051,7 +1098,7 @@ test.describe('T27-03 paragraph accept/reject + painter + sidebar (issue #79)', 
     await editor.pressEnter();
     await editor.typeText('world');
     expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
-    await backspaceForPPrDel(page);
+    await backspaceForPPrDel(page, editor);
     expect(await setSuggestionMode(page, false)).toBe(true);
 
     // Move the caret into the second paragraph first.
@@ -1081,7 +1128,7 @@ test.describe('T27-03 paragraph accept/reject + painter + sidebar (issue #79)', 
     await editor.pressEnter();
     await editor.typeText('world');
     expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
-    await backspaceForPPrDel(page);
+    await backspaceForPPrDel(page, editor);
     expect(await setSuggestionMode(page, false)).toBe(true);
 
     // Pilcrow glyph carries the spec'd classes + revision triple.
