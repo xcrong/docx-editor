@@ -18,15 +18,16 @@ export interface ReviewCallbacks {
 
 /**
  * Tracked-changes review group (7.6/7.7). Visible when the host wires any
- * review callback — except in `'viewing'` mode, where the editor is
- * read-only and the buttons would be disabled dead UI. An explicit
- * `showReviewControls` overrides both rules. Accept/Reject act on the
- * change at the cursor and disable when the cursor is not inside one.
+ * review callback — except in `'viewing'` mode or when the comments sidebar
+ * is closed (`commentsSidebarOpen === false`), when the buttons would be
+ * dead UI. An explicit `showReviewControls` overrides both rules. Accept /
+ * Reject act on the change at the cursor and disable when not inside one.
  */
 export function ToolbarReview({
   callbacks,
   showReviewControls,
   editingMode,
+  commentsSidebarOpen,
   inTrackedChange,
   disabled = false,
   onRefocusEditor,
@@ -39,6 +40,12 @@ export function ToolbarReview({
    * to the callback-sniffing rule. Explicit `showReviewControls` wins.
    */
   editingMode?: EditorMode;
+  /**
+   * Whether the comments sidebar is open. `false` hides the group (review
+   * actions live next to the change cards); omission keeps #112 behavior.
+   * Explicit `showReviewControls` wins.
+   */
+  commentsSidebarOpen?: boolean;
   inTrackedChange: boolean;
   disabled?: boolean;
   onRefocusEditor?: () => void;
@@ -63,7 +70,7 @@ export function ToolbarReview({
   );
   const hasReviewControls =
     showReviewControls ??
-    (hasCallbacks && (editingMode === undefined || editingMode !== 'viewing'));
+    (hasCallbacks && editingMode !== 'viewing' && commentsSidebarOpen !== false);
 
   const wrap = useCallback(
     (fn?: () => void) => () => {

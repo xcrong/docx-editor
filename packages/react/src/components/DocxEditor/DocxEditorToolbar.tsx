@@ -208,6 +208,7 @@ export function DocxEditorToolbar({
         onRejectAllChanges={onRejectAllChanges}
         onPreviousChange={onPreviousChange}
         onNextChange={onNextChange}
+        commentsSidebarOpen={showCommentsSidebar}
       >
         <EditorToolbar.TitleBar>
           {renderLogo && <EditorToolbar.Logo>{renderLogo()}</EditorToolbar.Logo>}

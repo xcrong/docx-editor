@@ -1192,6 +1192,7 @@ export interface ToolbarProps extends ReviewCallbacks {
     canUndo?: boolean;
     children?: ReactNode;
     className?: string;
+    commentsSidebarOpen?: boolean;
     currentFormatting?: SelectionFormatting;
     disabled?: boolean;
     documentFonts?: readonly FontOption[];
