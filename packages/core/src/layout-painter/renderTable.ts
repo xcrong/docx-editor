@@ -33,24 +33,11 @@ import {
   makeCutBorder,
   makeTableBodyClip,
 } from './renderTableBorders';
-import type { RevisionInfo } from '../types/content/trackedChange';
-
-/**
- * Apply tracked-change classes + data attrs to a painted row/cell. The
- * sidebar reads `data-revision-id` / `data-revision-author` to anchor
- * cards; the CSS in `prosemirror/editor.css` keys on the two classes.
- */
-function applyRevisionAttrs(
-  el: HTMLElement,
-  scope: 'row' | 'cell',
-  kind: 'ins' | 'del' | 'merge',
-  info: RevisionInfo
-): void {
-  el.classList.add(`ep-revision-${scope}`, `ep-revision-${kind}`);
-  el.dataset.revisionId = String(info.revisionId);
-  el.dataset.revisionAuthor = info.author;
-  if (info.date) el.dataset.revisionDate = info.date;
-}
+import {
+  paintCellRevisionCue,
+  paintRowRevisionCue,
+  paintTableRevisionCue,
+} from './renderTableRevisions';
 
 /**
  * CSS class names for table elements
@@ -268,31 +255,10 @@ function renderNestedTable(
     tableEl.dataset.pmEnd = String(block.pmEnd);
   }
 
-  // Whole-table tracked insertion / deletion — every row carries a
-  // tracked marker from the SAME (author, date). The revision ids
-  // need not match (foreign editors mint a fresh id per row), so the
-  // (author, date) tuple is the right fingerprint. Paint ONE tall bar
-  // on the table and tell renderTableRow to skip the per-row bar.
-  const firstRow = block.rows[0];
-  const sharedTrIns = firstRow?.trackedIns;
-  const sharedTrDel = firstRow?.trackedDel;
-  const sameBurst = (a: RevisionInfo | undefined, b: RevisionInfo | undefined): boolean =>
-    !!a && !!b && (a.author ?? '') === (b.author ?? '') && (a.date ?? null) === (b.date ?? null);
-  const wholeTableTracked =
-    block.rows.length > 0 &&
-    block.rows.every((r) => {
-      if (sharedTrIns) return sameBurst(r.trackedIns, sharedTrIns);
-      if (sharedTrDel) return sameBurst(r.trackedDel, sharedTrDel);
-      return false;
-    });
-  if (wholeTableTracked) {
-    const tableRev = (sharedTrIns ?? sharedTrDel) as RevisionInfo;
-    const kind = sharedTrIns ? 'ins' : 'del';
-    tableEl.classList.add('ep-revision-table', `ep-revision-${kind}`);
-    tableEl.dataset.revisionId = String(tableRev.revisionId);
-    tableEl.dataset.revisionAuthor = tableRev.author;
-    if (tableRev.date) tableEl.dataset.revisionDate = tableRev.date;
-  }
+  // Whole-table tracked insertion / deletion paints ONE tall bar on the
+  // table (see `paintTableRevisionCue`); tell renderTableRow to skip the
+  // per-row bar in that case.
+  const wholeTableTracked = paintTableRevisionCue(tableEl, block);
 
   const rowYPositions = buildRowYPositions(measure.rows);
 
@@ -369,9 +335,7 @@ function renderTableCell(
   const cellEl = doc.createElement('div');
   cellEl.className = TABLE_CLASS_NAMES.cell;
 
-  if (cell.trackedMarker && cell.trackedMarker.info.revisionId !== parentRowRevisionId) {
-    applyRevisionAttrs(cellEl, 'cell', cell.trackedMarker.kind, cell.trackedMarker.info);
-  }
+  paintCellRevisionCue(cellEl, cell, parentRowRevisionId);
 
   // Positioning
   cellEl.style.position = 'absolute';
@@ -550,16 +514,8 @@ function renderTableRow(
   const rowEl = doc.createElement('div');
   rowEl.className = TABLE_CLASS_NAMES.row;
 
-  // Tracked-row marker (sidebar reads the same data attrs as cells).
-  // Prefer `del` when both flags are present (rare; "ins of a row that
-  // was later marked deleted" — the deletion is the more recent action).
-  if (!suppressRowRevisionVisual) {
-    if (row.trackedDel) {
-      applyRevisionAttrs(rowEl, 'row', 'del', row.trackedDel);
-    } else if (row.trackedIns) {
-      applyRevisionAttrs(rowEl, 'row', 'ins', row.trackedIns);
-    }
-  }
+  // Tracked-row cue (sidebar reads the same data attrs as cells).
+  paintRowRevisionCue(rowEl, row, suppressRowRevisionVisual);
 
   // Use the pixel-rounded row height (diff of rounded row offsets) so the row
   // box edges — and the borders on them — sit on whole pixels. Falls back to
@@ -787,37 +743,10 @@ export function renderTableFragment(
     tableEl.dataset.pmEnd = String(fragment.pmEnd);
   }
 
-  // Whole-table tracked insertion / deletion — every row carries a
-  // tracked marker from the same (author, date) burst. Foreign editors
-  // mint a fresh revisionId per row, so the (author, date) tuple is the
-  // right fingerprint here; matching on id alone would miss the case.
-  const firstFragRow = block.rows[0];
-  const sharedFragIns = firstFragRow?.trackedIns;
-  const sharedFragDel = firstFragRow?.trackedDel;
-  const sameBurstFrag = (a: RevisionInfo | undefined, b: RevisionInfo | undefined): boolean =>
-    !!a && !!b && (a.author ?? '') === (b.author ?? '') && (a.date ?? null) === (b.date ?? null);
-  const fragWholeTableTracked =
-    block.rows.length > 0 &&
-    block.rows.every((r) => {
-      if (sharedFragIns) return sameBurstFrag(r.trackedIns, sharedFragIns);
-      if (sharedFragDel) return sameBurstFrag(r.trackedDel, sharedFragDel);
-      return false;
-    });
-  if (fragWholeTableTracked) {
-    const tableRev = (sharedFragIns ?? sharedFragDel) as RevisionInfo;
-    const kind = sharedFragIns ? 'ins' : 'del';
-    tableEl.classList.add('ep-revision-table', `ep-revision-${kind}`);
-    tableEl.dataset.revisionId = String(tableRev.revisionId);
-    tableEl.dataset.revisionAuthor = tableRev.author;
-    if (tableRev.date) tableEl.dataset.revisionDate = tableRev.date;
-    // The bar belongs in the document margin (matches paragraph change
-    // bar visual), so let the ::before pseudo at left:-10px extend past the
-    // table's left edge into the page padding. Only widen the X axis — the
-    // window relies on vertical clipping to hide off-window rows / a row that
-    // broke mid-content, so overflow-y must stay hidden.
-    tableEl.style.overflowX = 'visible';
-    tableEl.style.overflowY = 'hidden';
-  }
+  // Whole-table tracked insertion / deletion paints ONE tall bar on the
+  // table; per-row bars are suppressed in that case. The bar extends into
+  // the page margin (see `paintTableRevisionCue`).
+  const fragWholeTableTracked = paintTableRevisionCue(tableEl, block, true);
 
   // RTL table mirror axis (see computeCellGrid), reused by the handles below.
   const bidi = block.bidi === true;

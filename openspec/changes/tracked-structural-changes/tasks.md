@@ -167,32 +167,32 @@ Three landable phases. Each phase is a separate PR. Phase 1 includes the snapsho
 
 ### Accept / Reject
 
-- [ ] Per-marker semantics from design table for every table revision
-- [ ] Resolution order: cell-level → row-level → table-level
-- [ ] Cell-content reconciliation on horizontal merge accept: surviving cell keeps its content; absorbed cells' content is concatenated as additional paragraphs at the end of the surviving cell's content (spec'd in `tracked-structural-tables/spec.md`)
-- [ ] `trDel` accept on the only row of a table: remove the table node
-- [ ] `cellMarker` mutual exclusion: authoring `ins` on a cell that already has `ins` is a no-op; authoring `del` on a cell that has `ins` from the same `(id, author, date)` clears both (insert-then-delete collapse)
+- [x] Per-marker semantics from design table for every table revision (T27-06: `tableRevisionResolve.ts` — `trIns` accept-clear/reject-delete-row; `trDel` accept-delete-row/reject-clear; `cellMarker ins` accept-clear/reject-delete-cell; `del` accept-delete-cell/reject-clear; `merge` accept-apply (vertical span / horizontal collapse + content concat) / reject-clear-group; `trPrChange`/`tcPrChange`/`tblPrChange`/`tblPrExChange` accept-clear/reject-restore-prior; `tblGridChange` accept-clear/reject-restore-grid; `table-revision-accept.test.ts` ×23)
+- [x] Resolution order: cell-level → row-level → table-level (T27-06: `resolveTableCellMarkers` → `resolveTableRows` → `resolveTablePropertyChanges` in one `tr` (one undo); unit + e2e "one undo rolls back a table accept")
+- [x] Cell-content reconciliation on horizontal merge accept: surviving cell keeps its content; absorbed cells' content is concatenated as additional paragraphs at the end of the surviving cell's content (spec'd in `tracked-structural-tables/spec.md`) (T27-06: survivor colspan grows, absorbed paragraphs appended via `Fragment`; unit "accept horizontal merge collapses cells and concatenates content" + e2e merge test)
+- [x] `trDel` accept on the only row of a table: remove the table node (T27-06: `removeRowOrTable` — single-row table removed, empty-para replacement when only child; unit "accept trDel on the only row" + e2e `plantTableRowDeletion` flow)
+- [x] `cellMarker` mutual exclusion: authoring `ins` on a cell that already has `ins` is a no-op; authoring `del` on a cell that has `ins` from the same `(id, author, date)` clears both (insert-then-delete collapse) (T27-06: `nextCellMarker` in `TableExtension/commands/helpers.ts`, wired into `delete.ts` ×2 + `merge.ts` ×2; unit "cellMarker mutual exclusion" ×6)
 
 ### Painter
 
-- [ ] `packages/core/src/layout-painter/renderTable.ts` — colored border on revised rows/cells, change bar, strikethrough for deletions
-- [ ] Dashed boundary for unaccepted vertical `cellMerge`
-- [ ] `data-revision-id`, `data-revision-author`, `data-revision-date` on all revision DOM
+- [x] `packages/core/src/layout-painter/renderTable.ts` — colored border on revised rows/cells, change bar, strikethrough for deletions (T27-06: new `renderTableRevisions.ts` — `paintRowRevisionCue`/`paintCellRevisionCue`/`paintTableRevisionCue` (whole-table burst bar + `*Change` neutral bar); `editor.css` gains merge dashed outline + row-del strikethrough; `renderTable.ts` 1051/1140 lines)
+- [x] Dashed boundary for unaccepted vertical `cellMerge` (T27-06: `.ep-revision-cell.ep-revision-merge` outline dashed; e2e vertical-merge test asserts both cells paint `[data-revision-id]`)
+- [x] `data-revision-id`, `data-revision-author`, `data-revision-date` on all revision DOM (T27-06: rows/cells/tables incl. `*Change` + id-only `tblGridChange` (empty author/date); zero new dataset names; cross-page fragments reuse `tableRowBreak.ts` geometry — no new split logic; e2e "cross-page split table accept repaints without residue")
 
 ### Sidebar
 
-- [ ] Item builders for `trIns`, `trDel`, `trPrChange`, `cellMarker` (ins/del/merge), `tcPrChange`, `tblPrChange`, `tblPrExChange`, `tblGridChange`
-- [ ] Multi-site grouping: a row insertion with N inserted cells under one `(id, author, date)` is one entry, not N+1
-- [ ] i18n keys for table kinds (already stubbed in Phase 1)
+- [x] Item builders for `trIns`, `trDel`, `trPrChange`, `cellMarker` (ins/del/merge), `tcPrChange`, `tblPrChange`, `tblPrExChange`, `tblGridChange` (T27-06: extractor pre-existing (T27-05); cards gain the two missing `tableExceptionsChanged` + `tableGridChanged` branches in React `TrackedChangeCard.tsx` + Vue `TrackedChangeCard.vue`; grid card hides author/date header per spec)
+- [x] Multi-site grouping: a row insertion with N inserted cells under one `(id, author, date)` is one entry, not N+1 (T27-06: pre-existing `STRUCTURAL_PRIORITY` coalescing + `coalescedRevisionIds`; e2e multi-author test asserts one card per author)
+- [x] i18n keys for table kinds (already stubbed in Phase 1) (T27-06: reused as-is — `rowInserted`/`rowDeleted`/`rowPropertiesChanged`/`cellInserted`/`cellDeleted`/`cellMerged`/`cellPropertiesChanged`/`tablePropertiesChanged`/`tableExceptionsChanged`/`tableGridChanged`/`tableInserted`/`tableDeleted`; `i18n:validate` green, no new keys)
 
 ### Vue parity
 
-- [x] Painter inherits transparently from core (T27-05: painter untouched — core-only command/snapshot changes flow to Vue via the shared runtime + `commands/table.ts` layer; verified `typecheck` green for `vue`)
-- [x] Mirror any new sidebar item builders in Vue (T27-05: N/A — no sidebar builders; sidebar/painter rendering is T27-06)
+- [x] Painter inherits transparently from core (T27-05: painter untouched — core-only command/snapshot changes flow to Vue via the shared runtime + `commands/table.ts` layer; verified `typecheck` green for `vue`) (T27-06: painter cue helpers are core-only (`renderTableRevisions.ts`); Vue e2e asserts painted `[data-revision-id]` rows)
+- [x] Mirror any new sidebar item builders in Vue (T27-05: N/A — no sidebar builders; sidebar/painter rendering is T27-06) (T27-06: `TrackedChangeCard.vue` gains `tableExceptionsChanged` + `tableGridChanged` branches + grid author-header suppression, mirroring React; Vue demo e2e hooks `addColumnRight`/`mergeFirstRowCells`/`mergeFirstColumnCells`/`getFirstTableSnapshot`/`setFirstCellFillColor`/`plantTableRowDeletion` added; `e2e/tests/vue/tracked-changes-structural.spec.ts` +3 table tests, 6/6 green)
 
 ### Agents package
 
-- [x] Extend or defer (per Phase 1 decision); if extending, handle table revision attrs (T27-05: DEFER per #120, same as Phase 1)
+- [x] Extend or defer (per Phase 1 decision); if extending, handle table revision attrs (T27-05: DEFER per #120, same as Phase 1) (T27-06: still DEFER — agents support is tracked in #120, no duplicate work in this slice; `DocxReviewer.structural-paragraph-mark.test.ts` pin from T27-04 stands)
 
 ### Tests
 
@@ -201,8 +201,8 @@ Three landable phases. Each phase is a separate PR. Phase 1 includes the snapsho
 - [x] Conversion unit tests (T27-05: PM attrs ↔ model for `tblPrEx`/`tblPrExChange`/`tblGridChange`/markers + extractor entries)
 - [x] Playwright: add/delete row, add/delete column, horizontal/vertical merge in suggesting mode (T27-05: narrow `tracked-changes-tables-suggesting.spec.ts` — addColumn, merge-H, fill→`tcPrChange`, deleteRow save→reload e2e; addRow pre-covered; merge-V/split/deleteColumn covered at unit level in `suggestingTableCommands.test.ts` + `tableSnapshot.test.ts`)
 - [x] Playwright: open fixture with table revisions, save, reopen (T27-05: deleteRow save → ZIP has `<w:del>` → reload keeps the marked row, covered in the narrow spec)
-- [ ] Single-row delete-row accept removes table node
-- [ ] Accept/reject coverage for each marker
+- [x] Single-row delete-row accept removes table node (T27-06: unit + e2e "row deletion … last row removes the table" via `plantTableRowDeletion`)
+- [x] Accept/reject coverage for each marker (T27-06: `table-revision-accept.test.ts` — trIns/trDel/cell ins/del/merge-H/merge-V/trPrChange/tcPrChange/tblPrChange/tblPrExChange/tblGridChange accept+reject; e2e `tracked-changes-tables-accept.spec.ts` 11 tests map the issue's 8 items: row-insertion, row-deletion, cell-merge (H accept-collapse/reject + V markers/dashed), cross-page-split-row accept (repaint, no residual marker, cut-border bound), nested-table acceptAll (no crash), single-undo accept rollback (+redo), multi-author cards, save→reload round-trips (trDel/cellIns+cellDel+tcPrChange/vertical-cellMerge))
 - [x] `comments-sidebar.spec.ts` regression (T27-05: ran green — 18 passed; no sidebar files touched)
 
 ### Release

@@ -27,6 +27,7 @@ import {
   TableMap,
 } from 'prosemirror-tables';
 import { getTableContext } from '../context';
+import { nextCellMarker } from './helpers';
 import { makeRevisionInfo } from '../../../../plugins/revisionIds';
 import { isSuggestionModeActive } from '../../../../plugins/suggestionMode/commands';
 import { SUGGESTION_META } from '../../../../plugins/suggestionMode/state';
@@ -91,12 +92,23 @@ export const mergeCells: Command = (
   if (singleRow) {
     // Horizontal: leftmost cell is the merged-result placeholder (`ins`),
     // absorbed cells are tracked deletions. Cells stay visible until accept.
+    // Stamping goes through the mutual-exclusion rule (same-triple `ins`
+    // collapses instead of stacking).
     positions.forEach((pos, index) => {
       const node = tr.doc.nodeAt(pos);
       if (!node || !isCellNodeName(node.type.name)) return;
+      const stamped = nextCellMarker(
+        (node.attrs.cellMarker as {
+          kind: string;
+          info?: { revisionId?: number; author?: string; date?: string | null };
+        } | null) ?? null,
+        index === 0 ? 'ins' : 'del',
+        info
+      );
+      if ('noop' in stamped) return;
       tr.setNodeMarkup(pos, undefined, {
         ...node.attrs,
-        cellMarker: { kind: index === 0 ? 'ins' : 'del', info },
+        cellMarker: stamped.marker,
       });
     });
   } else {
@@ -106,13 +118,23 @@ export const mergeCells: Command = (
     positions.forEach((pos, index) => {
       const node = tr.doc.nodeAt(pos);
       if (!node || !isCellNodeName(node.type.name)) return;
+      const stamped = nextCellMarker(
+        (node.attrs.cellMarker as {
+          kind: string;
+          info?: { revisionId?: number; author?: string; date?: string | null };
+        } | null) ?? null,
+        'merge',
+        info
+      );
+      if ('noop' in stamped) return;
       tr.setNodeMarkup(pos, undefined, {
         ...node.attrs,
-        cellMarker: {
-          kind: 'merge',
-          info,
-          vMerge: index === 0 ? 'rest' : 'cont',
-        },
+        cellMarker: stamped.marker
+          ? {
+              ...stamped.marker,
+              vMerge: index === 0 ? 'rest' : 'cont',
+            }
+          : null,
       });
     });
   }

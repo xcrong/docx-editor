@@ -12,11 +12,13 @@
     @mousedown.stop
   >
     <div class="tc-card__head">
-      <Avatar :name="authorName" :size="32" />
-      <div class="tc-card__author-block">
-        <div class="tc-card__author">{{ authorName }}</div>
-        <div v-if="change.date" class="tc-card__date">{{ formatDate(change.date) }}</div>
-      </div>
+      <template v-if="change.type !== 'tableGridChanged'">
+        <Avatar :name="authorName" :size="32" />
+        <div class="tc-card__author-block">
+          <div class="tc-card__author">{{ authorName }}</div>
+          <div v-if="change.date" class="tc-card__date">{{ formatDate(change.date) }}</div>
+        </div>
+      </template>
       <div v-if="expanded" class="tc-card__actions">
         <button class="tc-card__icon-btn" :title="t('common.accept')" @click.stop="onAccept">
           <MaterialSymbol name="check" :size="20" />
@@ -104,6 +106,12 @@
       </template>
       <template v-else-if="change.type === 'tablePropertiesChanged'">
         <span class="tc-card__changed">{{ t('revisions.tablePropertiesChanged') }}</span>
+      </template>
+      <template v-else-if="change.type === 'tableExceptionsChanged'">
+        <span class="tc-card__changed">{{ t('revisions.tableExceptionsChanged') }}</span>
+      </template>
+      <template v-else-if="change.type === 'tableGridChanged'">
+        <span class="tc-card__changed">{{ t('revisions.tableGridChanged') }}</span>
       </template>
       <template v-else-if="change.type === 'tableInserted'">
         <span class="tc-card__inserted">{{ t('revisions.tableInserted') }}</span>

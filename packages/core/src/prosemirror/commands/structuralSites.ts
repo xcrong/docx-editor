@@ -348,3 +348,196 @@ export function findTableCellMarkerSites(
   });
   return sites;
 }
+
+export interface TableRowPropertyChangeSite {
+  pos: number;
+  node: import('prosemirror-model').Node;
+  /** Index into the row's `trPrChange` array (multiple authors can stack). */
+  entryIndex: number;
+  /** The prior `TableRowFormatting` snapshot from the matching entry. */
+  prior: import('../../types/content/trackedChange').TableRowPropertyChange['previousFormatting'];
+}
+
+export interface TableRowExceptionsChangeSite {
+  pos: number;
+  node: import('prosemirror-model').Node;
+  /** Index into the row's `tblPrExChange` array. */
+  entryIndex: number;
+  /** The prior `TableFormatting` snapshot from the matching entry. */
+  prior: import('../../types/content/trackedChange').TableExceptionsPropertyChange['previousFormatting'];
+}
+
+export interface TableCellPropertyChangeSite {
+  pos: number;
+  node: import('prosemirror-model').Node;
+  /** Index into the cell's `tcPrChange` array. */
+  entryIndex: number;
+  /** The prior `TableCellFormatting` snapshot from the matching entry. */
+  prior: import('../../types/content/trackedChange').TableCellPropertyChange['previousFormatting'];
+}
+
+export interface TablePropertyChangeSite {
+  pos: number;
+  node: import('prosemirror-model').Node;
+  /** Index into the table's `tblPrChange` array. */
+  entryIndex: number;
+  /** The prior `TableFormatting` snapshot from the matching entry. */
+  prior: import('../../types/content/trackedChange').TablePropertyChange['previousFormatting'];
+}
+
+export interface TableGridChangeSite {
+  pos: number;
+  node: import('prosemirror-model').Node;
+  /** The prior grid (column widths in twips) from the `tblGridChange` marker. */
+  prior: number[];
+}
+
+/**
+ * Walk the document for `tableRow` nodes whose `trPrChange` array has an
+ * entry with `info.id === revisionId`. One site per matching entry.
+ */
+export function findTableRowPropertyChangeSites(
+  state: EditorState,
+  revisionId: number
+): TableRowPropertyChangeSite[] {
+  const sites: TableRowPropertyChangeSite[] = [];
+  state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'tableRow') return;
+    const changes = node.attrs.trPrChange as Array<{
+      info: { id: number };
+      previousFormatting?: unknown;
+    }> | null;
+    if (!Array.isArray(changes)) return;
+    changes.forEach((entry, idx) => {
+      if (!entry?.info || typeof entry.info.id !== 'number') return;
+      if (entry.info.id === revisionId) {
+        sites.push({ pos, node, entryIndex: idx, prior: entry.previousFormatting as never });
+      }
+    });
+  });
+  return sites;
+}
+
+/**
+ * Walk the document for `tableRow` nodes whose `tblPrExChange` array
+ * (`<w:tblPrExChange>`, stored per-row per `CT_Row`) has a matching entry.
+ */
+export function findTableRowExceptionsChangeSites(
+  state: EditorState,
+  revisionId: number
+): TableRowExceptionsChangeSite[] {
+  const sites: TableRowExceptionsChangeSite[] = [];
+  state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'tableRow') return;
+    const changes = node.attrs.tblPrExChange as Array<{
+      info: { id: number };
+      previousFormatting?: unknown;
+    }> | null;
+    if (!Array.isArray(changes)) return;
+    changes.forEach((entry, idx) => {
+      if (!entry?.info || typeof entry.info.id !== 'number') return;
+      if (entry.info.id === revisionId) {
+        sites.push({ pos, node, entryIndex: idx, prior: entry.previousFormatting as never });
+      }
+    });
+  });
+  return sites;
+}
+
+/**
+ * Walk the document for `tableCell`/`tableHeader` nodes whose `tcPrChange`
+ * array has an entry with `info.id === revisionId`.
+ */
+export function findTableCellPropertyChangeSites(
+  state: EditorState,
+  revisionId: number
+): TableCellPropertyChangeSite[] {
+  const sites: TableCellPropertyChangeSite[] = [];
+  state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'tableCell' && node.type.name !== 'tableHeader') return;
+    const changes = node.attrs.tcPrChange as Array<{
+      info: { id: number };
+      previousFormatting?: unknown;
+    }> | null;
+    if (!Array.isArray(changes)) return;
+    changes.forEach((entry, idx) => {
+      if (!entry?.info || typeof entry.info.id !== 'number') return;
+      if (entry.info.id === revisionId) {
+        sites.push({ pos, node, entryIndex: idx, prior: entry.previousFormatting as never });
+      }
+    });
+  });
+  return sites;
+}
+
+/**
+ * Walk the document for `table` nodes whose `tblPrChange` array has a
+ * matching entry.
+ */
+export function findTablePropertyChangeSites(
+  state: EditorState,
+  revisionId: number
+): TablePropertyChangeSite[] {
+  const sites: TablePropertyChangeSite[] = [];
+  state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'table') return;
+    const changes = node.attrs.tblPrChange as Array<{
+      info: { id: number };
+      previousFormatting?: unknown;
+    }> | null;
+    if (!Array.isArray(changes)) return;
+    changes.forEach((entry, idx) => {
+      if (!entry?.info || typeof entry.info.id !== 'number') return;
+      if (entry.info.id === revisionId) {
+        sites.push({ pos, node, entryIndex: idx, prior: entry.previousFormatting as never });
+      }
+    });
+  });
+  return sites;
+}
+
+/**
+ * Walk the document for `table` nodes carrying an id-only `tblGridChange`
+ * (`CT_TblGridChange` — no author/date on the wire) with the given id.
+ */
+export function findTableGridChangeSites(
+  state: EditorState,
+  revisionId: number
+): TableGridChangeSite[] {
+  const sites: TableGridChangeSite[] = [];
+  state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'table') return;
+    const grid = node.attrs.tblGridChange as {
+      revisionId: number;
+      prior: number[];
+    } | null;
+    if (grid && grid.revisionId === revisionId) {
+      sites.push({ pos, node, prior: Array.isArray(grid.prior) ? grid.prior : [] });
+    }
+  });
+  return sites;
+}
+
+/**
+ * Remove a property-change array entry by index from the node at `nodeStart`.
+ * When the array empties, the attr is set to `null` so PM treats it as absent
+ * on save. Shared by every table-level `*Change` array
+ * (`trPrChange` / `tblPrExChange` / `tcPrChange` / `tblPrChange`).
+ */
+export function clearTablePropertyChangeEntry(
+  tr: Transaction,
+  nodeStart: number,
+  attrName: 'trPrChange' | 'tblPrExChange' | 'tcPrChange' | 'tblPrChange',
+  entryIndex: number
+): void {
+  const target = tr.doc.nodeAt(nodeStart);
+  if (!target) return;
+  const existing = target.attrs[attrName] as Array<unknown> | null;
+  if (!Array.isArray(existing) || entryIndex < 0 || entryIndex >= existing.length) return;
+  const next = existing.slice();
+  next.splice(entryIndex, 1);
+  tr.setNodeMarkup(nodeStart, undefined, {
+    ...target.attrs,
+    [attrName]: next.length > 0 ? next : null,
+  });
+}

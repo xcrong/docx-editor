@@ -222,6 +222,19 @@ function collectAllRevisionTriples(state: EditorState): RevisionTriple[] {
       }> | null;
       if (Array.isArray(trPrChange))
         for (const e of trPrChange) add(e?.info?.id, e?.info?.author, e?.info?.date);
+      // Table row exceptions (`tblPrExChange`, per-row) — never on the table.
+      const tblPrExChange = node.attrs.tblPrExChange as Array<{
+        info: { id: number; author: string; date?: string };
+      }> | null;
+      if (Array.isArray(tblPrExChange))
+        for (const e of tblPrExChange) add(e?.info?.id, e?.info?.author, e?.info?.date);
+    }
+    // Table grid change (`tblGridChange`, id only — no author/date).
+    if (node.type.name === 'table') {
+      const tblGridChange = node.attrs.tblGridChange as { revisionId: number } | null;
+      if (tblGridChange && typeof tblGridChange.revisionId === 'number') {
+        add(tblGridChange.revisionId, '', undefined);
+      }
     }
     // Table cell revisions.
     if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
@@ -262,8 +275,9 @@ function collectAllRevisionTriples(state: EditorState): RevisionTriple[] {
  * Walk the document and collect every distinct `revisionId` carried by
  * any tracked-change site: inline insertion/deletion marks, paragraph-
  * mark `pPrIns`/`pPrDel`, paragraph `pPrChange` / `paraRPrChange` /
- * `sectPrChange` entries, table row `trIns`/`trDel`, row `trPrChange`,
- * cell `cellMarker`/`tcPrChange`, table `tblPrChange`. The ids are
+ * `sectPrChange` entries, table row `trIns`/`trDel`, row `trPrChange` /
+ * `tblPrExChange`, cell `cellMarker`/`tcPrChange`, table `tblPrChange` /
+ * `tblGridChange`. The ids are
  * returned in document order; bare-id is sufficient for the resolver
  * since it walks every matching site for each id.
  */
@@ -470,9 +484,19 @@ import {
   findParagraphPropertyChangeSites,
   findSectionPropertyChangeSites,
   findTableCellMarkerSites,
+  findTableCellPropertyChangeSites,
+  findTableGridChangeSites,
+  findTablePropertyChangeSites,
+  findTableRowExceptionsChangeSites,
+  findTableRowPropertyChangeSites,
   findTableRowSites,
   joinParagraphWithNext,
 } from './structuralSites';
+import {
+  resolveTableCellMarkers,
+  resolveTablePropertyChanges,
+  resolveTableRows,
+} from './tableRevisionResolve';
 
 /**
  * Resolve every site sharing a revision id in one PM transaction. Bypass
@@ -489,6 +513,16 @@ import {
  *   reject deletion mark → keep text, drop mark.
  *   accept pPrChange / paraRPrChange / sectPrChange → clear entry, current wins.
  *   reject pPrChange / paraRPrChange / sectPrChange → restore prior, clear entry.
+ *   accept trIns → clear marker, keep row.
+ *   reject trIns → delete the row (whole table when it is the only row).
+ *   accept trDel → delete the row; reject trDel → clear marker.
+ *   accept cellMarker ins → clear; reject ins → delete the cell (grid adjusts).
+ *   accept cellMarker del → delete the cell (grid adjusts); reject del → clear.
+ *   accept merge → apply the vertical merge / collapse the horizontal pair.
+ *   reject merge → clear the group.
+ *   accept trPrChange / tcPrChange / tblPrChange / tblPrExChange / tblGridChange
+ *     → clear the entry; reject → restore `prior`, clear the entry.
+ * Resolution runs inner-to-outer (cell → row → table) in one transaction.
  */
 
 function resolveById(revisionId: number, mode: 'accept' | 'reject'): Command {
@@ -500,6 +534,11 @@ function resolveById(revisionId: number, mode: 'accept' | 'reject'): Command {
     const sectPropChangeSites = findSectionPropertyChangeSites(state, revisionId);
     const tableRowSites = findTableRowSites(state, revisionId);
     const tableCellSites = findTableCellMarkerSites(state, revisionId);
+    const tableCellPropSites = findTableCellPropertyChangeSites(state, revisionId);
+    const tableRowPropSites = findTableRowPropertyChangeSites(state, revisionId);
+    const tableRowExPropSites = findTableRowExceptionsChangeSites(state, revisionId);
+    const tablePropSites = findTablePropertyChangeSites(state, revisionId);
+    const tableGridSites = findTableGridChangeSites(state, revisionId);
     if (
       paragraphMarkSites.length === 0 &&
       inlineSites.length === 0 &&
@@ -507,7 +546,12 @@ function resolveById(revisionId: number, mode: 'accept' | 'reject'): Command {
       markPropChangeSites.length === 0 &&
       sectPropChangeSites.length === 0 &&
       tableRowSites.length === 0 &&
-      tableCellSites.length === 0
+      tableCellSites.length === 0 &&
+      tableCellPropSites.length === 0 &&
+      tableRowPropSites.length === 0 &&
+      tableRowExPropSites.length === 0 &&
+      tablePropSites.length === 0 &&
+      tableGridSites.length === 0
     ) {
       return false;
     }
@@ -711,93 +755,11 @@ function resolveById(revisionId: number, mode: 'accept' | 'reject'): Command {
       }
     }
 
-    // Table-cell markers (cellIns / cellDel / cellMerge).
-    //   accept ins  → clear marker (cell stays in its new form)
-    //   reject ins  → clear marker (Phase 2c: should delete the cell;
-    //                 mid-grid cell removal requires prosemirror-tables
-    //                 grid surgery and is deferred)
-    //   accept del  → clear marker (Phase 2c: should delete the cell)
-    //   reject del  → clear marker (cell stays)
-    //   accept/reject merge → clear marker
-    // Clear-only is non-destructive in every mode and gets the cell into a
-    // "marker resolved" state. The structural mutation lives in the
-    // suggesting-aware path on the next slice.
-    const sortedCells = [...tableCellSites].sort((a, b) => b.pos - a.pos);
-    for (const site of sortedCells) {
-      const mappedPos = tr.mapping.map(site.pos);
-      const live = tr.doc.nodeAt(mappedPos);
-      if (!live || (live.type.name !== 'tableCell' && live.type.name !== 'tableHeader')) continue;
-      const m = live.attrs.cellMarker as {
-        kind: 'ins' | 'del' | 'merge';
-        info: { revisionId: number };
-      } | null;
-      if (!m || m.info.revisionId !== revisionId) continue;
-      tr.setNodeMarkup(mappedPos, undefined, { ...live.attrs, cellMarker: null });
-    }
-
-    // Table-row markers (trIns / trDel). Per Word's accept/reject semantics:
-    //   accept trIns  → clear marker (the row stays as a real row)
-    //   reject trIns  → delete the row (rolls back the insertion)
-    //   accept trDel  → delete the row (confirms the deletion)
-    //   reject trDel  → clear marker (the row stays)
-    // Reverse-position order so an earlier row's removal doesn't shift the
-    // mapped position of later sites in the same transaction. If the row
-    // is the only row in its table, the entire table is removed (PM-tables
-    // requires at least one row per table).
-    const sortedRows = [...tableRowSites].sort((a, b) => b.pos - a.pos);
-    for (const site of sortedRows) {
-      const mappedPos = tr.mapping.map(site.pos);
-      const live = tr.doc.nodeAt(mappedPos);
-      if (!live || live.type.name !== 'tableRow') continue;
-      const trIns = live.attrs.trIns as { revisionId: number } | null;
-      const trDel = live.attrs.trDel as { revisionId: number } | null;
-      const hasIns = trIns?.revisionId === revisionId;
-      const hasDel = trDel?.revisionId === revisionId;
-      if (!hasIns && !hasDel) continue;
-
-      const removeRow = (mode === 'reject' && hasIns) || (mode === 'accept' && hasDel);
-
-      if (removeRow) {
-        // Walk back from the row's position to find its parent table.
-        // `tr.doc.resolve(mappedPos).node()` returns the parent at that
-        // depth; for a tableRow that's the table.
-        const $row = tr.doc.resolve(mappedPos + 1);
-        const parentTable = $row.node($row.depth - 1);
-        const parentTableStart = $row.before($row.depth - 1);
-        if (parentTable?.type.name === 'table' && parentTable.childCount > 1) {
-          tr.delete(mappedPos, mappedPos + live.nodeSize);
-        } else if (parentTable?.type.name === 'table') {
-          // Single-row table — remove the whole table. If the table is the
-          // only child of its parent (e.g., the only block in the doc),
-          // replace with an empty paragraph so the parent's `+` content
-          // constraint stays satisfied. Otherwise the apply would throw.
-          const $table = tr.doc.resolve(parentTableStart);
-          const isOnlyChild = $table.parent.childCount === 1;
-          if (isOnlyChild) {
-            const paraType = tr.doc.type.schema.nodes.paragraph;
-            tr.replaceWith(
-              parentTableStart,
-              parentTableStart + parentTable.nodeSize,
-              paraType.create()
-            );
-          } else {
-            tr.delete(parentTableStart, parentTableStart + parentTable.nodeSize);
-          }
-        } else {
-          // Defensive: parent isn't a table (shouldn't happen). Fall back
-          // to clearing the marker.
-          const newAttrs = { ...live.attrs };
-          if (hasIns) newAttrs.trIns = null;
-          if (hasDel) newAttrs.trDel = null;
-          tr.setNodeMarkup(mappedPos, undefined, newAttrs);
-        }
-      } else {
-        const newAttrs = { ...live.attrs };
-        if (hasIns) newAttrs.trIns = null;
-        if (hasDel) newAttrs.trDel = null;
-        tr.setNodeMarkup(mappedPos, undefined, newAttrs);
-      }
-    }
+    // Table revisions (inner-to-outer: cells → rows → table-level).
+    // See `tableRevisionResolve.ts` for the per-marker semantics.
+    resolveTableCellMarkers(tr, state, revisionId, mode);
+    resolveTableRows(tr, state, revisionId, mode);
+    resolveTablePropertyChanges(tr, state, revisionId, mode);
 
     if (tr.steps.length === 0) return false;
     dispatch(tr);

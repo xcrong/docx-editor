@@ -12,6 +12,7 @@ import type { Node as PMNode } from 'prosemirror-model';
 import { type Command, type EditorState, type Transaction } from 'prosemirror-state';
 import { CellSelection, selectedRect } from 'prosemirror-tables';
 import { getTableContext } from '../context';
+import { nextCellMarker } from './helpers';
 import { makeRevisionInfo } from '../../../../plugins/revisionIds';
 import { SUGGESTION_META } from '../../../../plugins/suggestionMode/state';
 
@@ -72,10 +73,22 @@ export const deleteRow: Command = (
         let cellPos = rowStart + 1;
         rowNode.forEach((cell) => {
           if (cell.type.name === 'tableCell' || cell.type.name === 'tableHeader') {
-            tr.setNodeMarkup(cellPos, undefined, {
-              ...cell.attrs,
-              cellMarker: { kind: 'del', info },
-            });
+            // Insert-then-delete in one revision session collapses per cell
+            // (an `ins` from the same triple clears instead of stacking).
+            const stamped = nextCellMarker(
+              (cell.attrs.cellMarker as {
+                kind: string;
+                info?: { revisionId?: number; author?: string; date?: string | null };
+              } | null) ?? null,
+              'del',
+              info
+            );
+            if (!('noop' in stamped)) {
+              tr.setNodeMarkup(cellPos, undefined, {
+                ...cell.attrs,
+                cellMarker: stamped.marker,
+              });
+            }
           }
           cellPos += cell.nodeSize;
         });
@@ -152,12 +165,24 @@ export const deleteColumn: Command = (
       // Suggesting mode: keep the column, mark every covered cell as a
       // tracked deletion under one revision triple. Widths are left alone
       // — the grid still contains the column until accept removes it.
+      // Insert-then-delete in one session collapses per cell (same rule as
+      // `deleteRow` above).
       for (const { start, node } of targetCells) {
         if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
-          tr = tr.setNodeMarkup(start, undefined, {
-            ...node.attrs,
-            cellMarker: { kind: 'del', info },
-          });
+          const stamped = nextCellMarker(
+            (node.attrs.cellMarker as {
+              kind: string;
+              info?: { revisionId?: number; author?: string; date?: string | null };
+            } | null) ?? null,
+            'del',
+            info
+          );
+          if (!('noop' in stamped)) {
+            tr = tr.setNodeMarkup(start, undefined, {
+              ...node.attrs,
+              cellMarker: stamped.marker,
+            });
+          }
         }
       }
       tr.setMeta(SUGGESTION_META, true);
