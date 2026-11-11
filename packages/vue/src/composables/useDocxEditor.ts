@@ -502,6 +502,13 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
       editorState.value = newState;
     },
     onBodyViewReady: (view) => {
+      // Assign BEFORE the initial layout: engine.run → computeAnchorPositions
+      // reads editorView.value, and this hook fires synchronously inside
+      // mountBodyView (before createEditorView's post-mount assignment runs).
+      // Without this the first layout computes anchors with a null view and
+      // engineAnchorPositions stays empty (#109). Mirrors React, where
+      // engine.bodyView is already set when onBodyViewReady fires.
+      editorView.value = view;
       editorState.value = view.state;
       isReady.value = true;
       // Initial layout + first paint request, mirroring the old

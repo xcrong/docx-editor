@@ -233,6 +233,16 @@ function computePositions() {
     const id = el.dataset.commentId;
     if (id && !commentEls.has(id)) commentEls.set(id, el);
   }
+  // Overlapping comment ranges expose every id via space-separated
+  // `data-comment-ids` (only the first id lands in `data-comment-id`, see
+  // renderParagraph/runs.ts). Without this a non-first overlapping id never
+  // anchors from the DOM pass (mirrors LeaderLines.vue's selector).
+  for (const el of container.querySelectorAll<HTMLElement>('[data-comment-ids]')) {
+    const ids = el.dataset.commentIds?.split(/\s+/).filter(Boolean) ?? [];
+    for (const id of ids) {
+      if (!commentEls.has(id)) commentEls.set(id, el);
+    }
+  }
   const insertionEls = new Map<string, HTMLElement>();
   for (const el of container.querySelectorAll<HTMLElement>('.docx-insertion[data-revision-id]')) {
     const id = el.dataset.revisionId;
@@ -424,10 +434,14 @@ function recompute() {
   });
 }
 
-// Items / expand state / container / zoom changes all bump positions
+// Items / expand state / container / zoom / engine anchors all bump positions
 // on the next animation frame. Zoom matters because the page is
 // `transform: scale(zoom)` and `getBoundingClientRect` returns
 // post-transform coords, so a zoom change shifts every anchor.
+// engineAnchorPositions arrives async after the first layout (a fresh Map
+// identity per engine run), so it must be tracked too — otherwise cards
+// never re-resolve once anchors land (#109). Mirrors React's useMemo dep
+// on anchorPositions.
 watch(
   () => [
     items.value,
@@ -437,6 +451,7 @@ watch(
     props.zoom,
     props.isAddingComment,
     props.addCommentYPosition,
+    props.engineAnchorPositions,
   ],
   () => recompute(),
   { immediate: true }
