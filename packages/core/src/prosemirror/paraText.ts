@@ -17,6 +17,31 @@
 import type { Node as PMNode } from 'prosemirror-model';
 
 /**
+ * First PM position of a node carrying a `bookmarks` attr entry with
+ * `name`. `w:bookmarkStart` markers fold into paragraph `attrs.bookmarks`
+ * in `toProseDoc`, so internal hyperlinks (`w:anchor`, painted as
+ * `a[href="#name"]`) resolve through this lookup in both adapters.
+ *
+ * Document order, first match wins. Returns null for a blank name or
+ * when no node carries the bookmark — callers treat that as "keep the
+ * current state" (no navigation, no error).
+ */
+export function findBookmarkPos(doc: PMNode, bookmarkName: string): number | null {
+  if (!bookmarkName) return null;
+  let result: number | null = null;
+  doc.descendants((node, pos) => {
+    if (result !== null) return false;
+    const bookmarks = (node.attrs as { bookmarks?: Array<{ name?: unknown }> } | null)?.bookmarks;
+    if (Array.isArray(bookmarks) && bookmarks.some((b) => b?.name === bookmarkName)) {
+      result = pos;
+      return false;
+    }
+    return true;
+  });
+  return result;
+}
+
+/**
  * PM position range for a paragraph identified by Word `w14:paraId`.
  * Stable across edits — inverse of `formatContentForLLM`'s `[paraId]` line tag.
  *

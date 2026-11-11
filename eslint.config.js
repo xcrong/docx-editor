@@ -264,10 +264,12 @@ export default [
   // lines over on each small prop addition) while a real split is planned.
   // #105 adds engine-anchor plumbing (getZoom option + engineAnchorPositions
   // destructure + sidebar prop); bump to 1230 for headroom.
+  // #88 adds internal-link navigation parity (content-key resolved watcher +
+  // deferred bookmark-navigate threading); bump to 1250 for headroom.
   {
     files: ['packages/vue/src/components/DocxEditor.vue'],
     rules: {
-      'max-lines': ['error', { max: 1230, skipBlankLines: false, skipComments: false }],
+      'max-lines': ['error', { max: 1250, skipBlankLines: false, skipComments: false }],
     },
   },
 

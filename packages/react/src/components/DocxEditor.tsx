@@ -54,7 +54,8 @@ import {
   mergeTrackedChangesWithHf,
   findViewOwningRevision,
 } from '../hooks/useTrackedChanges';
-import { type EditorState as PMEditorState } from 'prosemirror-state';
+import { TextSelection, type EditorState as PMEditorState } from 'prosemirror-state';
+import { findBookmarkPos } from '@xcrong/docx-editor-core/prosemirror/paraText';
 import type { ReactSidebarItem } from '../plugin-api/types';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import type { Translations } from '@xcrong/docx-editor-i18n';
@@ -845,6 +846,32 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
       pagedEditorRef,
     });
 
+  /**
+   * Internal-bookmark navigation for `#name` hrefs (w:anchor). Shared by
+   * the HyperlinkPopup "go" action and the context-menu "open link" item
+   * so both scroll to the bookmark instead of opening a blank tab (#88).
+   * Returns false when the bookmark is missing — callers keep the current
+   * state (no navigation, no error).
+   */
+  const navigateToBookmark = useCallback(
+    (bookmarkName: string): boolean => {
+      const view = getActiveEditorView();
+      if (!view) return false;
+      const targetPos = findBookmarkPos(view.state.doc, bookmarkName);
+      if (targetPos === null) return false;
+      pagedEditorRef.current?.scrollToPosition(targetPos);
+      try {
+        const { state, dispatch } = view;
+        const inner = Math.min(targetPos + 1, state.doc.content.size);
+        dispatch(state.tr.setSelection(TextSelection.create(state.doc, inner)));
+      } catch {
+        // Non-textselectable target — the scroll above already landed.
+      }
+      return true;
+    },
+    [getActiveEditorView]
+  );
+
   // Find/Replace hook
   const findReplace = useFindReplace();
 
@@ -1153,6 +1180,7 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
     hyperlinkDialog,
     getActiveEditorView,
     focusActiveEditor,
+    navigateToBookmark,
   });
 
   const {
@@ -1182,6 +1210,7 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
       setFloatingCommentBtn,
     }),
     zoom: state.zoom,
+    navigateToBookmark,
   });
 
   // Handle margin changes from rulers

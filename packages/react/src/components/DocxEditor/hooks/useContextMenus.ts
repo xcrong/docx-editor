@@ -75,6 +75,7 @@ export function useContextMenus({
   onInsertLink,
   onEditLink,
   zoom,
+  navigateToBookmark,
 }: {
   getActiveEditorView: () => EditorView | null | undefined;
   focusActiveEditor: () => void;
@@ -87,6 +88,12 @@ export function useContextMenus({
   onEditLink: (href: string, displayText: string) => void;
   /** Current zoom — used to resolve HF click positions. */
   zoom: number;
+  /**
+   * Internal-bookmark navigation (`#name` hrefs). Returns true when the
+   * bookmark resolved and the viewport moved; a missing bookmark is a
+   * silent no-op (never a blank tab).
+   */
+  navigateToBookmark?: (bookmarkName: string) => boolean;
 }) {
   const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -413,7 +420,15 @@ export function useContextMenus({
           removeHyperlink(view.state, view.dispatch);
           break;
         case 'openLink': {
-          const href = sanitizeHref(contextMenu.linkHref);
+          const raw = (contextMenu.linkHref ?? '').trim();
+          // Internal bookmark anchor (w:anchor) — scroll to the bookmark
+          // instead of opening a blank tab. A missing bookmark is a
+          // silent no-op (#88).
+          if (raw.startsWith('#')) {
+            navigateToBookmark?.(raw.substring(1));
+            break;
+          }
+          const href = sanitizeHref(raw);
           if (href) window.open(href, '_blank', 'noopener,noreferrer');
           break;
         }
@@ -429,6 +444,7 @@ export function useContextMenus({
       onAddComment,
       onInsertLink,
       onEditLink,
+      navigateToBookmark,
       contextMenu.linkHref,
     ]
   );

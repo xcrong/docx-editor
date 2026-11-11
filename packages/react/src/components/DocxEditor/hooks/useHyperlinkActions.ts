@@ -7,6 +7,7 @@ import {
   setHyperlinkText,
   removeHyperlinkRange,
 } from '@xcrong/docx-editor-core/prosemirror/commands';
+import { sanitizeHref } from '@xcrong/docx-editor-core/utils';
 import type { EditorView } from 'prosemirror-view';
 import type { HyperlinkData, useHyperlinkDialog } from '../../dialogs/HyperlinkDialog';
 import type { HyperlinkPopupData } from '../../ui/HyperlinkPopup';
@@ -22,10 +23,17 @@ export function useHyperlinkActions({
   hyperlinkDialog,
   getActiveEditorView,
   focusActiveEditor,
+  navigateToBookmark,
 }: {
   hyperlinkDialog: ReturnType<typeof useHyperlinkDialog>;
   getActiveEditorView: () => EditorView | null | undefined;
   focusActiveEditor: () => void;
+  /**
+   * Internal-bookmark navigation (`#name` hrefs). Returns true when the
+   * bookmark resolved and the viewport moved; false/undefined keeps the
+   * popup state untouched.
+   */
+  navigateToBookmark?: (bookmarkName: string) => boolean;
 }) {
   const [hyperlinkPopupData, setHyperlinkPopupData] = useState<HyperlinkPopupData | null>(null);
 
@@ -69,9 +77,21 @@ export function useHyperlinkActions({
     []
   );
 
-  const handleHyperlinkPopupNavigate = useCallback((href: string) => {
-    window.open(href, '_blank', 'noopener,noreferrer');
-  }, []);
+  const handleHyperlinkPopupNavigate = useCallback(
+    (href: string) => {
+      const raw = href.trim();
+      // Internal bookmark anchor (w:anchor, painted as a[href="#name"]) —
+      // scroll to the bookmark instead of opening a blank tab. Unknown
+      // bookmarks keep the popup open so the user can copy/edit the href.
+      if (raw.startsWith('#')) {
+        if (navigateToBookmark?.(raw.substring(1))) setHyperlinkPopupData(null);
+        return;
+      }
+      const safe = sanitizeHref(raw);
+      if (safe) window.open(safe, '_blank', 'noopener,noreferrer');
+    },
+    [navigateToBookmark]
+  );
 
   const handleHyperlinkPopupCopy = useCallback((href: string) => {
     navigator.clipboard.writeText(href).catch(() => {

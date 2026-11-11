@@ -6,6 +6,7 @@
 
 import { ref, type Ref } from 'vue';
 import type { EditorView } from 'prosemirror-view';
+import { sanitizeHref } from '@xcrong/docx-editor-core/utils';
 import {
   setHyperlinkText,
   removeHyperlinkRange,
@@ -18,6 +19,12 @@ type Commands = Record<string, (...args: unknown[]) => unknown>;
 export interface UseHyperlinkManagementOptions {
   editorView: Ref<EditorView | null>;
   getCommands: () => Commands;
+  /**
+   * Internal-bookmark navigation (`#name` hrefs). Returns true when the
+   * bookmark resolved and the viewport moved; a missing bookmark keeps
+   * the popup open so the user can copy/edit the href (#88).
+   */
+  navigateToBookmark?: (bookmarkName: string) => boolean;
 }
 
 export function useHyperlinkManagement(opts: UseHyperlinkManagementOptions) {
@@ -77,7 +84,15 @@ export function useHyperlinkManagement(opts: UseHyperlinkManagementOptions) {
   }
 
   function handleHyperlinkPopupNavigate(href: string) {
-    window.open(href, '_blank', 'noopener,noreferrer');
+    const raw = href.trim();
+    // Internal bookmark anchor (w:anchor, painted as a[href="#name"]) —
+    // scroll to the bookmark instead of opening a blank tab (#88).
+    if (raw.startsWith('#')) {
+      if (opts.navigateToBookmark?.(raw.substring(1))) hyperlinkPopupData.value = null;
+      return;
+    }
+    const safe = sanitizeHref(raw);
+    if (safe) window.open(safe, '_blank', 'noopener,noreferrer');
     hyperlinkPopupData.value = null;
   }
 
