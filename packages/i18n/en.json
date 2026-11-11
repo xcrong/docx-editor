@@ -594,6 +594,9 @@
     "paragraphMarkInserted": "Inserted paragraph break",
     "paragraphMarkDeleted": "Deleted paragraph break",
     "paragraphPropertiesChanged": "Changed paragraph properties",
+    "paragraphMarkPropertiesChanged": "Changed paragraph mark properties",
+    "sectionPropertiesChanged": "Changed section properties",
+    "runPropertiesChanged": "Changed run properties",
     "rowInserted": "Inserted row",
     "rowDeleted": "Deleted row",
     "rowPropertiesChanged": "Changed row properties",
@@ -602,6 +605,7 @@
     "cellMerged": "Merged cells",
     "cellPropertiesChanged": "Changed cell properties",
     "tablePropertiesChanged": "Changed table properties",
+    "tableGridChanged": "Changed table grid",
     "tableInserted": "Inserted table",
     "tableDeleted": "Deleted table"
   },

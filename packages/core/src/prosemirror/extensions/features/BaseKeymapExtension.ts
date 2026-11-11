@@ -243,7 +243,7 @@ export function applyPostSplitInheritance(
   tr.setStoredMarks(effectiveMarks);
 }
 
-const splitBlockClearBorders: Command = (state, dispatch, view) => {
+export const splitBlockClearBorders: Command = (state, dispatch, view) => {
   // Capture source paragraph info BEFORE split (splitBlock resets everything)
   const { $from: preSplitFrom } = state.selection;
   const sourcePara = preSplitFrom.parent.type.name === 'paragraph' ? preSplitFrom.parent : null;

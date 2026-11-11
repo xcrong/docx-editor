@@ -284,3 +284,29 @@ describe('run formatting integer attributes (issue #417)', () => {
     expect(xml).toContain('<w:position w:val="-6"/>');
   });
 });
+
+describe('run property changes (T27-02, issue #78)', () => {
+  test('w:rPrChange is the last child of w:rPr (EG_RPrContent ordering)', () => {
+    const run: Run = {
+      type: 'run',
+      content: [{ type: 'text', text: 'x' }],
+      formatting: { bold: true, fontSize: 22 },
+      propertyChanges: [
+        {
+          type: 'runPropertyChange',
+          info: { id: 7, author: 'Jane', date: '2024-05-06T07:08:09Z' },
+          previousFormatting: {},
+        },
+      ],
+    };
+
+    const xml = serializeRun(run);
+
+    const changeIdx = xml.indexOf('<w:rPrChange w:id="7"');
+    expect(changeIdx).toBeGreaterThan(-1);
+    expect(xml).toMatch(/<w:rPrChange w:id="7"[^>]*>.*?<\/w:rPrChange><\/w:rPr>/s);
+    // Base properties precede the change element.
+    expect(xml.indexOf('<w:b/>')).toBeLessThan(changeIdx);
+    expect(xml.indexOf('<w:sz w:val="22"/>')).toBeLessThan(changeIdx);
+  });
+});

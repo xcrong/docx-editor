@@ -43,17 +43,17 @@ Three landable phases. Each phase is a separate PR. Phase 1 includes the snapsho
 - [x] Emit `<w:rPrChange>` (from `paraRPrChange`) as the **last** child of `<w:pPr><w:rPr>` (per `EG_RPrContent` ordering) (T27-01: implemented in `buildParagraphMarkRPr`; ordering asserted by round-trip test)
 - [x] Emit `<w:pPrChange>` as the **last** child of `<w:pPr>` (T27-01: pre-existed; asserted by round-trip test)
 - [x] Section emission (in `documentSerializer.ts` or `paragraphSerializer.ts`, wherever section emission currently lives) — emit `<w:sectPrChange>` as the last child of `<w:sectPr>` in both pPr-level and body-level placements (T27-01: implemented in `sectionPropertiesSerializer.ts`; both placements asserted by round-trip test)
-- [ ] `serializer/runSerializer.ts` (or wherever run rPr is emitted) — enforce `<w:rPrChange>` is the last child of `<w:rPr>`
+- [x] `serializer/runSerializer.ts` (or wherever run rPr is emitted) — enforce `<w:rPrChange>` is the last child of `<w:rPr>` (T27-02: `serializeRunProperties` already appends `propertyChanges` after base properties; ordering asserted by the new `runSerializer.test.ts` case)
 
 ### Suggesting-mode plugin
 
-- [ ] `plugins/suggestionMode.ts` — Enter handler that **calls into** `splitBlockClearBorders` (in `BaseKeymapExtension.ts`), then sets `pPrIns` on the _first_ paragraph of the resulting split (normative)
-- [ ] Same Enter handler covers selection-covering-content (wrap as `deletion` then split) and empty-paragraph cases
-- [ ] Backspace at paragraph start (collapsed, non-first): set `pPrDel` on previous paragraph; cursor lands at its end; no actual join
-- [ ] Delete at paragraph end (collapsed, non-last): set `pPrDel` on current paragraph
-- [ ] Backspace at first paragraph start: no-op
-- [ ] Selection spanning paragraph boundary + Backspace/Delete: wrap inline + set `pPrDel` on covered paragraph marks; cursor at original `from`
-- [ ] Wrap paragraph-property commands (alignment, indent, line spacing, style) and section-property commands with `withSuggestingSnapshot`
+- [x] `plugins/suggestionMode.ts` — Enter handler that **calls into** `splitBlockClearBorders` (in `BaseKeymapExtension.ts`), then sets `pPrIns` on the _first_ paragraph of the resulting split (normative) (T27-02: `handleSuggestionEnter` delegates to the now-exported `splitBlockClearBorders` via capture-dispatch so the split + `pPrIns` + tracked deletion stay in one transaction; selection-collapse is an undispatched intermediate because `splitBlock` would `deleteSelection()` untracked)
+- [x] Same Enter handler covers selection-covering-content (wrap as `deletion` then split) and empty-paragraph cases (T27-02: deletion marks are applied mapped-through the captured split; verified by coalescing e2e)
+- [x] Backspace at paragraph start (collapsed, non-first): set `pPrDel` on previous paragraph; cursor lands at its end; no actual join (T27-02: pre-existed; e2e-covered)
+- [x] Delete at paragraph end (collapsed, non-last): set `pPrDel` on current paragraph (T27-02: pre-existed; `handleSuggestionDeleteAtEnd`)
+- [x] Backspace at first paragraph start: no-op (T27-02: pre-existed; falls through to the base keymap no-op)
+- [x] Selection spanning paragraph boundary + Backspace/Delete: wrap inline + set `pPrDel` on covered paragraph marks; cursor at original `from` (T27-02: `handleSuggestionDelete` selection branch marks fully-covered paragraph ends — end boundary strictly inside the range — and collapses to mapped `from`; unit-tested in `paragraphSnapshot.test.ts`)
+- [x] Wrap paragraph-property commands (alignment, indent, line spacing, style) and section-property commands with `withSuggestingSnapshot` (T27-02: new `paragraphPropertySnapshotter` in `plugins/suggestionMode/paragraphSnapshot.ts`; wrapped at the `commands/paragraph.ts` re-export layer — covering both adapters' toolbar/ruler paths — plus split-based `insertSectionBreak*` in `commands/sectionBreak.ts`; list toggles stay self-tracked via `ListExtension`; `sectionBreakType` rides `pPrChange.previousFormatting` under a cast and is ignored by the paragraph serializer on write — full `sectPrChange` authoring lands with the accept/reject slice)
 
 ### Accept / Reject
 
@@ -87,9 +87,8 @@ Three landable phases. Each phase is a separate PR. Phase 1 includes the snapsho
 
 ### i18n (all 7 locales)
 
-- [ ] Add all **15** keys to `packages/i18n/en.json` (with English values for those Phase 1 actually uses; placeholder strings for Phase 2/3 keys so `i18n:validate` is green):
-  - `revisions.paragraphMarkInserted`, `revisions.paragraphMarkDeleted`, `revisions.paragraphPropertiesChanged`, `revisions.paragraphMarkPropertiesChanged`, `revisions.sectionPropertiesChanged`, `revisions.runPropertiesChanged`, `revisions.rowInserted`, `revisions.rowDeleted`, `revisions.rowPropertiesChanged`, `revisions.cellInserted`, `revisions.cellDeleted`, `revisions.cellMerged`, `revisions.cellPropertiesChanged`, `revisions.tablePropertiesChanged`, `revisions.tableGridChanged`
-- [ ] `bun run i18n:fix` to mirror null entries into de, he, pl, pt-BR, tr, zh-CN
+- [x] Add all **15** keys to `packages/i18n/en.json` (with English values for those Phase 1 actually uses; placeholder strings for Phase 2/3 keys so `i18n:validate` is green) (T27-02: added the 4 missing keys — `paragraphMarkPropertiesChanged`, `sectionPropertiesChanged`, `runPropertiesChanged`, `tableGridChanged`; `en.json` now carries all 15 plus pre-existing `tableInserted`/`tableDeleted`)
+- [x] `bun run i18n:fix` to mirror null entries into de, he, pl, pt-BR, tr, zh-CN (T27-02: ran; also mirrored into fr/hi/id; `i18n:validate` green)
 
 ### Vue parity
 
