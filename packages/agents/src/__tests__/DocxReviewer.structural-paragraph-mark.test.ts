@@ -9,8 +9,9 @@ import { makeRun, makeParagraphFrom, makeReviewer } from './_helpers';
 //
 // NOTE — scope split with issue #120: model-level ACCEPT / REJECT semantics
 // for paragraph-level revisions (pPrIns join-on-accept, pPrDel join,
-// pPrChange/paraRPrChange/sectPrChange prior-restore) belong to #120. This
-// file only pins that the *propose* path is total and marker-preserving.
+// pPrChange/paraRPrChange/sectPrChange prior-restore) live in
+// `DocxReviewer.structural-accept.test.ts`. This file pins that the *propose*
+// path is total and marker-preserving.
 
 function structuralParagraph(text: string): Paragraph {
   return {
@@ -43,7 +44,12 @@ describe('propose* on paragraphs with paragraph-mark revisions', () => {
       replaceWith: '$500,000',
     });
     const changes = reviewer.getChanges();
-    expect(changes).toHaveLength(2);
+    // Two run-level proposals plus the two pre-existing structural revisions
+    // (pPrIns 41, propertyChange 42) — #120 surfaces paragraph-level
+    // revisions in discovery.
+    expect(changes).toHaveLength(4);
+    expect(changes.some((c) => c.type === 'paragraphInsertion' && c.id === 41)).toBe(true);
+    expect(changes.some((c) => c.type === 'paragraphPropertyChange' && c.id === 42)).toBe(true);
     const para = firstPara(reviewer);
     expect(para.pPrIns).toMatchObject({ id: 41, author: 'Jane' });
     expect(para.propertyChanges).toHaveLength(1);

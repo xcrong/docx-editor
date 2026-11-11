@@ -154,8 +154,11 @@ export interface ReviewChange {
     // (undocumented)
     text: string;
     // (undocumented)
-    type: 'insertion' | 'deletion' | 'moveFrom' | 'moveTo';
+    type: ReviewChangeKind;
 }
+
+// @public
+export type ReviewChangeKind = 'insertion' | 'deletion' | 'moveFrom' | 'moveTo' | StructuralChangeKind;
 
 // @public (undocumented)
 export interface ReviewComment {
@@ -176,6 +179,9 @@ export interface ReviewComment {
     // (undocumented)
     text: string;
 }
+
+// @public
+export type StructuralChangeKind = 'paragraphInsertion' | 'paragraphDeletion' | 'paragraphPropertyChange' | 'paragraphMarkPropertyChange' | 'sectionPropertyChange';
 
 // @public
 export class TextNotFoundError extends Error {

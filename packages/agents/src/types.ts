@@ -62,9 +62,34 @@ export interface GetContentOptions {
 // DISCOVERY — what getChanges() / getComments() return
 // ============================================================================
 
+/**
+ * Paragraph-level (structural) tracked-change kinds surfaced by `getChanges`
+ * alongside the inline `insertion` / `deletion` / `moveFrom` / `moveTo` kinds.
+ *
+ * Mirrors the model fields on `Paragraph`: `pPrIns` → `paragraphInsertion`,
+ * `pPrDel` → `paragraphDeletion`, `propertyChanges` (`w:pPrChange`) →
+ * `paragraphPropertyChange`, `paraRPrChange` (`CT_ParaRPrChange`) →
+ * `paragraphMarkPropertyChange`, and `sectPrChange` (`w:sectPrChange`) →
+ * `sectionPropertyChange` (paragraph-level and body-level placements).
+ */
+export type StructuralChangeKind =
+  | 'paragraphInsertion'
+  | 'paragraphDeletion'
+  | 'paragraphPropertyChange'
+  | 'paragraphMarkPropertyChange'
+  | 'sectionPropertyChange';
+
+/** Every tracked-change kind `getChanges` can report. */
+export type ReviewChangeKind =
+  | 'insertion'
+  | 'deletion'
+  | 'moveFrom'
+  | 'moveTo'
+  | StructuralChangeKind;
+
 export interface ReviewChange {
   id: number;
-  type: 'insertion' | 'deletion' | 'moveFrom' | 'moveTo';
+  type: ReviewChangeKind;
   author: string;
   date: string | null;
   text: string;
@@ -107,7 +132,7 @@ export interface ReviewComment {
 
 export interface ChangeFilter {
   author?: string;
-  type?: 'insertion' | 'deletion' | 'moveFrom' | 'moveTo';
+  type?: ReviewChangeKind;
   /** Also report tracked changes inside footnote bodies. Default: false. */
   includeFootnotes?: boolean;
   /** Also report tracked changes inside endnote bodies. Default: false. */
