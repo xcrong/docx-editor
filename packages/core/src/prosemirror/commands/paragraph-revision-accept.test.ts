@@ -257,4 +257,44 @@ describe('T27-03 paragraph accept/reject', () => {
     expect(runCmd(state, acceptAllChanges()).result).toBe(0);
     expect(runCmd(EditorState.create({ doc }), rejectAllChanges()).result).toBe(2);
   });
+
+  test('multi-author: same numeric id from two authors resolves as two triples', () => {
+    // T27-04 (issue #80): `w:id` is not author-scoped, so Jane and John may
+    // legally mint id 5. acceptAllChanges must count (5, Jane) and
+    // (5, John) as DISTINCT triples; the by-id resolver clears both in one
+    // transaction with a cross-author diagnostic.
+    const doc = schema.nodes.doc.create({}, [
+      p('aaa', { pPrIns: { revisionId: 5, author: 'Jane', date: null } }),
+      p('bbb', { pPrIns: { revisionId: 5, author: 'John', date: null } }),
+    ]);
+    const { result, state } = runCmd(EditorState.create({ doc }), acceptAllChanges());
+    expect(result).toBe(2);
+    expect(state.doc.firstChild!.attrs.pPrIns).toBeNull();
+    expect(state.doc.lastChild!.attrs.pPrIns).toBeNull();
+  });
+
+  test('multi-author: by-id accept clears both authors sites and warns', () => {
+    const doc = schema.nodes.doc.create({}, [
+      p('aaa', { pPrIns: { revisionId: 5, author: 'Jane', date: null } }),
+      p('bbb', { pPrDel: { revisionId: 5, author: 'John', date: null } }),
+    ]);
+    const warnings: string[] = [];
+    const origWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map(String).join(' '));
+    };
+    try {
+      const { result, state } = runCmd(EditorState.create({ doc }), acceptChangeById(5));
+      expect(result).toBe(true);
+      // Jane's pPrIns accept clears (split kept). John's pPrDel accept joins
+      // with the FOLLOWING sibling — none here (last paragraph), so it
+      // clears without joining. Both markers gone, paragraphs intact.
+      expect(state.doc.childCount).toBe(2);
+      expect(state.doc.firstChild!.attrs.pPrIns).toBeNull();
+      expect(state.doc.lastChild!.attrs.pPrDel).toBeNull();
+    } finally {
+      console.warn = origWarn;
+    }
+    expect(warnings.some((w) => w.includes('revisionId 5') && w.includes('2'))).toBe(true);
+  });
 });

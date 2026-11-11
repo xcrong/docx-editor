@@ -49,3 +49,58 @@ describe('hashParagraphBlock', () => {
     expect(noDefaults).not.toBe(withSize);
   });
 });
+
+describe('hashParagraphBlock revision invalidation (T27-04)', () => {
+  // Paragraph-mark / property revision state paints pilcrow glyphs and margin
+  // change bars. Same text + runs with different revision state must NOT
+  // share a measurement cache entry, or the second-painted paragraph
+  // inherits the first's revision visuals (stale cache).
+  test('pPrIns / pPrDel presence changes the hash; clearing restores it', () => {
+    const clean = hashParagraphBlock(emptyParagraph({}));
+    const ins = hashParagraphBlock(
+      emptyParagraph({ pPrIns: { revisionId: 42, author: 'Jane', date: null } })
+    );
+    const del = hashParagraphBlock(
+      emptyParagraph({ pPrDel: { revisionId: 43, author: 'Jane', date: null } })
+    );
+    expect(ins).not.toBe(clean);
+    expect(del).not.toBe(clean);
+    expect(ins).not.toBe(del);
+    // Accept clears the marker → the paragraph re-keys to the clean entry.
+    expect(hashParagraphBlock(emptyParagraph({}))).toBe(clean);
+  });
+
+  test('different revision ids hash differently (no cross-revision reuse)', () => {
+    const a = hashParagraphBlock(
+      emptyParagraph({ pPrIns: { revisionId: 1, author: 'Jane', date: null } })
+    );
+    const b = hashParagraphBlock(
+      emptyParagraph({ pPrIns: { revisionId: 2, author: 'Jane', date: null } })
+    );
+    expect(a).not.toBe(b);
+  });
+
+  test('property-change histories (pPrChange / paraRPrChange / sectPrChange) change the hash', () => {
+    const clean = hashParagraphBlock(emptyParagraph({}));
+    const prop = hashParagraphBlock(emptyParagraph({ pPrChange: [] }));
+    const markProp = hashParagraphBlock(emptyParagraph({ paraRPrChange: [] }));
+    const sect = hashParagraphBlock(
+      emptyParagraph({
+        sectPrChange: {
+          type: 'sectionPropertyChange',
+          info: { id: 9, author: 'Jane' },
+        },
+      })
+    );
+    // Presence flags are set for non-null histories; each differs from clean.
+    expect(prop).not.toBe(clean);
+    expect(markProp).not.toBe(clean);
+    expect(sect).not.toBe(clean);
+    expect(prop).not.toBe(markProp);
+  });
+
+  test('run revision_change presence (hasRevisionChange) changes the hash', () => {
+    const clean = hashParagraphBlock(emptyParagraph({}));
+    expect(hashParagraphBlock(emptyParagraph({ hasRevisionChange: true }))).not.toBe(clean);
+  });
+});
