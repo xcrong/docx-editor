@@ -238,6 +238,18 @@ export default [
     },
   },
 
+  // renderPage.ts is the single page composer (page chrome, content area,
+  // floating layers, header/footer bands + clip decisions, footnotes,
+  // borders). The HF floating-textbox escape hatches (#103: behind-watermark
+  // sandwich + clip exemption) pushed it just past the default 1000. Modest
+  // headroom while a real split is planned; the cap still enforces a ceiling.
+  {
+    files: ['packages/core/src/layout-painter/renderPage.ts'],
+    rules: {
+      'max-lines': ['error', { max: 1020, skipBlankLines: false, skipComments: false }],
+    },
+  },
+
   // DocxEditor.vue is the host component — same role as React's
   // DocxEditor.tsx (which has a 2000-line cap). The React-parity callback
   // props (#720) add per-prop wiring that must live inline in the SFC (the

@@ -19,7 +19,8 @@ import {
   type HeaderFooterContent,
   type HeaderFooterLayoutInfo,
 } from '../renderPage/headerFooter';
-import type { TextBoxBlock, TextBoxMeasure } from '../../layout-engine/types';
+import { renderPage } from '../renderPage';
+import type { Page, TextBoxBlock, TextBoxMeasure } from '../../layout-engine/types';
 import type { RenderContext } from '../renderPage';
 
 beforeAll(() => GlobalRegistrator.register());
@@ -76,9 +77,9 @@ function render(block: TextBoxBlock): HTMLElement | null {
 }
 
 describe('HF behind text box watermark (#103)', () => {
-  test('behind box paints below content (z-index -1)', () => {
+  test('behind box paints below content but above the page background (z-index 0)', () => {
     const box = render(watermarkBlock('behind'))!;
-    expect(box.style.zIndex).toBe('-1');
+    expect(box.style.zIndex).toBe('0');
   });
 
   test('behind box honors the page-center vertical anchor (not the HF cursor)', () => {
@@ -115,5 +116,83 @@ describe('HF behind text box watermark (#103)', () => {
     const box = el.querySelector<HTMLElement>('.layout-textbox')!;
     expect(box.style.top).toBe('0px');
     expect(box.style.zIndex).toBe('');
+  });
+});
+
+describe('page-level stacking + clipping (#103 follow-up)', () => {
+  const page: Page = {
+    number: 1,
+    fragments: [],
+    margins: { top: 102, right: 72, bottom: 72, left: 72 },
+    size: { w: 744, h: 1123 },
+  };
+  const pageCtx: RenderContext = {
+    pageNumber: 1,
+    totalPages: 1,
+    section: 'body',
+    contentWidth: 600,
+  };
+
+  // Small float: visualBottom (20) fits the band (54), so without the float
+  // escape hatch the header would clip it — even though its page-center top
+  // (~503px) lies far below the band.
+  function smallFloatHeader(): HeaderFooterContent {
+    const block: TextBoxBlock = {
+      kind: 'textBox',
+      id: 'wm-small',
+      width: 200,
+      height: 20,
+      content: [],
+      displayMode: 'float',
+      wrapType: 'behind',
+      position: {
+        horizontal: { relativeTo: 'page', align: 'center' },
+        vertical: { relativeTo: 'page', align: 'center' },
+      },
+    };
+    const measure: TextBoxMeasure = { kind: 'textBox', width: 200, height: 20, innerMeasures: [] };
+    return {
+      blocks: [block],
+      measures: [measure],
+      height: 20,
+      flowHeight: 0,
+      visualTop: 0,
+      visualBottom: 20,
+    };
+  }
+
+  test('floating behind box escapes header clipping and sits below body content', () => {
+    const el = renderPage(page, pageCtx, { document, headerContent: smallFloatHeader() });
+    const headerEl = el.querySelector<HTMLElement>('.layout-page-header')!;
+    expect(headerEl.style.overflow).not.toBe('hidden');
+    expect(headerEl.style.maxHeight).toBe('');
+    const box = headerEl.querySelector<HTMLElement>('.layout-textbox')!;
+    expect(box.style.zIndex).toBe('0');
+    // Page-center: (1123 - 20) / 2 - flowTop(48) = 503.5.
+    expect(parseFloat(box.style.top)).toBeCloseTo(503.5, 5);
+    // Sandwich: body content above the behind shape, page background below it.
+    const contentEl = el.querySelector<HTMLElement>('.layout-page-content')!;
+    expect(contentEl.style.zIndex).toBe('1');
+  });
+
+  test('inline-only header keeps clipping (existing behavior)', () => {
+    const block: TextBoxBlock = {
+      kind: 'textBox',
+      id: 'tb-inline',
+      width: 200,
+      height: 20,
+      content: [],
+      displayMode: 'inline',
+    };
+    const content: HeaderFooterContent = {
+      blocks: [block],
+      measures: [{ kind: 'textBox', width: 200, height: 20, innerMeasures: [] }],
+      height: 20,
+      flowHeight: 20,
+      visualTop: 0,
+      visualBottom: 20,
+    };
+    const el = renderPage(page, pageCtx, { document, headerContent: content });
+    expect(el.querySelector<HTMLElement>('.layout-page-header')!.style.overflow).toBe('hidden');
   });
 });
