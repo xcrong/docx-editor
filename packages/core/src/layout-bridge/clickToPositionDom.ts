@@ -14,29 +14,59 @@
 import { findBodyEmptyRuns, findBodyPmSpans } from './findBodyPmSpans';
 
 /**
+ * Options for {@link clickToPositionDom}.
+ *
+ * @public
+ */
+export interface ClickToPositionDomOptions {
+  /**
+   * Ignore hits inside `.layout-page-header` / `.layout-page-footer`.
+   * Body drags in normal (non-HF-edit) mode must resolve against the body
+   * PM document only: HF runs live in a separate PM document whose numeric
+   * positions overlap the body's, so an HF hit applied to the body view
+   * corrupts the selection (T30: drag auto-scroll extension collapsing when
+   * the edge-zone point slides over a footer). Defaults to false to keep
+   * HF-editing call sites on the current behavior.
+   */
+  bodyOnly?: boolean;
+}
+
+/** True when `el` lives inside a painted header or footer instance. */
+function isInHeaderFooter(el: Element): boolean {
+  const htmlEl = el as HTMLElement;
+  return !!htmlEl.closest?.('.layout-page-header, .layout-page-footer');
+}
+
+/**
  * Find ProseMirror position from a click using DOM-based detection.
  *
  * @param container - The pages container element
  * @param clientX - Client X coordinate from mouse event
  * @param clientY - Client Y coordinate from mouse event
  * @param zoom - Current zoom level (default 1)
+ * @param options - Hit-scope options (see {@link ClickToPositionDomOptions})
  * @returns ProseMirror position, or null if not found
  */
 export function clickToPositionDom(
   container: HTMLElement,
   clientX: number,
   clientY: number,
-  zoom: number = 1
+  zoom: number = 1,
+  options?: ClickToPositionDomOptions
 ): number | null {
+  const bodyOnly = options?.bodyOnly === true;
   // Get all elements at the click point
   const elements = document.elementsFromPoint(clientX, clientY);
+  // Body-only drags skip header/footer chrome: those spans carry HF-document
+  // positions that are meaningless (and harmful) on the body PM view.
+  const inScope = bodyOnly ? elements.filter((el) => !isInHeaderFooter(el)) : elements;
 
   // Find the page element
   const pageEl = elements.find((el) => el.classList.contains('layout-page')) as HTMLElement | null;
   if (!pageEl) return null;
 
   // Find span with PM position data
-  const spanEl = elements.find(
+  const spanEl = inScope.find(
     (el) =>
       el.tagName === 'SPAN' &&
       (el as HTMLElement).dataset.pmStart !== undefined &&
@@ -48,7 +78,7 @@ export function clickToPositionDom(
   }
 
   // Check for empty paragraphs (including inside table cells)
-  const emptyRun = elements.find((el) =>
+  const emptyRun = inScope.find((el) =>
     el.classList.contains('layout-empty-run')
   ) as HTMLElement | null;
   if (emptyRun) {
@@ -61,7 +91,7 @@ export function clickToPositionDom(
   // Check for paragraph elements directly (handles clicks in whitespace
   // to the right of text, or table cells where the narrow empty-run span
   // isn't hit but the parent paragraph div is)
-  const paragraphEl = elements.find(
+  const paragraphEl = inScope.find(
     (el) =>
       el.classList.contains('layout-paragraph') && (el as HTMLElement).dataset.pmStart !== undefined
   ) as HTMLElement | null;
@@ -78,7 +108,7 @@ export function clickToPositionDom(
   // Check if click is within a table cell. When clicking in empty space below
   // text in a cell, restrict the search to spans within that cell to avoid
   // the cursor jumping to a different cell (fixes #54).
-  const cellEl = elements.find((el) =>
+  const cellEl = inScope.find((el) =>
     el.classList.contains('layout-table-cell')
   ) as HTMLElement | null;
   if (cellEl) {
@@ -86,7 +116,7 @@ export function clickToPositionDom(
   }
 
   // Fallback: Find nearest text span on the page
-  return findNearestSpan(container, pageEl, clientX, clientY, zoom);
+  return findNearestSpan(container, pageEl, clientX, clientY, zoom, bodyOnly);
 }
 
 /**
@@ -265,13 +295,19 @@ function findNearestSpan(
   pageEl: HTMLElement,
   clientX: number,
   clientY: number,
-  _zoom: number
+  _zoom: number,
+  bodyOnly = false
 ): number | null {
+  // Body-only drags resolve inside the content subtree so header/footer
+  // spans on the same page can never win the nearest-line lookup.
+  const scopeRoot = bodyOnly
+    ? ((pageEl.querySelector('.layout-page-content') as HTMLElement | null) ?? pageEl)
+    : pageEl;
   // Get all text spans on this page
-  const spans = pageEl.querySelectorAll('span[data-pm-start][data-pm-end]');
+  const spans = scopeRoot.querySelectorAll('span[data-pm-start][data-pm-end]');
   if (spans.length === 0) {
     // No text spans - return position based on paragraph
-    const paragraphs = pageEl.querySelectorAll('.layout-paragraph');
+    const paragraphs = scopeRoot.querySelectorAll('.layout-paragraph');
     if (paragraphs.length > 0) {
       const firstP = paragraphs[0] as HTMLElement;
       return Number(firstP.dataset.pmStart) || 0;
@@ -280,7 +316,7 @@ function findNearestSpan(
   }
 
   // Find the closest line to the click Y
-  const lines = pageEl.querySelectorAll('.layout-line');
+  const lines = scopeRoot.querySelectorAll('.layout-line');
   let closestLine: HTMLElement | null = null;
   let closestLineDistance = Infinity;
 

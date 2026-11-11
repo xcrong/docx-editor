@@ -5,7 +5,12 @@
 ```ts
 
 // @public
-export function clickToPositionDom(container: HTMLElement, clientX: number, clientY: number, zoom?: number): number | null;
+export function clickToPositionDom(container: HTMLElement, clientX: number, clientY: number, zoom?: number, options?: ClickToPositionDomOptions): number | null;
+
+// @public
+export interface ClickToPositionDomOptions {
+    bodyOnly?: boolean;
+}
 
 // @public
 export function clipRectToTableWindow(spanEl: Element, rect: {

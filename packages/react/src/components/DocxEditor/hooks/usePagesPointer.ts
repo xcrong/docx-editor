@@ -35,6 +35,7 @@ import {
 } from '@xcrong/docx-editor-core/layout-bridge';
 import type { FlowBlock, Layout, Measure } from '@xcrong/docx-editor-core/layout-engine';
 import { addColumnRight, addRowBelow } from '@xcrong/docx-editor-core/prosemirror';
+import { AUTO_SCROLL_EDGE_ZONE } from '@xcrong/docx-editor-core/utils/autoScroll';
 import {
   captureInlinePositionEmu,
   findImageElement as coreFindImageElement,
@@ -231,10 +232,10 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
 
   // Trampoline so useDragAutoScroll's callback can reach getPositionFromMouse
   // without forming a closure cycle. Assigned every render below.
-  const dragExtendRef = useRef<(cx: number, cy: number) => void>(() => {});
+  const dragExtendRef = useRef<(cx: number, cy: number, delta?: number) => void>(() => {});
 
-  const dragAutoScrollCallbackRef = useCallback((cx: number, cy: number) => {
-    dragExtendRef.current(cx, cy);
+  const dragAutoScrollCallbackRef = useCallback((cx: number, cy: number, delta: number) => {
+    dragExtendRef.current(cx, cy, delta);
   }, []);
   const { updateMousePosition: updateDragScroll, stopAutoScroll: stopDragAutoScroll } =
     useDragAutoScroll({
@@ -251,7 +252,13 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
     (clientX: number, clientY: number): number | null => {
       if (!pagesContainerRef.current || !layout) return null;
 
-      const domPos = clickToPositionDom(pagesContainerRef.current, clientX, clientY, zoom);
+      const domPos = clickToPositionDom(pagesContainerRef.current, clientX, clientY, zoom, {
+        // Normal mode resolves against the body PM document only: HF spans
+        // carry HF-document positions that would corrupt a body drag when
+        // the pointer slides over a header/footer (T30). HF edit mode keeps
+        // the unscoped lookup for the HF fallback below.
+        bodyOnly: !hfEditMode,
+      });
       if (domPos !== null) return domPos;
 
       // In HF edit mode, the geometry-based fallback below uses BODY blocks/
@@ -498,11 +505,18 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
 
   // Re-wire the drag trampoline every render so it sees the latest
   // `getPositionFromMouse` closure + the latest active surface.
-  dragExtendRef.current = (cx: number, cy: number) => {
+  // `delta` carries the tick's signed scroll: when the pointer sits on the
+  // native scrollbar `elementsFromPoint` hits nothing and the direct resolve
+  // misses, so retry one edge-zone inward (over real content) instead of
+  // freezing the selection head while the document scrolls underneath.
+  dragExtendRef.current = (cx: number, cy: number, delta = 0) => {
     if (!isDraggingRef.current || dragAnchorRef.current === null) return;
     const surface = activeSurface();
     if (!surface) return;
-    const pmPos = getPositionFromMouse(cx, cy);
+    let pmPos = getPositionFromMouse(cx, cy);
+    if (pmPos === null && delta !== 0) {
+      pmPos = getPositionFromMouse(cx, cy - Math.sign(delta) * AUTO_SCROLL_EDGE_ZONE);
+    }
     if (pmPos === null) return;
     surface.setSelection(dragAnchorRef.current, pmPos);
   };

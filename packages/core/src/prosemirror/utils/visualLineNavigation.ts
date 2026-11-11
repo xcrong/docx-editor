@@ -20,6 +20,7 @@
  */
 import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
+import { findBodyEmptyRuns, findBodyPmSpans } from '../../layout-bridge/findBodyPmSpans';
 import { findVerticalScrollParent } from '../../utils/findVerticalScrollParent';
 
 const CONTENT_LINE_SELECTOR = '.layout-page-content .layout-line';
@@ -50,7 +51,10 @@ function scrollIntoViewIfNeeded(el: HTMLElement): void {
 
 /** @internal */
 export function getCaretClientX(container: HTMLElement, pmPos: number): number | null {
-  const spans = container.querySelectorAll('span[data-pm-start][data-pm-end]');
+  // Body-scoped: HF runs live in a separate PM document whose numeric
+  // positions overlap the body's — an unscoped span query would resolve the
+  // caret X against header/footer text (same fix as findBodyPmSpans).
+  const spans = findBodyPmSpans(container);
   for (const span of Array.from(spans)) {
     const spanEl = span as HTMLElement;
     const pmStart = Number(spanEl.dataset.pmStart);
@@ -70,8 +74,8 @@ export function getCaretClientX(container: HTMLElement, pmPos: number): number |
       return range.getBoundingClientRect().left;
     }
   }
-  const emptyRuns = container.querySelectorAll('.layout-empty-run');
-  for (const emptyRun of Array.from(emptyRuns)) {
+  const emptyRuns = findBodyEmptyRuns(container);
+  for (const emptyRun of emptyRuns) {
     const paragraph = emptyRun.closest('.layout-paragraph') as HTMLElement;
     if (!paragraph) continue;
     const pmStart = Number(paragraph.dataset.pmStart);

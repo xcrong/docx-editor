@@ -42,6 +42,7 @@ import type {
   FloatPageGeometry,
 } from '@xcrong/docx-editor-core/layout-bridge/measuring';
 import { measureTableBlock, resolveHeaderFooter } from '@xcrong/docx-editor-core/layout-bridge';
+import { useVisualLineNavigation } from './useVisualLineNavigation';
 import { computeCommentAnchorPositions } from '@xcrong/docx-editor-core/layout-bridge/anchorPositions';
 import { calibrateAnchorsToContainer } from './sidebarAnchorCalibration';
 import {
@@ -345,6 +346,13 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
   // undefined (all highlights shown) when unset.
   let resolvedCommentIdsProvider: (() => Set<number>) | null = null;
 
+  // Visual-line ArrowUp/Down (sticky X + painted-line auto-scroll) for the
+  // body PM view. Same core algorithm React wraps in its
+  // `useVisualLineNavigation` hook; without this the body view falls back
+  // to PM's document-offset stepping, which skips/sticks on wrapped lines
+  // and never scrolls the painted line into view (T30).
+  const visualLineNav = useVisualLineNavigation(pagesContainer);
+
   const engineHost: EngineHost = {
     getDocument: () => document.value,
     getStyles: () => document.value?.package?.styles ?? null,
@@ -472,6 +480,9 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
           editable: () => !unref(readOnly),
           // Keeps `overflow-anchor` on the PM root across outer-deco sync.
           attributes: { style: 'overflow-anchor: none' },
+          // Visual-line ArrowUp/Down before PM's default handling (parity
+          // with React's onBodyKeyDown → useVisualLineNavigation).
+          handleKeyDown: (view, event) => visualLineNav.handlePMKeyDown(view, event),
           dispatchTransaction(this: EditorView, transaction: Transaction) {
             dispatch(transaction, this);
           },

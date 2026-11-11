@@ -172,10 +172,11 @@ export function resolvePos(
   pagesContainer: HTMLElement | null,
   view: EditorView | null,
   clientX: number,
-  clientY: number
+  clientY: number,
+  opts?: { bodyOnly?: boolean }
 ): number | null {
   if (!pagesContainer || !view) return null;
-  const pos = clickToPositionDom(pagesContainer, clientX, clientY, 1);
+  const pos = clickToPositionDom(pagesContainer, clientX, clientY, 1, opts);
   if (pos === null || pos < 0) return null;
   return Math.min(pos, view.state.doc.content.size);
 }

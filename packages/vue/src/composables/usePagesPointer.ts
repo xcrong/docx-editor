@@ -31,6 +31,7 @@ import type { ImageSelectionInfo } from '../components/imageSelectionTypes';
 import type { Layout } from '@xcrong/docx-editor-core/layout-engine';
 import type { HyperlinkPopupData } from '../components/ui/hyperlinkPopupTypes';
 import { useDragAutoScroll } from './useDragAutoScroll';
+import { AUTO_SCROLL_EDGE_ZONE as EDGE_ZONE_PX } from '@xcrong/docx-editor-core/utils/autoScroll';
 import { findBookmarkPos } from '@xcrong/docx-editor-core/prosemirror/paraText';
 import {
   createCellDragTracker,
@@ -160,11 +161,18 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
 
   // Auto-scroll when a drag-select reaches the top/bottom edge of the scroll
   // container, extending the selection as it scrolls (parity with React).
+  // `delta` carries the tick's signed scroll: when the pointer sits on the
+  // native scrollbar the direct resolve misses (`elementsFromPoint` hits
+  // nothing there), so retry one edge-zone inward over real content instead
+  // of freezing the selection head mid-scroll.
   const dragAutoScroll = useDragAutoScroll({
     pagesContainer: opts.pagesRef,
-    onScrollExtendSelection: (clientX, clientY) => {
+    onScrollExtendSelection: (clientX, clientY, delta) => {
       if (!isDragging || dragAnchor === null) return;
-      const pos = resolvePos(clientX, clientY);
+      let pos = resolvePos(clientX, clientY);
+      if (pos === null && delta !== 0) {
+        pos = resolvePos(clientX, clientY - Math.sign(delta) * EDGE_ZONE_PX);
+      }
       if (pos !== null && pos !== dragAnchor) setPmSelection(dragAnchor, pos);
     },
   });
@@ -174,7 +182,13 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
   let scrollFadeTimer: ReturnType<typeof setTimeout> | null = null;
 
   function resolvePos(clientX: number, clientY: number): number | null {
-    return resolvePosImpl(opts.pagesRef.value, opts.editorView.value, clientX, clientY);
+    // Normal mode resolves against the body PM document only: HF spans
+    // carry HF-document positions that would corrupt a body drag when the
+    // pointer slides over a header/footer (T30). HF edit mode keeps the
+    // unscoped lookup.
+    return resolvePosImpl(opts.pagesRef.value, opts.editorView.value, clientX, clientY, {
+      bodyOnly: !hfEdit.value,
+    });
   }
 
   /**

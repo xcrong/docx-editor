@@ -73,7 +73,11 @@ export {
   getSelectionRectsFromDom,
   getCaretPositionFromDom,
 } from './clickToPositionDom';
-export type { DomSelectionRect, DomCaretPosition } from './clickToPositionDom';
+export type {
+  DomSelectionRect,
+  DomCaretPosition,
+  ClickToPositionDomOptions,
+} from './clickToPositionDom';
 export { syncImeCaretAnchor, resetImeCaretAnchor } from './imeCaretAnchor';
 export type { SyncImeCaretAnchorOptions, VisibleCaretViewportRect } from './imeCaretAnchor';
 export { applyCellSelectionHighlight } from './cellSelectionHighlight';
