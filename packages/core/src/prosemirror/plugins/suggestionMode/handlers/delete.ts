@@ -7,7 +7,7 @@
 import { TextSelection, type EditorState, type Transaction } from 'prosemirror-state';
 import type { Node as PMNode, MarkType } from 'prosemirror-model';
 
-import { findAdjacentRevisionForRange } from '../adjacency';
+import { findAdjacentRevisionForRange, findAdjacentParagraphMark } from '../adjacency';
 import { makeMarkAttrs } from '../markAttrs';
 import { suggestionModeKey, SUGGESTION_META, type SuggestionModeState } from '../state';
 
@@ -85,9 +85,39 @@ export function handleSuggestionDelete(
 
   // --- Selection delete ---
   if (!empty) {
+    // Paragraph marks fully covered by the range get `pPrDel` — the join is
+    // deferred to accept, mirroring collapsed Backspace-at-start. A mark is
+    // covered when its paragraph's end boundary lies strictly inside the
+    // range (the paragraph holding `$to` keeps its mark). Positions are
+    // collected pre-edit and mapped through (retracting own insertions may
+    // delete content and shift them).
+    const coveredParaStarts: number[] = [];
+    state.doc.nodesBetween($from.pos, $to.pos, (node, pos) => {
+      if (node.type.name === 'paragraph') {
+        const paraEnd = pos + node.nodeSize;
+        if (paraEnd > $from.pos && paraEnd < $to.pos) coveredParaStarts.push(pos);
+      }
+    });
+
     markRangeAsDeleted(tr, state.doc, $from.pos, $to.pos, insertionType, deletionType, pluginState);
-    // Collapse cursor to after the marked/retracted content
-    const cursorPos = tr.mapping.map($to.pos);
+
+    for (const paraPos of coveredParaStarts) {
+      const mapped = tr.mapping.map(paraPos);
+      const node = tr.doc.nodeAt(mapped);
+      if (!node || node.type.name !== 'paragraph') continue;
+      // Never clobber another author's marker; an already-marked paragraph
+      // is left alone (second delete is a no-op, like the collapsed path).
+      if (node.attrs.pPrDel) continue;
+      const info =
+        findAdjacentParagraphMark(tr.doc, mapped, 'pPrDel', pluginState.author) ??
+        makeMarkAttrs(pluginState);
+      tr.setNodeMarkup(mapped, undefined, { ...node.attrs, pPrDel: info });
+    }
+
+    // Collapse the cursor: spanning deletes land at the original `from`
+    // (Word joins there on accept); single-paragraph deletes keep the
+    // existing collapse-after-content behavior.
+    const cursorPos = tr.mapping.map(coveredParaStarts.length > 0 ? $from.pos : $to.pos);
     tr.setSelection(TextSelection.near(tr.doc.resolve(cursorPos)));
     dispatch(tr.scrollIntoView());
     return true;

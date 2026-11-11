@@ -6,25 +6,30 @@
 
 import { TextSelection, type EditorState, type Transaction } from 'prosemirror-state';
 
-import {
-  applyPostSplitInheritance,
-  STYLE_MARK_NAMES,
-} from '../../../extensions/features/BaseKeymapExtension';
-import { getDocumentStyleResolver } from '../../documentStyles';
+import { splitBlockClearBorders } from '../../../extensions/features/BaseKeymapExtension';
 import { findAdjacentParagraphMark } from '../adjacency';
 import { makeMarkAttrs } from '../markAttrs';
 import { suggestionModeKey, SUGGESTION_META, type MarkAttrs } from '../state';
 import { markRangeAsDeleted } from './delete';
 
 /**
- * Suggesting-mode Enter handler. Splits the paragraph (via the existing
- * BaseKeymapExtension `splitBlockClearBorders` behavior, re-implemented
- * inline so we can capture the resulting transaction and add a `pPrIns`
- * attr on the *first* paragraph in the same PM transaction).
+ * Suggesting-mode Enter handler. Delegates the split itself to the shared
+ * `splitBlockClearBorders` from `BaseKeymapExtension` (so style inheritance,
+ * `w:next` handling, and border clearing can never drift between plain and
+ * suggesting mode), then sets `pPrIns` on the FIRST paragraph of the
+ * resulting split in the same PM transaction (one undo step).
  *
  * Per ECMA-376 §17.13.5, the paragraph mark of the FIRST paragraph after
  * a split is the one that was newly introduced. Reject of `pPrIns` joins
  * the first paragraph back with the next; accept just clears the marker.
+ *
+ * The split runs on a dispatch-less capture: `splitBlock` would
+ * `deleteSelection()` untracked on a non-empty selection, so the handler
+ * first collapses to the selection start (via an undispatched intermediate
+ * state — no plugin hooks observe it as a real edit), captures the split
+ * transaction, then marks the covered content as a tracked deletion mapped
+ * through the split. Empty selections and empty paragraphs flow through
+ * the same path with an empty deletion range.
  */
 export function handleSuggestionEnter(
   state: EditorState,
@@ -40,38 +45,50 @@ export function handleSuggestionEnter(
 
   if (!dispatch) return true;
 
-  // If the selection covers content, mark it as deletion first (existing
-  // suggesting-mode behavior) so the split happens at the selection start.
   const insertionType = state.schema.marks.insertion;
   const deletionType = state.schema.marks.deletion;
   if (!insertionType || !deletionType) return false;
 
-  // Capture source paragraph + active style marks BEFORE any tr work so
-  // `applyPostSplitInheritance` can match `splitBlockClearBorders` behavior:
-  // typed text after the split inherits font / size / color via setStoredMarks.
-  const sourcePara = $from.parent;
-  const preMarks = state.storedMarks ?? $from.marks();
-  const styleMarks = preMarks.filter((m) => STYLE_MARK_NAMES.has(m.type.name));
+  const delFrom = $from.pos;
+  const delTo = $to.pos;
 
-  const tr = state.tr;
+  // Collapse to the selection start without dispatching. The collapse tr
+  // carries SUGGESTION_META so the suggesting-mode appendTransaction
+  // catch-all leaves the intermediate state alone.
+  const collapseTr = state.tr.setSelection(TextSelection.near(state.doc.resolve(delFrom)));
+  collapseTr.setMeta(SUGGESTION_META, true);
+  const collapsedState = state.apply(collapseTr);
+
+  // The first paragraph is the one whose mark just got introduced. Its start
+  // precedes the split point, so it stays valid across the split below.
+  const $collapsed = collapsedState.selection.$from;
+  const firstParaStart = $collapsed.before($collapsed.depth);
+
+  // Delegate the split (style inheritance, w:next, border clearing) to the
+  // shared plain-Enter command, capturing its transaction instead of
+  // dispatching so pPrIns + deletion marks join it in one undo step.
+  let splitTr: Transaction | null = null;
+  const ok = splitBlockClearBorders(collapsedState, (captured) => {
+    splitTr = captured;
+  });
+  if (!ok || !splitTr) return false;
+  const tr: Transaction = splitTr;
   tr.setMeta(SUGGESTION_META, true);
 
-  if (!state.selection.empty) {
-    markRangeAsDeleted(tr, state.doc, $from.pos, $to.pos, insertionType, deletionType, pluginState);
-    // Collapse cursor to the deletion start before splitting.
-    const collapsePos = tr.mapping.map($from.pos);
-    tr.setSelection(TextSelection.near(tr.doc.resolve(collapsePos)));
+  // Mark covered content as a tracked deletion (no-op range for collapsed
+  // cursors and empty paragraphs). Positions map through the split: content
+  // after the split point now lives in the second paragraph.
+  if (delTo > delFrom) {
+    markRangeAsDeleted(
+      tr,
+      tr.doc,
+      tr.mapping.map(delFrom),
+      tr.mapping.map(delTo),
+      insertionType,
+      deletionType,
+      pluginState
+    );
   }
-
-  // The first paragraph is the one whose mark just got introduced. We need
-  // its absolute position BEFORE the split to find it again after.
-  const $cursor = tr.selection.$from;
-  const firstParaStart = $cursor.before($cursor.depth);
-
-  // Split the paragraph at the cursor. After tr.split, the cursor (mapped)
-  // lands at the start of the NEW paragraph, which is what
-  // applyPostSplitInheritance expects.
-  tr.split(tr.selection.from, 1);
 
   // Set pPrIns on the FIRST paragraph (the one before the split). Coalesce
   // with an adjacent same-author pPrIns so consecutive Enters in one editing
@@ -86,17 +103,6 @@ export function handleSuggestionEnter(
       pPrIns: info,
     });
   }
-
-  // Shared with plain Enter: inherits style attrs, clears borders, and
-  // (for an empty new paragraph) sets stored marks so typed text picks up
-  // the source paragraph's font / size / color.
-  applyPostSplitInheritance(
-    tr,
-    sourcePara,
-    styleMarks,
-    state.schema,
-    getDocumentStyleResolver(state)
-  );
 
   dispatch(tr.scrollIntoView());
   return true;

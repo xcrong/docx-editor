@@ -6,6 +6,8 @@
 
 import type { Command } from 'prosemirror-state';
 import { TextSelection } from 'prosemirror-state';
+import { withSuggestingSnapshot } from '../plugins/suggestionMode/snapshot';
+import { paragraphPropertySnapshotter } from '../plugins/suggestionMode/paragraphSnapshot';
 
 type InsertableSectionBreak = 'nextPage' | 'continuous';
 
@@ -70,12 +72,21 @@ function insertSectionBreakAtCursor(breakType: InsertableSectionBreak): Command 
 
 /**
  * Insert a "next page" section break at the cursor — starts a new section on a
- * new page.
+ * new page. In suggesting mode the break type is snapshotted as a tracked
+ * paragraph-property change (same `pPrChange` channel as the other
+ * section-break commands in `commands/paragraph.ts`).
  */
-export const insertSectionBreakNextPage: Command = insertSectionBreakAtCursor('nextPage');
+export const insertSectionBreakNextPage: Command = withSuggestingSnapshot(
+  insertSectionBreakAtCursor('nextPage'),
+  paragraphPropertySnapshotter
+);
 
 /**
  * Insert a "continuous" section break at the cursor — starts a new section on
- * the same page.
+ * the same page. Tracked like {@link insertSectionBreakNextPage} when
+ * suggesting.
  */
-export const insertSectionBreakContinuous: Command = insertSectionBreakAtCursor('continuous');
+export const insertSectionBreakContinuous: Command = withSuggestingSnapshot(
+  insertSectionBreakAtCursor('continuous'),
+  paragraphPropertySnapshotter
+);

@@ -30,11 +30,12 @@ import { SUGGESTION_META } from './state';
 /**
  * Minimal shape of a `*Change` array entry (`pPrChange`, `trPrChange`,
  * `tcPrChange`, `tblPrChange`, `paraRPrChange`, …). All of them carry the
- * OOXML `(w:id, w:author, w:date)` triple under `info`.
+ * OOXML `(w:id, w:author, w:date)` triple under `info`. Concrete entry types
+ * (e.g. `ParagraphPropertyChange`) satisfy this structurally — no index
+ * signature, so they stay assignable without casts.
  */
 export interface PropertyChangeEntry {
   info: { id: number; author: string; date?: string };
-  [key: string]: unknown;
 }
 
 /**

@@ -603,7 +603,11 @@
     "cellPropertiesChanged": "Mengubah properti sel",
     "tablePropertiesChanged": "Mengubah properti tabel",
     "tableInserted": "Menyisipkan tabel",
-    "tableDeleted": "Menghapus tabel"
+    "tableDeleted": "Menghapus tabel",
+    "paragraphMarkPropertiesChanged": null,
+    "runPropertiesChanged": null,
+    "sectionPropertiesChanged": null,
+    "tableGridChanged": null
   },
   "contextMenu": {
     "ariaLabel": "Menu tindakan AI",

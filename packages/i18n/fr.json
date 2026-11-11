@@ -881,6 +881,10 @@
     "rowPropertiesChanged": null,
     "tableDeleted": null,
     "tableInserted": null,
-    "tablePropertiesChanged": null
+    "tablePropertiesChanged": null,
+    "paragraphMarkPropertiesChanged": null,
+    "runPropertiesChanged": null,
+    "sectionPropertiesChanged": null,
+    "tableGridChanged": null
   }
 }

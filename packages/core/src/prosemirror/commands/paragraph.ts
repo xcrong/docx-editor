@@ -9,6 +9,8 @@
  */
 
 import type { Command } from 'prosemirror-state';
+import { withSuggestingSnapshot } from '../plugins/suggestionMode/snapshot';
+import { paragraphPropertySnapshotter } from '../plugins/suggestionMode/paragraphSnapshot';
 import type {
   ParagraphAlignment,
   LineSpacingRule,
@@ -36,66 +38,111 @@ const cmds = singletonManager.getCommands();
 
 // Alignment
 export function setAlignment(alignment: ParagraphAlignment): Command {
-  return cmds.setAlignment(alignment);
+  return withSuggestingSnapshot(cmds.setAlignment(alignment), paragraphPropertySnapshotter);
 }
-export const alignLeft: Command = cmds.alignLeft();
-export const alignCenter: Command = cmds.alignCenter();
-export const alignRight: Command = cmds.alignRight();
-export const alignJustify: Command = cmds.alignJustify();
+export const alignLeft: Command = withSuggestingSnapshot(
+  cmds.alignLeft(),
+  paragraphPropertySnapshotter
+);
+export const alignCenter: Command = withSuggestingSnapshot(
+  cmds.alignCenter(),
+  paragraphPropertySnapshotter
+);
+export const alignRight: Command = withSuggestingSnapshot(
+  cmds.alignRight(),
+  paragraphPropertySnapshotter
+);
+export const alignJustify: Command = withSuggestingSnapshot(
+  cmds.alignJustify(),
+  paragraphPropertySnapshotter
+);
 
 // Line spacing
 export function setLineSpacing(value: number, rule: LineSpacingRule = 'auto'): Command {
-  return cmds.setLineSpacing(value, rule);
+  return withSuggestingSnapshot(cmds.setLineSpacing(value, rule), paragraphPropertySnapshotter);
 }
-export const singleSpacing: Command = cmds.singleSpacing();
-export const oneAndHalfSpacing: Command = cmds.oneAndHalfSpacing();
-export const doubleSpacing: Command = cmds.doubleSpacing();
+export const singleSpacing: Command = withSuggestingSnapshot(
+  cmds.singleSpacing(),
+  paragraphPropertySnapshotter
+);
+export const oneAndHalfSpacing: Command = withSuggestingSnapshot(
+  cmds.oneAndHalfSpacing(),
+  paragraphPropertySnapshotter
+);
+export const doubleSpacing: Command = withSuggestingSnapshot(
+  cmds.doubleSpacing(),
+  paragraphPropertySnapshotter
+);
 
 // Indentation
 export function increaseIndent(amount: number = 720): Command {
-  return cmds.increaseIndent(amount);
+  return withSuggestingSnapshot(cmds.increaseIndent(amount), paragraphPropertySnapshotter);
 }
 export function decreaseIndent(amount: number = 720): Command {
-  return cmds.decreaseIndent(amount);
+  return withSuggestingSnapshot(cmds.decreaseIndent(amount), paragraphPropertySnapshotter);
 }
 export function setIndentLeft(twips: number): Command {
-  return cmds.setIndentLeft(twips);
+  return withSuggestingSnapshot(cmds.setIndentLeft(twips), paragraphPropertySnapshotter);
 }
 export function setIndentRight(twips: number): Command {
-  return cmds.setIndentRight(twips);
+  return withSuggestingSnapshot(cmds.setIndentRight(twips), paragraphPropertySnapshotter);
 }
 export function setIndentFirstLine(twips: number, hanging?: boolean): Command {
-  return cmds.setIndentFirstLine(twips, hanging);
+  return withSuggestingSnapshot(
+    cmds.setIndentFirstLine(twips, hanging),
+    paragraphPropertySnapshotter
+  );
 }
 
-// Lists
+// Lists — toggle commands self-track via `appendParagraphPropertyChange`
+// (ListExtension); wrapping them again would stack a second same-session
+// entry, so they stay unwrapped. Level/remove commands carry no tracking of
+// their own and go through the shared snapshotter.
 export const toggleBulletList: Command = cmds.toggleBulletList();
 export const toggleNumberedList: Command = cmds.toggleNumberedList();
-export const increaseListLevel: Command = cmds.increaseListLevel();
-export const decreaseListLevel: Command = cmds.decreaseListLevel();
-export const removeList: Command = cmds.removeList();
+export const increaseListLevel: Command = withSuggestingSnapshot(
+  cmds.increaseListLevel(),
+  paragraphPropertySnapshotter
+);
+export const decreaseListLevel: Command = withSuggestingSnapshot(
+  cmds.decreaseListLevel(),
+  paragraphPropertySnapshotter
+);
+export const removeList: Command = withSuggestingSnapshot(
+  cmds.removeList(),
+  paragraphPropertySnapshotter
+);
 
 // Spacing
 export function setSpaceBefore(twips: number): Command {
-  return cmds.setSpaceBefore(twips);
+  return withSuggestingSnapshot(cmds.setSpaceBefore(twips), paragraphPropertySnapshotter);
 }
 export function setSpaceAfter(twips: number): Command {
-  return cmds.setSpaceAfter(twips);
+  return withSuggestingSnapshot(cmds.setSpaceAfter(twips), paragraphPropertySnapshotter);
 }
 
 // Paragraph styles
 export function applyStyle(styleId: string, resolvedAttrs?: ResolvedStyleAttrs): Command {
-  return cmds.applyStyle(styleId, resolvedAttrs);
+  return withSuggestingSnapshot(
+    cmds.applyStyle(styleId, resolvedAttrs),
+    paragraphPropertySnapshotter
+  );
 }
-export const clearStyle: Command = cmds.clearStyle();
+export const clearStyle: Command = withSuggestingSnapshot(
+  cmds.clearStyle(),
+  paragraphPropertySnapshotter
+);
 
 // Section breaks
 export function insertSectionBreak(
   breakType: 'nextPage' | 'continuous' | 'oddPage' | 'evenPage'
 ): Command {
-  return cmds.insertSectionBreak(breakType);
+  return withSuggestingSnapshot(cmds.insertSectionBreak(breakType), paragraphPropertySnapshotter);
 }
-export const removeSectionBreak: Command = cmds.removeSectionBreak();
+export const removeSectionBreak: Command = withSuggestingSnapshot(
+  cmds.removeSectionBreak(),
+  paragraphPropertySnapshotter
+);
 
 // Tab stops
 export function addTabStop(
@@ -103,15 +150,18 @@ export function addTabStop(
   alignment: TabStopAlignment = 'left',
   leader: TabLeader = 'none'
 ): Command {
-  return cmds.addTabStop(position, alignment, leader);
+  return withSuggestingSnapshot(
+    cmds.addTabStop(position, alignment, leader),
+    paragraphPropertySnapshotter
+  );
 }
 export function removeTabStop(position: number): Command {
-  return cmds.removeTabStop(position);
+  return withSuggestingSnapshot(cmds.removeTabStop(position), paragraphPropertySnapshotter);
 }
 
 // Text direction
-export const setRtl: Command = cmds.setRtl();
-export const setLtr: Command = cmds.setLtr();
+export const setRtl: Command = withSuggestingSnapshot(cmds.setRtl(), paragraphPropertySnapshotter);
+export const setLtr: Command = withSuggestingSnapshot(cmds.setLtr(), paragraphPropertySnapshotter);
 
 // Table of Contents
 export const generateTOC: Command = cmds.generateTOC();
