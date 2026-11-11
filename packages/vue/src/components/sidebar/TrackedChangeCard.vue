@@ -63,6 +63,24 @@
           ></template
         >
       </template>
+      <template v-else-if="change.type === 'paragraphMarkPropertiesChanged'">
+        {{ t('revisions.paragraphMarkPropertiesChanged')
+        }}<template v-if="change.text"
+          >:
+          <span class="tc-card__changed"
+            >&quot;{{ truncateText(change.text) }}&quot;</span
+          ></template
+        >
+      </template>
+      <template v-else-if="change.type === 'sectionPropertiesChanged'">
+        {{ t('revisions.sectionPropertiesChanged')
+        }}<template v-if="change.text"
+          >:
+          <span class="tc-card__changed"
+            >&quot;{{ truncateText(change.text) }}&quot;</span
+          ></template
+        >
+      </template>
       <template v-else-if="change.type === 'rowInserted'">
         <span class="tc-card__inserted">{{ t('revisions.rowInserted') }}</span>
       </template>

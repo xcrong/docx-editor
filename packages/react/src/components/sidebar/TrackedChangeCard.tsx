@@ -164,6 +164,30 @@ export function TrackedChangeCard({
               </>
             ) : null}
           </>
+        ) : change.type === 'paragraphMarkPropertiesChanged' ? (
+          <>
+            {t('revisions.paragraphMarkPropertiesChanged')}
+            {change.text ? (
+              <>
+                {': '}
+                <span style={{ color: 'var(--doc-text-muted)', fontWeight: 500 }}>
+                  &quot;{truncateText(change.text)}&quot;
+                </span>
+              </>
+            ) : null}
+          </>
+        ) : change.type === 'sectionPropertiesChanged' ? (
+          <>
+            {t('revisions.sectionPropertiesChanged')}
+            {change.text ? (
+              <>
+                {': '}
+                <span style={{ color: 'var(--doc-text-muted)', fontWeight: 500 }}>
+                  &quot;{truncateText(change.text)}&quot;
+                </span>
+              </>
+            ) : null}
+          </>
         ) : change.type === 'rowInserted' ? (
           <span style={{ color: 'var(--doc-success)', fontWeight: 500 }}>
             {t('revisions.rowInserted')}

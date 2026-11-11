@@ -472,12 +472,50 @@ export function installE2EHooks(
       revisionId: number,
       prior: unknown,
       current?: unknown,
-      paraAttrs?: Record<string, unknown>
+      paraAttrs?: Record<string, unknown>,
+      paraIndex?: number
     ) => {
       const view = editorRef.current?.getEditorRef()?.getView?.();
       if (!view) return false;
-      let firstParaPos: number | null = null;
+      let targetPos: number | null = null;
       // Evolving-let: takes the descendants callback's node type on assignment.
+      let targetPara = null as unknown;
+      let index = 0;
+      view.state.doc.descendants((node, pos) => {
+        if (targetPos != null) return false;
+        if (node.type.name === 'paragraph') {
+          if (index === (paraIndex ?? 0)) {
+            targetPos = pos;
+            targetPara = node;
+            return false;
+          }
+          index += 1;
+        }
+        return true;
+      });
+      if (targetPos == null || targetPara == null) return false;
+      const tr = view.state.tr.setNodeMarkup(targetPos, undefined, {
+        ...(targetPara as { attrs: Record<string, unknown> }).attrs,
+        ...(paraAttrs ?? {}),
+        pPrChange: [
+          {
+            type: 'paragraphPropertyChange',
+            info: { id: revisionId, author: 'Jane', date: new Date().toISOString() },
+            previousFormatting: prior,
+            ...(current !== undefined ? { currentFormatting: current } : {}),
+          },
+        ],
+      });
+      view.dispatch(tr);
+      return true;
+    },
+    // Test-only: plant a paraRPrChange entry (CT_ParaRPrChange) on the first
+    // paragraph for accept/reject verification. `prior` is the previous
+    // paragraph-mark run formatting.
+    plantParagraphMarkPropertyChange: (revisionId: number, prior: unknown) => {
+      const view = editorRef.current?.getEditorRef()?.getView?.();
+      if (!view) return false;
+      let firstParaPos: number | null = null;
       let firstPara = null as unknown;
       view.state.doc.descendants((node, pos) => {
         if (firstParaPos != null) return false;
@@ -491,15 +529,47 @@ export function installE2EHooks(
       if (firstParaPos == null || firstPara == null) return false;
       const tr = view.state.tr.setNodeMarkup(firstParaPos, undefined, {
         ...(firstPara as { attrs: Record<string, unknown> }).attrs,
-        ...(paraAttrs ?? {}),
-        pPrChange: [
+        paraRPrChange: [
           {
-            type: 'paragraphPropertyChange',
+            type: 'paragraphMarkPropertyChange',
             info: { id: revisionId, author: 'Jane', date: new Date().toISOString() },
             previousFormatting: prior,
-            ...(current !== undefined ? { currentFormatting: current } : {}),
           },
         ],
+      });
+      view.dispatch(tr);
+      return true;
+    },
+    // Test-only: plant a pPr-level sectPrChange entry on the first paragraph
+    // for accept/reject verification. `prior` is the previous section
+    // properties snapshot.
+    plantSectionPropertyChange: (revisionId: number, prior: unknown) => {
+      const view = editorRef.current?.getEditorRef()?.getView?.();
+      if (!view) return false;
+      let firstParaPos: number | null = null;
+      let firstPara = null as unknown;
+      view.state.doc.descendants((node, pos) => {
+        if (firstParaPos != null) return false;
+        if (node.type.name === 'paragraph') {
+          firstParaPos = pos;
+          firstPara = node;
+          return false;
+        }
+        return true;
+      });
+      if (firstParaPos == null || firstPara == null) return false;
+      const prevSect = ((firstPara as { attrs: Record<string, unknown> }).attrs
+        ._sectionProperties ?? {}) as Record<string, unknown>;
+      const tr = view.state.tr.setNodeMarkup(firstParaPos, undefined, {
+        ...(firstPara as { attrs: Record<string, unknown> }).attrs,
+        _sectionProperties: {
+          ...prevSect,
+          sectPrChange: {
+            type: 'sectionPropertyChange',
+            info: { id: revisionId, author: 'Jane', date: new Date().toISOString() },
+            previousSectionProperties: prior,
+          },
+        },
       });
       view.dispatch(tr);
       return true;

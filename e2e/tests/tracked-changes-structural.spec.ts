@@ -787,9 +787,11 @@ test.describe('Tracked paragraph-mark revisions (issue #614)', () => {
     expect(await page.locator('tr[data-revision-id]').count()).toBeGreaterThan(0);
 
     const accepted = await page.evaluate(
-      () => window.__DOCX_EDITOR_E2E__?.acceptAllChanges?.() ?? false
+      () => window.__DOCX_EDITOR_E2E__?.acceptAllChanges?.() ?? 0
     );
-    expect(accepted).toBe(true);
+    // acceptAllChanges returns the count of distinct (id, author, date)
+    // triples resolved (tracked-changes-review MODIFIED requirement).
+    expect(accepted).toBeGreaterThan(0);
 
     // All tracking is gone after acceptAll.
     await page.waitForTimeout(50);
@@ -911,9 +913,9 @@ test.describe('Tracked paragraph-mark revisions (issue #614)', () => {
     await page.waitForTimeout(50);
     expect(await page.locator('.layout-page-content .docx-insertion').count()).toBeGreaterThan(0);
     const rejected = await page.evaluate(
-      () => window.__DOCX_EDITOR_E2E__?.rejectAllChanges?.() ?? false
+      () => window.__DOCX_EDITOR_E2E__?.rejectAllChanges?.() ?? 0
     );
-    expect(rejected).toBe(true);
+    expect(rejected).toBeGreaterThan(0);
     await page.waitForTimeout(50);
     expect(await page.locator('.layout-page-content .docx-insertion').count()).toBe(0);
   });
@@ -934,5 +936,205 @@ test.describe('Tracked paragraph-mark revisions (issue #614)', () => {
     await page.waitForTimeout(100);
     await expect(page.locator('[data-testid="toolbar-accept-change"]')).toBeDisabled();
     await expect(page.locator('[data-testid="toolbar-reject-change"]')).toBeDisabled();
+  });
+});
+
+test.describe('T27-03 paragraph accept/reject + painter + sidebar (issue #79)', () => {
+  let editor: EditorPage;
+
+  test.beforeEach(async ({ page }) => {
+    editor = new EditorPage(page);
+    await editor.gotoEmpty();
+    await editor.waitForReady();
+    await editor.focus();
+  });
+
+  async function openSidebar(page: import('@playwright/test').Page) {
+    const toggle = page.locator('[aria-label="Toggle comments sidebar"]');
+    if ((await toggle.getAttribute('aria-pressed')) !== 'true') {
+      await toggle.click();
+      await page.waitForTimeout(150);
+    }
+  }
+
+  // Backspace at the start of the second paragraph in suggesting mode marks
+  // `pPrDel` on the first paragraph. The caret is placed deterministically
+  // via `selectRange` (Home-key placement races focus restoration and a
+  // blind retry would delete text), then a single Backspace is dispatched
+  // and the marker is polled — no repeated keypresses.
+  async function backspaceForPPrDel(page: import('@playwright/test').Page) {
+    await editor.selectRange(1, 0, 0);
+    await page.keyboard.press('Backspace');
+    await expect(async () => {
+      expect((await getParaRevision(page, 0))?.pPrDel).not.toBeNull();
+    }).toPass({ timeout: 10000 });
+  }
+
+  test('Sidebar accept joins split paragraphs with no residual markers; undo restores', async ({
+    page,
+  }) => {
+    await editor.typeText('Hello');
+    await editor.pressEnter();
+    await editor.typeText('world');
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    await backspaceForPPrDel(page);
+    expect(await setSuggestionMode(page, false)).toBe(true);
+
+    const before = await getParaRevision(page, 0);
+    expect(before?.pPrDel, 'Backspace must set pPrDel on previous paragraph').not.toBeNull();
+    const revId = before?.pPrDel?.revisionId as number;
+
+    // Separate history groups: ProseMirror merges transactions <500ms
+    // apart into one undo step. Waiting here keeps the Backspace marking
+    // and the sidebar accept in distinct groups, so one undo reverts only
+    // the accept (the issue's "one undo rolls back the whole operation").
+    await page.waitForTimeout(800);
+
+    await openSidebar(page);
+    const card = page.locator('.docx-unified-sidebar .docx-tracked-change-card').first();
+    await expect(card).toBeVisible();
+    await expect(card).toContainText('Jane');
+    // Expand the card (Accept/Reject only render expanded), then accept.
+    const acceptBtn = card.getByTitle('Accept');
+    if (!(await acceptBtn.isVisible())) {
+      await card.click();
+    }
+    await acceptBtn.click();
+    await page.waitForTimeout(150);
+
+    // Paragraphs joined, no residual markers anywhere in the painted DOM.
+    expect(await getParaRevision(page, 0)).not.toBeNull();
+    expect((await getParaRevision(page, 0))?.pPrDel).toBeNull();
+    expect(await editor.getParagraph(1).count()).toBe(0);
+    expect(await page.locator('.layout-page-content [data-revision-id]').count()).toBe(0);
+
+    // One undo rolls the whole accept back.
+    await editor.undo();
+    await page.waitForTimeout(150);
+    const restored = await getParaRevision(page, 0);
+    expect(restored?.pPrDel?.revisionId).toBe(revId);
+    expect(await editor.getParagraph(1).count()).toBe(1);
+  });
+
+  test('Reject pPrDel leaves a document equal to the pre-edit state', async ({ page }) => {
+    await editor.typeText('Hello');
+    await editor.pressEnter();
+    await editor.typeText('world');
+    await page.waitForTimeout(100);
+
+    const snapshot = await page.evaluate(() => ({
+      text: document.querySelector('.layout-page-content')?.textContent ?? '',
+      p0: window.__DOCX_EDITOR_E2E__?.getParagraphAttrs?.(0) ?? null,
+      p1: window.__DOCX_EDITOR_E2E__?.getParagraphAttrs?.(1) ?? null,
+    }));
+
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    await backspaceForPPrDel(page);
+    expect(await setSuggestionMode(page, false)).toBe(true);
+    const revId = (await getParaRevision(page, 0))?.pPrDel?.revisionId as number;
+
+    expect(await rejectById(page, revId)).toBe(true);
+    await page.waitForTimeout(150);
+
+    // Normalized content comparison (PM attrs + painted text; core.xml
+    // timestamps / zip metadata are save-layer concerns, unchanged here).
+    const after = await page.evaluate(() => ({
+      text: document.querySelector('.layout-page-content')?.textContent ?? '',
+      p0: window.__DOCX_EDITOR_E2E__?.getParagraphAttrs?.(0) ?? null,
+      p1: window.__DOCX_EDITOR_E2E__?.getParagraphAttrs?.(1) ?? null,
+    }));
+    expect(after).toEqual(snapshot);
+  });
+
+  test('Revised paragraph fragment is clickable and lands the caret', async ({ page }) => {
+    await editor.typeText('Hello');
+    await editor.pressEnter();
+    await editor.typeText('world');
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    await backspaceForPPrDel(page);
+    expect(await setSuggestionMode(page, false)).toBe(true);
+
+    // Move the caret into the second paragraph first.
+    await editor.getParagraph(1).click();
+    await page.waitForTimeout(100);
+    const anchorInSecond = await page.evaluate(
+      () => window.__DOCX_EDITOR_E2E__?.getSelectionAnchor?.() ?? null
+    );
+
+    // Click the revised fragment (carries data-pm-start/end + revision id).
+    const revised = page.locator('.layout-page-content .layout-revision-pmark').first();
+    await expect(revised).toBeVisible();
+    await revised.click();
+    await page.waitForTimeout(100);
+    const anchorAfter = await page.evaluate(
+      () => window.__DOCX_EDITOR_E2E__?.getSelectionAnchor?.() ?? null
+    );
+    expect(anchorAfter).not.toBeNull();
+    expect(anchorInSecond).not.toBeNull();
+    expect(anchorAfter as number).toBeLessThan(anchorInSecond as number);
+  });
+
+  test('Painter surfaces pilcrow triple + property change bar; sidebar lists the property card', async ({
+    page,
+  }) => {
+    await editor.typeText('Hello');
+    await editor.pressEnter();
+    await editor.typeText('world');
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    await backspaceForPPrDel(page);
+    expect(await setSuggestionMode(page, false)).toBe(true);
+
+    // Pilcrow glyph carries the spec'd classes + revision triple.
+    const glyph = page.locator('.layout-page-content .ep-revision-pilcrow').first();
+    await expect(glyph).toBeVisible();
+    await expect(glyph).toHaveText('¶');
+    const revId = await glyph.getAttribute('data-revision-id');
+    expect(revId).not.toBeNull();
+    expect(await glyph.getAttribute('data-revision-author')).toBe('Jane');
+
+    // Plant a pPrChange on the SECOND paragraph (no paragraph-mark revision
+    // there, so the fragment exposes the property triple — one element
+    // carries one data-revision-id).
+    expect(
+      await page.evaluate(
+        () =>
+          window.__DOCX_EDITOR_E2E__?.plantParagraphPropertyChange?.(
+            777,
+            { alignment: 'left' },
+            undefined,
+            undefined,
+            1
+          ) ?? false
+      )
+    ).toBe(true);
+    await page.waitForTimeout(150);
+    const bar = page.locator(
+      '.layout-page-content .ep-revision-prop-change[data-revision-id="777"]'
+    );
+    await expect(bar).toBeVisible();
+
+    // The sidebar lists the property change with its kind label + quoted text.
+    await openSidebar(page);
+    const cards = page.locator('.docx-unified-sidebar .docx-tracked-change-card');
+    await expect(cards.filter({ hasText: 'Changed paragraph properties' }).first()).toBeVisible();
+  });
+
+  test('plant + reject paraRPrChange restores the pilcrow formatting in the editor', async ({
+    page,
+  }) => {
+    await editor.typeText('Hello');
+    await page.waitForTimeout(100);
+    expect(
+      await page.evaluate(
+        () =>
+          window.__DOCX_EDITOR_E2E__?.plantParagraphMarkPropertyChange?.(660, { bold: false }) ??
+          false
+      )
+    ).toBe(true);
+    await page.waitForTimeout(100);
+    expect(await rejectById(page, 660)).toBe(true);
+    await page.waitForTimeout(100);
+    const attrs = await getParagraphAttrs(page, 0);
+    expect(attrs?.paraRPrChange).toBeNull();
   });
 });

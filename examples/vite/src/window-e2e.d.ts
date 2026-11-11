@@ -122,15 +122,18 @@ declare global {
       } | null;
       acceptChangeById: (revisionId: number) => boolean;
       rejectChangeById: (revisionId: number) => boolean;
-      acceptAllChanges: () => boolean;
-      rejectAllChanges: () => boolean;
+      acceptAllChanges: () => number;
+      rejectAllChanges: () => number;
       getParagraphAttrs: (index: number) => Record<string, unknown> | null;
       plantParagraphPropertyChange: (
         revisionId: number,
         prior: unknown,
         current?: unknown,
-        paraAttrs?: Record<string, unknown>
+        paraAttrs?: Record<string, unknown>,
+        paraIndex?: number
       ) => boolean;
+      plantParagraphMarkPropertyChange: (revisionId: number, prior: unknown) => boolean;
+      plantSectionPropertyChange: (revisionId: number, prior: unknown) => boolean;
       insertTable: (rows: number, cols: number) => boolean;
       insertImage: (src: string, width?: number, height?: number) => boolean;
       selectFirstImage: () => boolean;
