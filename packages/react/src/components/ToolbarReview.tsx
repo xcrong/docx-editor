@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { MaterialSymbol } from './ui/Icons';
 import { ToolbarButton, ToolbarGroup } from './Toolbar';
 import { useTranslation } from '../i18n';
+import type { EditorMode } from './DocxEditor/internals/editing-modes';
 
 /** Review icon size — matches the rail's icon scale. */
 const ICON_SIZE = 20;
@@ -17,18 +18,27 @@ export interface ReviewCallbacks {
 
 /**
  * Tracked-changes review group (7.6/7.7). Visible when the host wires any
- * review callback. Accept/Reject act on the change at the cursor and
- * disable when the cursor is not inside one.
+ * review callback — except in `'viewing'` mode, where the editor is
+ * read-only and the buttons would be disabled dead UI. An explicit
+ * `showReviewControls` overrides both rules. Accept/Reject act on the
+ * change at the cursor and disable when the cursor is not inside one.
  */
 export function ToolbarReview({
   callbacks,
   showReviewControls,
+  editingMode,
   inTrackedChange,
   disabled = false,
   onRefocusEditor,
 }: {
   callbacks: ReviewCallbacks;
   showReviewControls?: boolean;
+  /**
+   * Current editing mode. `'viewing'` hides the group (read-only); any
+   * other mode (or omission, for standalone `<Toolbar>` use) falls back
+   * to the callback-sniffing rule. Explicit `showReviewControls` wins.
+   */
+  editingMode?: EditorMode;
   inTrackedChange: boolean;
   disabled?: boolean;
   onRefocusEditor?: () => void;
@@ -43,16 +53,17 @@ export function ToolbarReview({
     onNextChange,
   } = callbacks;
 
+  const hasCallbacks = !!(
+    onAcceptChange ||
+    onRejectChange ||
+    onAcceptAllChanges ||
+    onRejectAllChanges ||
+    onPreviousChange ||
+    onNextChange
+  );
   const hasReviewControls =
     showReviewControls ??
-    !!(
-      onAcceptChange ||
-      onRejectChange ||
-      onAcceptAllChanges ||
-      onRejectAllChanges ||
-      onPreviousChange ||
-      onNextChange
-    );
+    (hasCallbacks && (editingMode === undefined || editingMode !== 'viewing'));
 
   const wrap = useCallback(
     (fn?: () => void) => () => {

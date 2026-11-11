@@ -484,10 +484,7 @@ import ImageTransformDropdown, {
 } from './ui/ImageTransformDropdown.vue';
 import type { SelectionContext } from '@xcrong/docx-editor-core/prosemirror/plugins/selectionTracker';
 import type { ColorValue, Theme, Style } from '@xcrong/docx-editor-core/types/document';
-import {
-  normalizeFontFamilies,
-  type FontOption,
-} from '@xcrong/docx-editor-core/utils/fontOptions';
+import { normalizeFontFamilies, type FontOption } from '@xcrong/docx-editor-core/utils/fontOptions';
 import { excludeFontsByName } from '@xcrong/docx-editor-core/utils';
 import {
   defaultFonts,
@@ -549,7 +546,8 @@ const props = defineProps<{
   /**
    * Whether to show the tracked-changes review group. When omitted, the
    * group shows iff the host wires any `review-*` listener (mirrors React's
-   * "any review callback" rule). Note: presence is read from raw vnode
+   * "any review callback" rule) — except in `viewing` mode, where it hides.
+   * Note: presence is read from raw vnode
    * props, since Vue Boolean-casts an absent optional boolean to `false`.
    */
   showReviewControls?: boolean;
@@ -608,12 +606,12 @@ const zoomDropdownRef = ref<HTMLElement | null>(null);
 const { openDropdown, dropdownMenuStyle, toggleDropdown, recomputeDropdownPos } =
   useToolbarDropdowns({
     zoom: zoomDropdownRef,
-  style: styleDropdownRef,
-  font: fontDropdownRef,
-  size: sizeDropdownRef,
-  align: alignDropdownRef,
-  spacing: spacingDropdownRef,
-});
+    style: styleDropdownRef,
+    font: fontDropdownRef,
+    size: sizeDropdownRef,
+    align: alignDropdownRef,
+    spacing: spacingDropdownRef,
+  });
 
 // =========================================================================
 // Selection context (reactive via stateTick)
@@ -643,7 +641,9 @@ const ctx = computed<SelectionContext>(() => {
 // cursor is not inside an insertion/deletion.
 const inTrackedChange = computed(() => ctx.value.inInsertion || ctx.value.inDeletion);
 // Mirror React: show the review group when the host wires any review
-// listener, unless `showReviewControls` explicitly overrides. Two Vue
+// listener, except in `viewing` mode (read-only — the buttons would be
+// disabled dead UI), unless `showReviewControls` explicitly overrides.
+// Two Vue
 // gotchas documented here: (1) `useAttrs()` cannot be used — declared emit
 // listeners are excluded from attrs by `setFullProps` (`!isEmitListener`
 // guard), so `vnode.props` (raw props, listeners included) is the only
@@ -661,7 +661,7 @@ const showReviewGroup = computed(() => {
   // here because Vue Boolean-casts an absent optional boolean prop to
   // `false`, which would permanently shadow the listener sniffing below.
   if ('showReviewControls' in vnodeProps) return !!props.showReviewControls;
-  return !!(
+  const hasListeners = !!(
     vnodeProps.onReviewAccept ||
     vnodeProps.onReviewReject ||
     vnodeProps.onReviewAcceptAll ||
@@ -669,6 +669,11 @@ const showReviewGroup = computed(() => {
     vnodeProps.onReviewPrev ||
     vnodeProps.onReviewNext
   );
+  // `viewing` is read-only: hide the group. `editing`/`suggesting` (and an
+  // absent `editorMode`, for standalone `<Toolbar>` use) keep the legacy
+  // listener-sniffing behavior.
+  if (props.editorMode !== undefined) return props.editorMode !== 'viewing' && hasListeners;
+  return hasListeners;
 });
 
 // =========================================================================
@@ -681,10 +686,7 @@ const showReviewGroup = computed(() => {
 // "$from at a mark boundary" case. No local mark snapshot needed.
 
 // Effective font family/size (style-cascade fallback) — see `useEffectiveFont`.
-const { currentFontFamily, currentFontSize } = useEffectiveFont(
-  ctx,
-  () => props.styleDefinitions
-);
+const { currentFontFamily, currentFontSize } = useEffectiveFont(ctx, () => props.styleDefinitions);
 
 const currentAlignment = computed(() => {
   return ctx.value.paragraphFormatting.alignment || 'left';
