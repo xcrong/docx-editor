@@ -50,6 +50,25 @@ export interface SectionPropertyChangeSite {
   prior: import('../../types/document').SectionProperties | undefined;
 }
 
+export interface RevisionChangeSite {
+  /** Start of the marked range. */
+  from: number;
+  /** End of the marked range. */
+  to: number;
+  /** The node carrying the `revision_change` mark. */
+  // Kept as `any` here to avoid the Node import cycle; callers handle typing.
+  node: import('prosemirror-model').Node;
+  /** The stacked session this site resolves (numeric `w:id`). */
+  entryRevisionId: number;
+  /** Author/date of that session (numeric ids are not author-scoped). */
+  entryAuthor: string;
+  entryDate: string | null;
+  /** The prior run-formatting snapshot from the matching session. */
+  prior: import('../../types/document').TextFormatting | undefined;
+  /** Whether the session is the mark's latest (vs a `priorStack` entry). */
+  isLatest: boolean;
+}
+
 export interface TableRowSite {
   pos: number;
   node: import('prosemirror-model').Node;
@@ -219,6 +238,192 @@ export function findInlineMarkSites(
     }
   });
   return sites;
+}
+
+/**
+ * Walk the document for inline nodes carrying a `revision_change` mark with
+ * a stacked session whose `revisionId` matches (run-level `w:rPrChange` —
+ * Phase 3). One site per contiguous sibling run sharing the session triple;
+ * the session's `prior` rides along for the reject path. Numeric ids are
+ * not author-scoped, so author/date ride along for the entry check.
+ */
+export function findRevisionChangeSites(
+  state: EditorState,
+  revisionId: number
+): RevisionChangeSite[] {
+  const sites: RevisionChangeSite[] = [];
+  const markType = state.schema.marks.revision_change;
+  if (!markType) return sites;
+  state.doc.descendants((node, pos) => {
+    if (!node.isInline) return;
+    for (const mark of node.marks) {
+      if (mark.type !== markType) continue;
+      const stack =
+        (mark.attrs.priorStack as Array<{
+          revisionId: unknown;
+          author: unknown;
+          date: unknown;
+          prior: unknown;
+        }> | null) ?? [];
+      const sessions: Array<{
+        revisionId: unknown;
+        author: unknown;
+        date: unknown;
+        prior: unknown;
+        isLatest: boolean;
+      }> = [
+        ...stack.map((s) => ({
+          revisionId: s?.revisionId,
+          author: s?.author,
+          date: s?.date,
+          prior: s?.prior,
+          isLatest: false as const,
+        })),
+        {
+          revisionId: mark.attrs.revisionId,
+          author: mark.attrs.author,
+          date: mark.attrs.date,
+          prior: mark.attrs.prior,
+          isLatest: true as const,
+        },
+      ];
+      for (const session of sessions) {
+        if (session.revisionId !== revisionId) continue;
+        const author = (session.author as string) || '';
+        const date = (session.date as string | null) ?? null;
+        const prior = (session.prior as RevisionChangeSite['prior']) ?? undefined;
+        // Coalesce contiguous siblings ONLY when the whole session triple
+        // matches (numeric ids are not author-scoped) AND the prior is
+        // equal: adjacent nodes from one op can carry different priors
+        // (different pre-edit states), and restoring one node's prior onto
+        // its neighbor would plant foreign formatting (T27-07). Priors are
+        // canonicalized (sorted keys), so JSON is a stable comparator.
+        const priorKey = JSON.stringify(prior ?? null);
+        const last = sites[sites.length - 1];
+        if (
+          last &&
+          last.entryRevisionId === revisionId &&
+          last.entryAuthor === author &&
+          last.entryDate === date &&
+          last.to === pos &&
+          JSON.stringify(last.prior ?? null) === priorKey
+        ) {
+          last.to = pos + node.nodeSize;
+        } else {
+          sites.push({
+            from: pos,
+            to: pos + node.nodeSize,
+            node,
+            entryRevisionId: revisionId,
+            entryAuthor: author,
+            entryDate: date,
+            prior,
+            isLatest: session.isLatest,
+          });
+        }
+      }
+    }
+  });
+  return sites;
+}
+
+/**
+ * Whether a `revision_change` mark carries the session a site resolved
+ * (latest or stacked). Guards the reject walk against mapped positions
+ * landing on a node whose mark no longer holds that session.
+ */
+export function markHasSession(
+  mark: import('prosemirror-model').Mark,
+  site: Pick<RevisionChangeSite, 'entryRevisionId' | 'entryAuthor' | 'entryDate'>
+): boolean {
+  if (
+    mark.attrs.revisionId === site.entryRevisionId &&
+    mark.attrs.author === site.entryAuthor &&
+    ((mark.attrs.date as string | null) ?? null) === site.entryDate
+  ) {
+    return true;
+  }
+  const stack =
+    (mark.attrs.priorStack as Array<{
+      revisionId: unknown;
+      author: unknown;
+      date: unknown;
+    }> | null) ?? [];
+  return stack.some(
+    (s) =>
+      s?.revisionId === site.entryRevisionId &&
+      (s?.author as string) === site.entryAuthor &&
+      ((s?.date as string | null) ?? null) === site.entryDate
+  );
+} /**
+ * Remove one stacked `revision_change` session from every mark in
+ * `[from, to)`. When the removed session was the last remaining entry the
+ * mark itself is dropped; otherwise the mark is rewritten with the surviving
+ * stack (new latest = last survivor). Mark-only steps — positions stay
+ * valid, no mapping needed.
+ */
+export function removeRevisionChangeEntry(
+  tr: Transaction,
+  from: number,
+  to: number,
+  revisionId: number,
+  author: string,
+  date: string | null
+): void {
+  const markType = tr.doc.type.schema.marks.revision_change;
+  if (!markType) return;
+  tr.doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isInline) return true;
+    const mark = node.marks.find((m) => m.type === markType);
+    if (!mark) return false;
+    const stack =
+      (mark.attrs.priorStack as Array<{
+        revisionId: unknown;
+        author: unknown;
+        date: unknown;
+        prior: unknown;
+      }> | null) ?? [];
+    const same = (id: unknown, a: unknown, d: unknown): boolean =>
+      id === revisionId && (a as string) === author && ((d as string | null) ?? null) === date;
+    const nextStack = stack.filter((s) => !same(s?.revisionId, s?.author, s?.date));
+    const latestMatches = same(mark.attrs.revisionId, mark.attrs.author, mark.attrs.date);
+    if (nextStack.length === stack.length && !latestMatches) return false;
+    const end = pos + node.nodeSize;
+    if (latestMatches) {
+      if (nextStack.length === 0) {
+        tr.removeMark(pos, end, markType);
+        return false;
+      }
+      // Promote the newest survivor to latest (stack is oldest-first).
+      const promoted = nextStack[nextStack.length - 1]!;
+      tr.removeMark(pos, end, markType);
+      tr.addMark(
+        pos,
+        end,
+        markType.create({
+          revisionId: promoted.revisionId,
+          author: promoted.author,
+          date: promoted.date,
+          prior: promoted.prior,
+          priorStack: nextStack.length > 1 ? nextStack.slice(0, -1) : null,
+        })
+      );
+    } else {
+      tr.removeMark(pos, end, markType);
+      tr.addMark(
+        pos,
+        end,
+        markType.create({
+          revisionId: mark.attrs.revisionId,
+          author: mark.attrs.author,
+          date: mark.attrs.date,
+          prior: mark.attrs.prior,
+          priorStack: nextStack.length > 0 ? nextStack : null,
+        })
+      );
+    }
+    return false;
+  });
 }
 
 /**

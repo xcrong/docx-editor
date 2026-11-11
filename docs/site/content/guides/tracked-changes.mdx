@@ -37,6 +37,7 @@ export function ReviewerEditor({ buf, reviewer }: { buf: ArrayBuffer; reviewer: 
 The revision model covers more than inline text:
 
 - **Text** insertions and deletions, including replacements (shown as "Replaced X with Y").
+- **Run formatting**: bold, italic, font, size, color, and highlight changes, shown as "Bold added" or "Font changed from X to Y". Accept keeps the formatting; reject restores what was there before.
 - **Paragraph structure**: inserted and deleted paragraph breaks, paragraph property changes.
 - **Tables**: row and cell insert, delete, and merge, plus row, cell, and table property changes.
 - **Images**: inserted and deleted images.

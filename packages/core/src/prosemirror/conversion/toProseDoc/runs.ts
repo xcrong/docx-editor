@@ -16,6 +16,7 @@ import { schema } from '../../schema';
 import type {
   Run,
   RunContent,
+  RunPropertyChange,
   Hyperlink,
   Image,
   Shape,
@@ -29,6 +30,41 @@ import { isWrapNone } from '../../../docx/wrapTypes';
 import { mergeTextFormatting } from '../../../utils/textFormattingMerge';
 import type { StyleResolver } from '../../styles';
 import { textFormattingToMarks } from './marks';
+import {
+  canonicalizeRunPrior,
+  type RevisionChangeStackEntry,
+} from '../../extensions/marks/TrackedChangeExtensions';
+
+/**
+ * Build the `revision_change` mark for a run's `w:rPrChange` stack
+ * (Phase 3, issue #83). The LAST entry is the latest session; earlier
+ * entries ride `priorStack` oldest-first so every session keeps its own
+ * prior (newest-first reject restores the original exactly). Paragraph-mark
+ * `CT_ParaRPrChange` never lands here — it travels `paraRPrChange`.
+ *
+ * Priors pass through verbatim (canonicalized): both the editor snapshotter
+ * and the OOXML wire format store COMPLETE pre-edit snapshots, where an
+ * absent field means "was absent". A minimal prior pinning `null` would
+ * have no OOXML carrier (serializes as a bare `<w:rPr/>`, parses back as
+ * `{}`), silently converting "remove on reject" into "keep on reject" —
+ * which is why the snapshotter stores full pre-edit states.
+ */
+function revisionChangeMark(changes: RunPropertyChange[]): ReturnType<typeof schema.mark> {
+  const last = changes[changes.length - 1]!;
+  const stack: RevisionChangeStackEntry[] = changes.slice(0, -1).map((c) => ({
+    revisionId: c.info.id,
+    author: c.info.author,
+    date: c.info.date ?? null,
+    prior: canonicalizeRunPrior(c.previousFormatting ?? {}),
+  }));
+  return schema.mark('revision_change', {
+    revisionId: last.info.id,
+    author: last.info.author,
+    date: last.info.date ?? null,
+    prior: canonicalizeRunPrior(last.previousFormatting ?? {}),
+    priorStack: stack.length > 0 ? stack : null,
+  });
+}
 
 /**
  * Convert a SimpleField or ComplexField to a ProseMirror field node.
@@ -123,6 +159,16 @@ export function convertRun(
     run.formatting
   );
   const marks = textFormattingToMarks(mergedFormatting);
+  // Run-level property revisions (`w:rPrChange`) ride as an inline
+  // `revision_change` mark (Phase 3, issue #83). One mark per text node —
+  // when a run carries several stacked `w:rPrChange` entries, OOXML order
+  // wins and the LAST entry covers the earlier ones (the serializer emits a
+  // single entry back, so the round-trip is stable). Paragraph-mark
+  // `CT_ParaRPrChange` never lands here — it travels `paraRPrChange`.
+  const changes = run.propertyChanges;
+  if (changes && changes.length > 0) {
+    marks.push(revisionChangeMark(changes));
+  }
 
   for (const content of run.content) {
     const contentNodes = convertRunContent(content, marks);
@@ -441,15 +487,22 @@ export function convertHyperlink(
         child.formatting
       );
       const runMarks = textFormattingToMarks(mergedFormatting);
+      // Run property revisions survive inside hyperlinks too (full stack,
+      // same rule as `convertRun`).
+      const linkChanges = child.propertyChanges;
+      const allMarks =
+        linkChanges && linkChanges.length > 0
+          ? [...runMarks, revisionChangeMark(linkChanges)]
+          : runMarks;
       // Add link mark to run marks
-      const allMarks = [...runMarks, linkMark];
+      const withLink = [...allMarks, linkMark];
 
       // Delegate to convertRunContent so tabs, breaks, fields, footnote refs
       // etc. inside a hyperlink round-trip. (Drawings and shapes inside a
       // hyperlink don't carry the hyperlink mark through convertImage /
       // convertShape today — linked-image round-trip is a separate gap.)
       for (const content of child.content) {
-        nodes.push(...convertRunContent(content, allMarks));
+        nodes.push(...convertRunContent(content, withLink));
       }
     }
   }

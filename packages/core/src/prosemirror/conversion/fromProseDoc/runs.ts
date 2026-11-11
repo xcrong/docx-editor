@@ -14,6 +14,7 @@ import type { Node as PMNode, Mark } from 'prosemirror-model';
 import { pixelsToEmu } from '../../../docx/imageParser';
 import type {
   Run,
+  RunPropertyChange,
   TextContent,
   BreakContent,
   TabContent,
@@ -26,6 +27,7 @@ import type {
   ComplexField,
   FieldType,
   MathEquation,
+  TextFormatting,
 } from '../../../types/document';
 import type { ImageAttrs } from '../../schema/nodes';
 import { sanitizeHref } from '../../../utils/sanitizeHref';
@@ -72,7 +74,65 @@ export function addNodeToHyperlink(hyperlink: Hyperlink, node: PMNode): void {
 }
 
 /**
+ * Build the `propertyChanges` entries for a `revision_change` mark, if
+ * present. The mark's latest session plus its `priorStack` expand back to
+ * the full `w:rPrChange` array (oldest-first) — the inverse of
+ * `revisionChangeMark` in `toProseDoc/runs.ts`. Shared by the plain-text
+ * path and the insertion/deletion-wrapper path so a text node carrying
+ * BOTH marks keeps its formatting revision on save.
+ */
+export function revisionChangeFromMarks(
+  marks: readonly Mark[],
+  currentFormatting: TextFormatting
+): Run['propertyChanges'] {
+  const revision = marks.find((m) => m.type.name === 'revision_change');
+  if (!revision) return undefined;
+  const toEntry = (
+    id: unknown,
+    author: unknown,
+    date: unknown,
+    prior: unknown
+  ): RunPropertyChange | null => {
+    if (typeof id !== 'number') return null;
+    const dateStr = typeof date === 'string' ? date : undefined;
+    return {
+      type: 'runPropertyChange',
+      info: {
+        id,
+        author: (typeof author === 'string' && author) || 'Unknown',
+        ...(dateStr ? { date: dateStr } : {}),
+      },
+      previousFormatting: (prior as TextFormatting | null) ?? undefined,
+      ...(Object.keys(currentFormatting).length > 0 ? { currentFormatting } : {}),
+    };
+  };
+  const stack =
+    (revision.attrs.priorStack as Array<{
+      revisionId: number;
+      author: string;
+      date: string | null;
+      prior: unknown;
+    }> | null) ?? [];
+  const entries = stack
+    .map((s) => toEntry(s?.revisionId, s?.author, s?.date, s?.prior))
+    .filter((e): e is RunPropertyChange => e !== null);
+  const latest = toEntry(
+    revision.attrs.revisionId,
+    revision.attrs.author,
+    revision.attrs.date,
+    revision.attrs.prior
+  );
+  if (latest) entries.push(latest);
+  return entries.length > 0 ? entries : undefined;
+}
+
+/**
  * Create a Run from text and marks
+ *
+ * A `revision_change` mark on the text becomes the run's `propertyChanges`
+ * (single `runPropertyChange` entry — the inverse of the last-wins rule in
+ * `toProseDoc/runs.ts`). `prior` is already canonicalized at mark-creation
+ * time and passes through by reference.
  */
 export function createRunFromText(text: string, marks: readonly Mark[]): Run {
   const formatting = marksToTextFormatting(marks);
@@ -81,11 +141,16 @@ export function createRunFromText(text: string, marks: readonly Mark[]): Run {
     text,
   };
 
-  return {
+  const run: Run = {
     type: 'run',
     formatting: Object.keys(formatting).length > 0 ? formatting : undefined,
     content: [textContent],
   };
+
+  const propertyChanges = revisionChangeFromMarks(marks, formatting);
+  if (propertyChanges) run.propertyChanges = propertyChanges;
+
+  return run;
 }
 
 /**

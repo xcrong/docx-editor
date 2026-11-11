@@ -646,7 +646,7 @@ export const wordFeatures: WordFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Full revision model incl. structural changes (paragraph breaks, paragraph props, table rows/cells). Opens cleanly in Word’s review pane.',
+      'Full revision model incl. structural changes (paragraph breaks, paragraph props, table rows/cells) and run formatting revisions (w:rPrChange with per-session accept/reject). Opens cleanly in Word’s review pane.',
     docsLink: '/docs/1.x/guides/tracked-changes',
   },
   {

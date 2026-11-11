@@ -10,6 +10,11 @@
  */
 import type { Paragraph } from '../types/content';
 
+// Re-export the run-revision description helper (implemented next to the
+// other revision utilities) so both sidebar cards share one import path.
+export { describeRunPropertyChange } from './runPropertyDescriptions';
+export type { TranslateFn } from './runPropertyDescriptions';
+
 /** Extract plain text from a Comment's paragraph content. */
 export function getCommentText(paragraphs?: Paragraph[]): string {
   if (!paragraphs?.length) return '';
@@ -110,6 +115,11 @@ export interface TrackedChangeEntry {
    * - `paragraphMarkPropertiesChanged` — formatting of the paragraph-mark
    *   glyph itself was changed (`w:pPr/w:rPr/w:rPrChange`,
    *   `CT_ParaRPrChange`).
+   * - `runPropertiesChanged` — formatting of a run was changed
+   *   (`w:rPr/w:rPrChange` → inline `revision_change` mark).
+   *   `priorFormatting` carries the pre-change snapshot and
+   *   `currentFormatting` the post-change formatting so the sidebar can
+   *   render "original → revised".
    * - `sectionPropertiesChanged` — section geometry was changed
    *   (`w:sectPrChange`).
    */
@@ -120,6 +130,7 @@ export interface TrackedChangeEntry {
     | 'paragraphMarkInsertion'
     | 'paragraphMarkDeletion'
     | 'paragraphPropertiesChanged'
+    | 'runPropertiesChanged'
     | 'rowInserted'
     | 'rowDeleted'
     | 'rowPropertiesChanged'
@@ -186,4 +197,13 @@ export interface TrackedChangeEntry {
    * resolve every id in this list in addition to {@link revisionId}.
    */
   coalescedRevisionIds?: number[];
+  /**
+   * Only set when `type === 'runPropertiesChanged'` — the pre-change run
+   * formatting snapshot (the `revision_change` mark's `prior`) and the
+   * post-change formatting, so the sidebar can describe the change as
+   * "original → revised".
+   */
+  priorFormatting?: import('../types/document').TextFormatting;
+  /** Post-change run formatting for `runPropertiesChanged` entries. */
+  currentFormatting?: import('../types/document').TextFormatting;
 }

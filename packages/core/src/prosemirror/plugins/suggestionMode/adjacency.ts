@@ -118,6 +118,67 @@ export function findAdjacentRevision(
 }
 
 /**
+ * Find an adjacent `revision_change` mark by the same author whose FULL
+ * pre-edit prior deep-equals `prior`. Lets consecutive formatting ops in
+ * suggesting mode share one revision triple (span coalescing for run
+ * property changes — Phase 3, issue #83), the same role
+ * `findAdjacentRevision` plays for insertion/deletion typing.
+ *
+ * Looks at `$pos.nodeBefore` / `nodeAfter` (same parent). Cross-block lookup
+ * is intentionally skipped: formatting ops apply per-range, and a paragraph
+ * boundary already scopes the snapshotter's capture.
+ */
+export function findAdjacentRevisionChange(
+  doc: PMNode,
+  pos: number,
+  author: string,
+  prior: Record<string, unknown>
+): MarkAttrs | null {
+  const matches = (node: PMNode | null | undefined): MarkAttrs | null => {
+    if (!node?.isText) return null;
+    const mark = node.marks.find(
+      (m) => m.type.name === 'revision_change' && m.attrs.author === author
+    );
+    if (!mark) return null;
+    if (!priorsEqual(mark.attrs.prior as Record<string, unknown> | null, prior)) return null;
+    return projectMarkAttrs(mark.attrs);
+  };
+  try {
+    const $pos = doc.resolve(pos);
+    for (const node of [$pos.nodeBefore, $pos.nodeAfter]) {
+      const hit = matches(node);
+      if (hit) return hit;
+    }
+  } catch {
+    /* position out of range */
+  }
+  return null;
+}
+
+/** Deep-equal for canonicalized priors (key order already normalized). */
+function priorsEqual(
+  a: Record<string, unknown> | null | undefined,
+  b: Record<string, unknown>
+): boolean {
+  if (a == null) return false;
+  if (a === (b as unknown)) return true;
+  if (typeof a !== 'object' || typeof b !== 'object') return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  return aKeys.every(
+    (k) => Object.prototype.hasOwnProperty.call(b, k) && priorsEqualValue(a[k], b[k])
+  );
+}
+
+function priorsEqualValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (a == null || b == null) return false;
+  if (typeof a !== 'object' || typeof b !== 'object') return a === b;
+  return priorsEqual(a as Record<string, unknown>, b as Record<string, unknown>);
+}
+/**
  * Find an adjacent revision at either edge of a range.
  * This keeps consecutive backspaces grouped even though the cursor moves left.
  */

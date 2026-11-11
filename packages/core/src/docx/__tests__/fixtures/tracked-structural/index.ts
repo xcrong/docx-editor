@@ -108,6 +108,33 @@ export const TRACKED_STRUCTURAL_FIXTURES = {
       `<w:tc><w:p><w:r><w:t>excepted</w:t></w:r></w:p></w:tc>` +
       `<w:tc><w:p><w:r><w:t>row</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`
   ),
+
+  // -- T27-07 (issue #83): run property revisions (`w:rPrChange`) --------
+
+  /** Run property change: bold + red + 14pt now, plain 12pt black before. */
+  runPropertyChanges: docXml(
+    `<w:p><w:r><w:rPr><w:b/><w:color w:val="FF0000"/><w:sz w:val="28"/>` +
+      `<w:rPrChange w:id="401" w:author="Grace" w:date="2024-07-08T09:10:11Z"><w:rPr><w:color w:val="000000"/><w:sz w:val="24"/></w:rPr></w:rPrChange>` +
+      `</w:rPr><w:t>Bold red 14pt</w:t></w:r>` +
+      `<w:r><w:t>plain</w:t></w:r></w:p>`
+  ),
+  /** Two stacked `w:rPrChange` on one run — conversion keeps the LAST. */
+  runPropertyChangesStacked: docXml(
+    `<w:p><w:r><w:rPr><w:b/><w:bCs/>` +
+      `<w:rPrChange w:id="402" w:author="Grace" w:date="2024-07-08T09:10:11Z"><w:rPr><w:i/><w:iCs/></w:rPr></w:rPrChange>` +
+      `<w:rPrChange w:id="403" w:author="Heidi" w:date="2024-07-08T09:10:12Z"><w:rPr><w:u w:val="single"/></w:rPr></w:rPrChange>` +
+      `</w:rPr><w:t>stacked</w:t></w:r></w:p>`
+  ),
+  /** Paragraph-mark `w:rPrChange` (pilcrow) AND run `w:rPrChange` in one
+   * paragraph — the Phase 1 run-mark path and the Phase 3 inline mark must
+   * not cross-contaminate on parse or serialize. */
+  runPropertyChangesWithPilcrow: docXml(
+    `<w:p><w:pPr><w:rPr>` +
+      `<w:rPrChange w:id="404" w:author="Dan" w:date="2024-04-05T06:07:08Z"><w:rPr><w:b/></w:rPr></w:rPrChange>` +
+      `</w:rPr></w:pPr>` +
+      `<w:r><w:rPr><w:i/><w:rPrChange w:id="405" w:author="Grace" w:date="2024-07-08T09:10:11Z"><w:rPr><w:color w:val="0000FF"/></w:rPr></w:rPrChange>` +
+      `</w:rPr><w:t>italic</w:t></w:r></w:p>`
+  ),
 } as const;
 
 export type TrackedStructuralFixtureName = keyof typeof TRACKED_STRUCTURAL_FIXTURES;

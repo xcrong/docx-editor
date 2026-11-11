@@ -207,6 +207,22 @@ function applyRunStyles(
     if (run.changeRevisionId != null) element.dataset.revisionId = String(run.changeRevisionId);
   }
 
+  // Run property revision (`w:rPrChange` → `revision_change` mark) — subtle
+  // wavy underline + faint tint so the change is visible without shouting.
+  // Reuses the tracked-change dataset contract (`data-revision-id`,
+  // `data-change-author`, `data-change-date`) so sidebar anchoring and the
+  // selection map keep working; a run carrying both insertion/deletion and
+  // revision marks keeps the insertion/deletion anchor (set above) and only
+  // gains the class here.
+  if (run.revisionChange) {
+    element.classList.add('ep-revision-change');
+    if (element.dataset.revisionId == null) {
+      element.dataset.revisionId = String(run.revisionChange.revisionId);
+      if (run.revisionChange.author) element.dataset.changeAuthor = run.revisionChange.author;
+      if (run.revisionChange.date) element.dataset.changeDate = run.revisionChange.date;
+    }
+  }
+
   if (decorations.length > 0) {
     element.style.textDecorationLine = decorations.join(' ');
   }

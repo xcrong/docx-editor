@@ -886,6 +886,22 @@
     "runPropertiesChanged": null,
     "sectionPropertiesChanged": null,
     "tableGridChanged": null,
-    "tableExceptionsChanged": null
+    "tableExceptionsChanged": null,
+    "runBaselineApplied": null,
+    "runBoldAdded": null,
+    "runBoldRemoved": null,
+    "runColorChanged": null,
+    "runDefaultValue": null,
+    "runFontChanged": null,
+    "runFontSizeChanged": null,
+    "runHighlightChanged": null,
+    "runItalicAdded": null,
+    "runItalicRemoved": null,
+    "runStrikeAdded": null,
+    "runStrikeRemoved": null,
+    "runSubscriptApplied": null,
+    "runSuperscriptApplied": null,
+    "runUnderlineAdded": null,
+    "runUnderlineRemoved": null
   }
 }

@@ -20,6 +20,9 @@ import type { EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import type { Mark } from 'prosemirror-model';
 import type { TrackedChangeEntry } from '../../utils/comments';
+import type { TextFormatting } from '../../types/document';
+import { marksToTextFormatting } from '../conversion/fromProseDoc/marks';
+import { canonicalizeRunPrior } from '../extensions/marks/TrackedChangeExtensions';
 
 /**
  * Output of {@link extractTrackedChanges}.
@@ -70,8 +73,9 @@ export function extractTrackedChanges(state: EditorState | null): TrackedChanges
   const { doc, schema } = state;
   const insertionType = schema.marks.insertion;
   const deletionType = schema.marks.deletion;
+  const revisionChangeType = schema.marks.revision_change;
   const commentType = schema.marks.comment;
-  if (!insertionType && !deletionType) return EMPTY_RESULT;
+  if (!insertionType && !deletionType && !revisionChangeType) return EMPTY_RESULT;
 
   const raw: TrackedChangeEntry[] = [];
   const commentToRevision = new Map<number, number>();
@@ -432,6 +436,76 @@ export function extractTrackedChanges(state: EditorState | null): TrackedChanges
         });
         tcMark = mark;
       }
+      // Run property revisions (`w:rPrChange` → `revision_change` mark).
+      // Deliberately NOT part of STRUCTURAL_PRIORITY: a run formatting
+      // change is independent of structural cards sharing its (author,
+      // date) and must never coalesce into one with them (Phase 1/3
+      // mutual-exclusion — pinned by the T27-07 no-crosstalk tests).
+      // One entry per stacked session (stack oldest-first, then the
+      // latest): every session keeps its own prior so reject-all restores
+      // the original newest-first.
+      if (revisionChangeType && mark.type === revisionChangeType) {
+        const stack =
+          (mark.attrs.priorStack as Array<{
+            revisionId: unknown;
+            author: unknown;
+            date: unknown;
+            prior: unknown;
+          }> | null) ?? [];
+        // Newest-first (latest, then the stack reversed): a reject-all
+        // walks sessions back to the original in order, and the sidebar
+        // reads newest-first like Word's review pane. Per-entry currents
+        // are assigned below.
+        const sessions: Array<{
+          revisionId: unknown;
+          author: unknown;
+          date: unknown;
+          prior: unknown;
+        }> = [
+          {
+            revisionId: mark.attrs.revisionId,
+            author: mark.attrs.author,
+            date: mark.attrs.date,
+            prior: mark.attrs.prior,
+          },
+          ...stack
+            .slice()
+            .reverse()
+            .map((s) => ({
+              revisionId: s?.revisionId,
+              author: s?.author,
+              date: s?.date,
+              prior: s?.prior,
+            })),
+        ];
+        const actualCurrent = canonicalizeRunPrior(marksToTextFormatting(node.marks));
+        // Each entry's `currentFormatting` is the post-state of its own
+        // session — the next-newer entry's prior (the latest uses the actual
+        // current) — so the sidebar's "original → revised" names only that
+        // session's fields.
+        const numbered = sessions.filter(
+          (s): s is { revisionId: number; author: unknown; date: unknown; prior: unknown } =>
+            typeof s.revisionId === 'number'
+        );
+        numbered.forEach((session, i) => {
+          const prior = (session.prior as TextFormatting | null) ?? undefined;
+          const newerPrior = i > 0 ? numbered[i - 1]!.prior : undefined;
+          raw.push({
+            type: 'runPropertiesChanged',
+            text: inlineText,
+            author: (session.author as string) || '',
+            date: (session.date as string | undefined) ?? undefined,
+            from: pos,
+            to: pos + node.nodeSize,
+            revisionId: session.revisionId,
+            ...(prior ? { priorFormatting: canonicalizeRunPrior(prior) } : {}),
+            currentFormatting:
+              newerPrior != null
+                ? canonicalizeRunPrior(newerPrior as TextFormatting)
+                : actualCurrent,
+          });
+        });
+      }
     }
     if (commentType) {
       for (const m of node.marks) {
@@ -534,12 +608,43 @@ export function extractTrackedChanges(state: EditorState | null): TrackedChanges
   // revisionId — including runs split across paragraph boundaries — but
   // foreign editors mint a fresh id per atomic edit, so dropping the
   // revisionId from the key keeps both cases consistent.
+  //
+  // `runPropertiesChanged` merges under the same rule PLUS prior/current
+  // equality: two adjacent same-key ranges with different snapshots are
+  // different changes and keep separate cards (stable "original → revised"
+  // descriptions). Coalesced ids ride `coalescedRevisionIds` so one Accept
+  // still clears every site.
   const inlineGroups = new Map<string, TrackedChangeEntry>();
+  const runPropGroups = new Map<string, TrackedChangeEntry>();
   const merged: TrackedChangeEntry[] = [];
   for (const entry of ordered) {
     const isInlineType = entry.type === 'insertion' || entry.type === 'deletion';
-    if (!isInlineType) {
+    const isRunPropType = entry.type === 'runPropertiesChanged';
+    if (!isInlineType && !isRunPropType) {
       merged.push({ ...entry });
+      continue;
+    }
+    if (isRunPropType) {
+      const key = `${entry.type}|${entry.author}|${entry.date ?? ''}|${JSON.stringify(
+        entry.priorFormatting ?? null
+      )}|${JSON.stringify(entry.currentFormatting ?? null)}`;
+      const group = runPropGroups.get(key);
+      if (group) {
+        const sep = group.to === entry.from ? '' : ' ';
+        group.text += sep + entry.text;
+        group.to = entry.to;
+        if (entry.revisionId !== group.revisionId) {
+          const ids = new Set<number>(group.coalescedRevisionIds ?? []);
+          for (const id of entry.coalescedRevisionIds ?? []) ids.add(id);
+          ids.add(entry.revisionId);
+          ids.delete(group.revisionId);
+          group.coalescedRevisionIds = ids.size > 0 ? [...ids] : undefined;
+        }
+      } else {
+        const copy = { ...entry };
+        runPropGroups.set(key, copy);
+        merged.push(copy);
+      }
       continue;
     }
     const key = `${entry.type}|${entry.author}|${entry.date ?? ''}`;

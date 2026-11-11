@@ -83,6 +83,15 @@
           ></template
         >
       </template>
+      <template v-else-if="change.type === 'runPropertiesChanged'">
+        {{ describeChange(change)
+        }}<template v-if="change.text"
+          >:
+          <span class="tc-card__changed"
+            >&quot;{{ truncateText(change.text) }}&quot;</span
+          ></template
+        >
+      </template>
       <template v-else-if="change.type === 'rowInserted'">
         <span class="tc-card__inserted">{{ t('revisions.rowInserted') }}</span>
       </template>
@@ -143,6 +152,7 @@
 import { computed } from 'vue';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import type { TrackedChangeEntry } from './sidebarUtils';
+import { describeRunPropertyChange } from '@xcrong/docx-editor-core/utils/comments';
 import { formatDate, truncateText } from './sidebarUtils';
 import Avatar from './Avatar.vue';
 import MaterialSymbol from '../ui/MaterialSymbol.vue';
@@ -168,6 +178,13 @@ const emit = defineEmits<{
 }>();
 
 const authorName = computed(() => props.change.author || t('trackedChanges.unknown'));
+
+// Localized "original → revised" label for `runPropertiesChanged` cards.
+function describeChange(change: TrackedChangeEntry): string {
+  return describeRunPropertyChange(change.priorFormatting, change.currentFormatting, (k, p) =>
+    t(k as 'revisions.runPropertiesChanged', p)
+  );
+}
 
 // Dispatch by `revisionId` whenever the host wired the by-id channel.
 // Walks every id the card represents: the primary, the replacement's

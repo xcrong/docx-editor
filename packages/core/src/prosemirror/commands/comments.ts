@@ -171,6 +171,7 @@ function collectAllRevisionTriples(state: EditorState): RevisionTriple[] {
   };
   const insertionType = state.schema.marks.insertion;
   const deletionType = state.schema.marks.deletion;
+  const revisionChangeType = state.schema.marks.revision_change;
   state.doc.descendants((node) => {
     // Paragraph-mark and paragraph-property revisions.
     if (node.type.name === 'paragraph') {
@@ -257,6 +258,8 @@ function collectAllRevisionTriples(state: EditorState): RevisionTriple[] {
         for (const e of tblPrChange) add(e?.info?.id, e?.info?.author, e?.info?.date);
     }
     // Inline insertion/deletion marks (text and inline atoms like images).
+    // Run property revisions contribute every stacked session id (latest +
+    // `priorStack`) so accept/reject-all reaches subsumed sessions.
     if (node.isInline) {
       for (const mark of node.marks) {
         if (
@@ -264,6 +267,21 @@ function collectAllRevisionTriples(state: EditorState): RevisionTriple[] {
           (deletionType && mark.type === deletionType)
         ) {
           add(mark.attrs.revisionId, mark.attrs.author, mark.attrs.date);
+        }
+        if (revisionChangeType && mark.type === revisionChangeType) {
+          add(mark.attrs.revisionId, mark.attrs.author, mark.attrs.date);
+          // Newest-first per node (latest, then the stack reversed) so a
+          // reject-all walks sessions back to the original in order.
+          const stack =
+            (mark.attrs.priorStack as Array<{
+              revisionId: unknown;
+              author: unknown;
+              date: unknown;
+            }> | null) ?? [];
+          for (let i = stack.length - 1; i >= 0; i--) {
+            const entry = stack[i];
+            add(entry?.revisionId, entry?.author, entry?.date);
+          }
         }
       }
     }
@@ -349,6 +367,14 @@ export function rejectAllChanges(): (
  * after the previous resolution applied. Each call produces its own
  * transaction (one undo step per revision id), matching Word's UX where
  * each accept is individually undoable.
+ *
+ * Reject walks ids newest-first (descending numeric `w:id` — locally minted
+ * ids are monotonic, so larger means a later session). Stacked sessions on
+ * one node (`revision_change` `priorStack`, `pPrChange` arrays, …) only
+ * restore the original when the newest session goes first: each prior is
+ * relative to its own session's start, so oldest-first would replay stale
+ * intermediates on top. Accept order is irrelevant (every path clears), so
+ * it keeps stable document order.
  */
 function dispatchIdsInOrder(
   state: EditorState,
@@ -356,12 +382,13 @@ function dispatchIdsInOrder(
   ids: number[],
   mode: 'accept' | 'reject'
 ): void {
+  const ordered = mode === 'reject' ? [...ids].sort((a, b) => b - a) : ids;
   let lastState: EditorState = state;
   const capturingDispatch = (tr: Transaction) => {
     dispatch(tr);
     lastState = lastState.apply(tr);
   };
-  for (const id of ids) {
+  for (const id of ordered) {
     resolveById(id, mode)(lastState, capturingDispatch);
   }
 }
@@ -482,6 +509,7 @@ import {
   findParagraphMarkPropertyChangeSites,
   findParagraphMarkSites,
   findParagraphPropertyChangeSites,
+  findRevisionChangeSites,
   findSectionPropertyChangeSites,
   findTableCellMarkerSites,
   findTableCellPropertyChangeSites,
@@ -491,7 +519,10 @@ import {
   findTableRowPropertyChangeSites,
   findTableRowSites,
   joinParagraphWithNext,
+  markHasSession,
+  removeRevisionChangeEntry,
 } from './structuralSites';
+import { restoreRunMarks } from '../plugins/suggestionMode/runSnapshot';
 import {
   resolveTableCellMarkers,
   resolveTablePropertyChanges,
@@ -513,6 +544,8 @@ import {
  *   reject deletion mark → keep text, drop mark.
  *   accept pPrChange / paraRPrChange / sectPrChange → clear entry, current wins.
  *   reject pPrChange / paraRPrChange / sectPrChange → restore prior, clear entry.
+ *   accept revision_change → remove mark (formatting stays).
+ *   reject revision_change → restore the mark's prior run formatting, remove mark.
  *   accept trIns → clear marker, keep row.
  *   reject trIns → delete the row (whole table when it is the only row).
  *   accept trDel → delete the row; reject trDel → clear marker.
@@ -539,6 +572,7 @@ function resolveById(revisionId: number, mode: 'accept' | 'reject'): Command {
     const tableRowExPropSites = findTableRowExceptionsChangeSites(state, revisionId);
     const tablePropSites = findTablePropertyChangeSites(state, revisionId);
     const tableGridSites = findTableGridChangeSites(state, revisionId);
+    const revisionSites = findRevisionChangeSites(state, revisionId);
     if (
       paragraphMarkSites.length === 0 &&
       inlineSites.length === 0 &&
@@ -551,7 +585,8 @@ function resolveById(revisionId: number, mode: 'accept' | 'reject'): Command {
       tableRowPropSites.length === 0 &&
       tableRowExPropSites.length === 0 &&
       tablePropSites.length === 0 &&
-      tableGridSites.length === 0
+      tableGridSites.length === 0 &&
+      revisionSites.length === 0
     ) {
       return false;
     }
@@ -752,6 +787,49 @@ function resolveById(revisionId: number, mode: 'accept' | 'reject'): Command {
         });
       } else {
         clearSectionPropertyChange(tr, mappedPos);
+      }
+    }
+
+    // Run property revisions (`revision_change` marks). Accept drops the
+    // resolved session (latest or stacked); the mark itself drops when its
+    // last session resolves. Reject additionally restores that session's
+    // prior run formatting onto each text node first. Mark-only steps, but
+    // earlier inline deletions in this same transaction shift positions, so
+    // every site maps through `tr.mapping` like the paragraph loops above.
+    const revisionChangeType = state.schema.marks.revision_change;
+    if (revisionChangeType && revisionSites.length > 0) {
+      for (const site of revisionSites) {
+        if (mode === 'reject' && site.prior) {
+          const from = tr.mapping.map(site.from);
+          const to = tr.mapping.map(site.to);
+          tr.doc.nodesBetween(from, to, (node, pos) => {
+            if (!node.isText) return true;
+            const mark = node.marks.find((m) => m.type === revisionChangeType);
+            if (!mark || !markHasSession(mark, site)) return false;
+            // Text nodes can't use `setNodeMarkup` (PM forbids constructing
+            // text via `NodeType.create`), so reconcile mark-by-mark: remove
+            // what the prior drops, add what it restores. `Mark.eq` compares
+            // type + attrs, keeping the walk idempotent.
+            const end = pos + node.nodeSize;
+            const restored = restoreRunMarks(node.marks, site.prior!, state.schema);
+            for (const current of node.marks) {
+              if (current.type === revisionChangeType) continue;
+              if (!restored.some((r) => r.eq(current))) tr.removeMark(pos, end, current.type);
+            }
+            for (const wanted of restored) {
+              if (!node.marks.some((m) => m.eq(wanted))) tr.addMark(pos, end, wanted);
+            }
+            return false;
+          });
+        }
+        removeRevisionChangeEntry(
+          tr,
+          tr.mapping.map(site.from),
+          tr.mapping.map(site.to),
+          site.entryRevisionId,
+          site.entryAuthor,
+          site.entryDate
+        );
       }
     }
 
