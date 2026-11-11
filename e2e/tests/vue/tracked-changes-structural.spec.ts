@@ -154,3 +154,106 @@ test.describe('Vue: tracked paragraph-mark revisions (issue #80)', () => {
     expect(await getParaRevision(page, 1)).toBeNull();
   });
 });
+
+async function tableSnapshot(page: import('@playwright/test').Page) {
+  return page.evaluate(() => window.__DOCX_EDITOR_E2E__?.getFirstTableSnapshot?.() ?? null);
+}
+
+test.describe('Vue: tracked table revisions (issue #82)', () => {
+  test('addRowBelow in suggesting mode sets trIns; accept keeps the row', async ({ page }) => {
+    await boot(page);
+    expect(await page.evaluate(() => window.__DOCX_EDITOR_E2E__?.plantSimpleTable?.())).toBe(true);
+    expect(await page.evaluate(() => window.__DOCX_EDITOR_E2E__?.focusFirstTableCell?.())).toBe(
+      true
+    );
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    expect(await page.evaluate(() => window.__DOCX_EDITOR_E2E__?.addRowBelow?.())).toBe(true);
+    await expect(async () => {
+      expect((await tableSnapshot(page))?.rowCount).toBe(2);
+    }).toPass({ timeout: 10000 });
+
+    const snap = await tableSnapshot(page);
+    expect(snap?.rows[1]?.trIns).not.toBeNull();
+    const revId = (snap?.rows[1]?.trIns as { revisionId: number }).revisionId;
+    // The inserted row paints with its revision id (shared core painter).
+    await expect(
+      page.locator(`.layout-table-row[data-revision-id="${revId}"]`).first()
+    ).toBeVisible();
+
+    expect(
+      await page.evaluate(
+        (rid) => window.__DOCX_EDITOR_E2E__?.acceptChangeById(rid) ?? false,
+        revId
+      )
+    ).toBe(true);
+    expect((await tableSnapshot(page))?.rows[1]?.trIns).toBeNull();
+    // The Vue composable repaints asynchronously — poll for the cue removal.
+    await expect(async () => {
+      expect(await page.locator(`.layout-table-row[data-revision-id="${revId}"]`).count()).toBe(0);
+    }).toPass({ timeout: 10000 });
+  });
+
+  test('deleteCurrentRow in suggesting mode sets trDel; reject keeps the row', async ({ page }) => {
+    await boot(page);
+    expect(await page.evaluate(() => window.__DOCX_EDITOR_E2E__?.plantSimpleTable?.())).toBe(true);
+    expect(await page.evaluate(() => window.__DOCX_EDITOR_E2E__?.focusFirstTableCell?.())).toBe(
+      true
+    );
+    expect(await page.evaluate(() => window.__DOCX_EDITOR_E2E__?.addRowBelow?.())).toBe(true);
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    expect(await page.evaluate(() => window.__DOCX_EDITOR_E2E__?.deleteCurrentRow?.())).toBe(true);
+    await expect(async () => {
+      expect((await tableSnapshot(page))?.rows[0]?.trDel).not.toBeNull();
+    }).toPass({ timeout: 10000 });
+
+    const snap = await tableSnapshot(page);
+    const revId = (snap?.rows[0]?.trDel as { revisionId: number }).revisionId;
+    expect(
+      await page.evaluate(
+        (rid) => window.__DOCX_EDITOR_E2E__?.rejectChangeById(rid) ?? false,
+        revId
+      )
+    ).toBe(true);
+    const after = await tableSnapshot(page);
+    expect(after?.rowCount).toBe(2);
+    expect(after?.rows[0]?.trDel).toBeNull();
+  });
+
+  test('mergeFirstRowCells tags ins/del under one triple; accept collapses', async ({ page }) => {
+    await boot(page);
+    expect(await page.evaluate(() => window.__DOCX_EDITOR_E2E__?.plantSimpleTable?.())).toBe(true);
+    expect(await page.evaluate(() => window.__DOCX_EDITOR_E2E__?.focusFirstTableCell?.())).toBe(
+      true
+    );
+    expect(await page.evaluate(() => window.__DOCX_EDITOR_E2E__?.addColumnRight?.())).toBe(true);
+    expect(await setSuggestionMode(page, true, 'Jane')).toBe(true);
+    expect(await page.evaluate(() => window.__DOCX_EDITOR_E2E__?.mergeFirstRowCells?.())).toBe(
+      true
+    );
+    await expect(async () => {
+      const cells = ((await tableSnapshot(page))?.cells[0] ?? []) as Array<{
+        kind: string;
+        info: { revisionId: number };
+      } | null>;
+      expect(cells[0]?.kind).toBe('ins');
+      expect(cells[1]?.kind).toBe('del');
+    }).toPass({ timeout: 10000 });
+
+    const snap = await tableSnapshot(page);
+    const cells = (snap?.cells[0] ?? []) as Array<{
+      kind: string;
+      info: { revisionId: number };
+    } | null>;
+    expect(cells[0]?.info.revisionId).toBe(cells[1]?.info.revisionId);
+    const revId = cells[0]!.info.revisionId;
+    // Sidebar shows one card for the coalesced row/cell burst.
+    await expect(page.locator('.docx-tracked-change-card, .tc-card').first()).toBeVisible();
+    expect(
+      await page.evaluate(
+        (rid) => window.__DOCX_EDITOR_E2E__?.acceptChangeById(rid) ?? false,
+        revId
+      )
+    ).toBe(true);
+    expect((await tableSnapshot(page))?.colCount).toBe(1);
+  });
+});

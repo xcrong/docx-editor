@@ -128,6 +128,49 @@ export function getTargetCellPositions(state: EditorState): { pos: number; node:
 }
 
 /**
+ * Tracked-cell authoring rule (mutual exclusion per EG_CellMarkupElements —
+ * a cell carries at most ONE of cellIns / cellDel / cellMerge).
+ *
+ * - Authoring `ins` on a cell that already carries `ins` is a no-op (same
+ *   marker rewritten would fork the triple; keep the original).
+ * - Authoring `del` on a cell that carries `ins` from the SAME
+ *   `(id, author, date)` triple clears both (insert-then-delete collapse —
+ *   the net edit is nothing). Symmetrically, `ins` over a same-triple `del`
+ *   clears both.
+ * - Same-kind `del` over `del` is a no-op; `merge` always overwrites (a
+ *   merge is a distinct op, never a collapse); a different triple overwrites.
+ *
+ * Returns `{ noop: true }` when nothing should change, otherwise the marker
+ * to write (`null` clears the attr).
+ */
+export function nextCellMarker(
+  existing: {
+    kind: string;
+    info?: { revisionId?: number; author?: string; date?: string | null };
+  } | null,
+  kind: 'ins' | 'del' | 'merge',
+  info: { revisionId: number; author: string; date: string | null }
+): { noop: true } | { marker: { kind: 'ins' | 'del' | 'merge'; info: typeof info } | null } {
+  if (!existing) return { marker: { kind, info } };
+  const sameTriple =
+    existing.info?.revisionId === info.revisionId &&
+    (existing.info?.author ?? '') === (info.author ?? '') &&
+    (existing.info?.date ?? null) === (info.date ?? null);
+  if (!sameTriple) return { marker: { kind, info } };
+  if (existing.kind !== 'ins' && existing.kind !== 'del' && existing.kind !== 'merge') {
+    return { marker: { kind, info } };
+  }
+  if (kind === 'merge') return { marker: { kind, info } };
+  if (existing.kind === kind) return { noop: true };
+  if ((existing.kind === 'ins' && kind === 'del') || (existing.kind === 'del' && kind === 'ins')) {
+    return { marker: null };
+  }
+  // Same-triple `merge` overwritten by ins/del (or vice versa) — the newer
+  // op wins; there is no meaningful collapse between them.
+  return { marker: { kind, info } };
+}
+
+/**
  * Build a full grid map of all cells in the table: pos → grid info.
  * Also builds a reverse lookup by (rowIdx, colIdx).
  */

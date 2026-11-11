@@ -139,6 +139,7 @@ declare global {
       selectFirstImage: () => boolean;
       plantSimpleTable: () => boolean;
       plantTableRowInsertion: (revisionId: number) => boolean;
+      plantTableRowDeletion: (revisionId: number) => boolean;
       getFirstTableRowAttrs: () => Record<string, unknown> | null;
       countTableRows: () => number;
       focusFirstTableCell: () => boolean;
@@ -146,12 +147,14 @@ declare global {
       deleteCurrentRow: () => boolean;
       addColumnRight: () => boolean;
       mergeFirstRowCells: () => boolean;
+      mergeFirstColumnCells: () => boolean;
       setFirstCellFillColor: (color: string) => boolean;
       getFirstTableSnapshot: () => {
         rowCount: number;
         colCount: number;
         rows: Array<Record<string, unknown>>;
         cells: Array<Array<unknown>>;
+        cellPropChanges: Array<Array<unknown>>;
         tblPrChange: unknown;
         tblGridChange: unknown;
       } | null;

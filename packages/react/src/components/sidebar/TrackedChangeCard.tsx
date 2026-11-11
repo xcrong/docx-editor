@@ -84,6 +84,11 @@ export function TrackedChangeCard({
     }
   };
 
+  // `tableGridChanged` is id-only on the wire (no author/date) — show the
+  // kind label without an author header, per
+  // `tracked-structural-tables/spec.md`.
+  const showAuthorHeader = change.type !== 'tableGridChanged';
+
   return (
     <div
       ref={measureRef}
@@ -93,17 +98,21 @@ export function TrackedChangeCard({
       style={isExpanded ? CARD_STYLE_EXPANDED : CARD_STYLE_COLLAPSED}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <div style={avatarStyle(authorName)}>{getInitials(authorName)}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--doc-text)' }}>
-            {authorName}
-          </div>
-          {change.date && (
-            <div style={{ fontSize: 11, color: 'var(--doc-text-muted)' }}>
-              {formatDate(change.date)}
+        {showAuthorHeader ? (
+          <>
+            <div style={avatarStyle(authorName)}>{getInitials(authorName)}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--doc-text)' }}>
+                {authorName}
+              </div>
+              {change.date && (
+                <div style={{ fontSize: 11, color: 'var(--doc-text-muted)' }}>
+                  {formatDate(change.date)}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        ) : null}
         {isExpanded && (
           <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
             <button onClick={handleAccept} title={t('common.accept')} style={ICON_BUTTON_STYLE}>
@@ -220,6 +229,12 @@ export function TrackedChangeCard({
           <span style={{ color: 'var(--doc-text-muted)' }}>
             {t('revisions.tablePropertiesChanged')}
           </span>
+        ) : change.type === 'tableExceptionsChanged' ? (
+          <span style={{ color: 'var(--doc-text-muted)' }}>
+            {t('revisions.tableExceptionsChanged')}
+          </span>
+        ) : change.type === 'tableGridChanged' ? (
+          <span style={{ color: 'var(--doc-text-muted)' }}>{t('revisions.tableGridChanged')}</span>
         ) : change.type === 'tableInserted' ? (
           <span style={{ color: 'var(--doc-success)', fontWeight: 500 }}>
             {t('revisions.tableInserted')}

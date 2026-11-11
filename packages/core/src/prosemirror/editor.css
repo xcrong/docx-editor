@@ -841,6 +841,25 @@
 .ep-revision-cell.ep-revision-merge {
   box-shadow: inset 0 3px 0 #5f6368;
   background-color: rgba(95, 99, 104, 0.05);
+  /* Unaccepted vertical `cellMerge` group — dashed boundary between the
+     cells (outline doesn't affect layout, so measured geometry is safe). */
+  outline: 2px dashed #5f6368;
+  outline-offset: -2px;
+}
+
+/* Deleted-row strikethrough overlay (cells already carry their own via
+   `.ep-revision-cell.ep-revision-del`; the row rule covers Foreign shapes
+   whose cells lack markers). */
+.layout-table-row.ep-revision-del {
+  text-decoration: line-through;
+  text-decoration-color: rgba(198, 40, 40, 0.6);
+}
+
+/* Property-change bar on painted tables. The generic rule adds 6px content
+   padding — harmless on rows/cells (absolute children / inline padding win),
+   but it would shift a whole table box, so reset it there. */
+.layout-table.ep-revision-prop-change {
+  padding-left: 0;
 }
 
 /* Property-change paragraphs/blocks — quiet left margin bar in a neutral

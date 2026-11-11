@@ -454,6 +454,34 @@ export function installE2EHooks(
       if (!applyCellSelection(view, cellPositions[0]!, cellPositions[1]!)) return false;
       return mergeCells(view.state, view.dispatch);
     },
+    // T27-06: select the first column's first two cells and dispatch
+    // `mergeCells` (suggesting → vertical `merge` markers, no collapse).
+    mergeFirstColumnCells: () => {
+      const view = editorRef.current?.getEditorRef()?.getView?.();
+      if (!view) return false;
+      const cellPositions: number[] = [];
+      let rowCount = 0;
+      view.state.doc.descendants((node, pos) => {
+        if (node.type.name === 'tableRow') {
+          rowCount += 1;
+          if (rowCount > 2) return false;
+          return true;
+        }
+        if (rowCount >= 1 && rowCount <= 2) {
+          if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
+            // First cell of each of the first two rows (descendants visits
+            // cells in order, so the first per row is the column-0 cell when
+            // no colspans are present).
+            if (cellPositions.length < rowCount) cellPositions.push(pos);
+            return false;
+          }
+        }
+        return true;
+      });
+      if (cellPositions.length < 2) return false;
+      if (!applyCellSelection(view, cellPositions[0]!, cellPositions[1]!)) return false;
+      return mergeCells(view.state, view.dispatch);
+    },
     // T27-05: dispatch `setCellFillColor` on the current cell selection.
     setFirstCellFillColor: (color: string) => {
       const view = editorRef.current?.getEditorRef()?.getView?.();
@@ -462,11 +490,14 @@ export function installE2EHooks(
     },
     // T27-05: snapshot the first table's revision attrs for assertions —
     // row markers, per-cell markers, column counts, table-level changes.
+    // T27-06: rows also expose `trPrChange` / `tblPrExChange`, and
+    // `cellPropChanges` mirrors `cells` with each cell's `tcPrChange`.
     getFirstTableSnapshot: () => {
       const view = editorRef.current?.getEditorRef()?.getView?.();
       if (!view) return null;
       const rows: Array<Record<string, unknown>> = [];
       const cells: Array<Array<unknown>> = [];
+      const cellPropChanges: Array<Array<unknown>> = [];
       let tableAttrs: Record<string, unknown> | null = null;
       let inFirstTable = false;
       view.state.doc.descendants((node) => {
@@ -479,12 +510,20 @@ export function installE2EHooks(
         if (!inFirstTable) return false;
         if (node.type.name === 'tableRow') {
           const attrs = node.attrs as Record<string, unknown>;
-          rows.push({ trIns: attrs.trIns ?? null, trDel: attrs.trDel ?? null });
+          rows.push({
+            trIns: attrs.trIns ?? null,
+            trDel: attrs.trDel ?? null,
+            trPrChange: attrs.trPrChange ?? null,
+            tblPrExChange: attrs.tblPrExChange ?? null,
+          });
           const markers: Array<unknown> = [];
+          const propChanges: Array<unknown> = [];
           node.forEach((cell) => {
             markers.push((cell.attrs as Record<string, unknown>).cellMarker ?? null);
+            propChanges.push((cell.attrs as Record<string, unknown>).tcPrChange ?? null);
           });
           cells.push(markers);
+          cellPropChanges.push(propChanges);
           return false;
         }
         return false;
@@ -496,9 +535,42 @@ export function installE2EHooks(
         colCount,
         rows,
         cells,
+        cellPropChanges,
         tblPrChange: tableAttrs.tblPrChange ?? null,
         tblGridChange: tableAttrs.tblGridChange ?? null,
       };
+    },
+    // Test-only: plant trDel on the first table row in the document.
+    // Returns false if no table exists. Unlike `deleteCurrentRow` (which
+    // refuses single-row tables), this stamps unconditionally so the
+    // accept-on-only-row → remove-table path is reachable in e2e.
+    plantTableRowDeletion: (revisionId: number) => {
+      const view = editorRef.current?.getEditorRef()?.getView?.();
+      if (!view) return false;
+      let rowPos: number | null = null;
+      // Evolving-let: takes the descendants callback's node type on assignment.
+      let rowNode = null as unknown;
+      view.state.doc.descendants((node, pos) => {
+        if (rowPos != null) return false;
+        if (node.type.name === 'tableRow') {
+          rowPos = pos;
+          rowNode = node;
+          return false;
+        }
+        return true;
+      });
+      if (rowPos == null || rowNode == null) return false;
+      view.dispatch(
+        view.state.tr.setNodeMarkup(rowPos, undefined, {
+          ...(rowNode as { attrs: Record<string, unknown> }).attrs,
+          trDel: {
+            revisionId,
+            author: 'Jane',
+            date: new Date().toISOString(),
+          },
+        })
+      );
+      return true;
     },
     // Test-only: plant trIns on the first table row in the document.
     // Returns false if no table exists.

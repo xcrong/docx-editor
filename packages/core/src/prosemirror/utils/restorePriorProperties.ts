@@ -15,7 +15,14 @@
  * @packageDocumentation
  */
 
-import type { ParagraphFormatting, SectionProperties, TextFormatting } from '../../types/document';
+import type {
+  ParagraphFormatting,
+  SectionProperties,
+  TableCellFormatting,
+  TableFormatting,
+  TableRowFormatting,
+  TextFormatting,
+} from '../../types/document';
 
 /**
  * Fields of `ParagraphFormatting` whose PM-attr shape is congruent with the
@@ -169,4 +176,134 @@ export function restoreRunPriorProperties(
     (next as Record<string, unknown>)[key as string] = prior[key];
   }
   return next;
+}
+
+/**
+ * Table prior snapshots are MODEL-shaped (`TableFormatting` — `{ value, type }`
+ * measurements, `layout`, `shading.fill.rgb`) while the `table` PM attrs are
+ * FLAT (plain-twips numbers, hex fills). The inverse of `tablePriorFromSnap`
+ * in `plugins/suggestionMode/tableSnapshot.ts`. Only fields with a PM attr
+ * land on the node — `cellSpacing`, `indent`, `borders`, `shading`, `overlap`
+ * live in `_originalFormatting`, not attrs (same convention as the paragraph
+ * restore skipping `frame`). Prior entries pin changed fields only, so copy
+ * own-properties.
+ */
+export function restoreTablePriorProperties(
+  attrs: Record<string, unknown>,
+  prior: TableFormatting
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...attrs };
+  const p = prior as unknown as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(p, 'styleId')) next.styleId = p.styleId ?? null;
+  if (Object.prototype.hasOwnProperty.call(p, 'width')) {
+    const w = p.width as { value?: unknown; type?: unknown } | null;
+    next.width = typeof w?.value === 'number' ? w.value : null;
+    next.widthType = typeof w?.type === 'string' ? w.type : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(p, 'justification'))
+    next.justification = p.justification ?? null;
+  if (Object.prototype.hasOwnProperty.call(p, 'layout')) next.tableLayout = p.layout ?? null;
+  if (Object.prototype.hasOwnProperty.call(p, 'floating')) next.floating = p.floating ?? null;
+  if (Object.prototype.hasOwnProperty.call(p, 'cellMargins')) {
+    const m = p.cellMargins as Record<string, { value?: unknown } | null> | null;
+    if (m == null) {
+      next.cellMargins = null;
+    } else {
+      const out: Record<string, unknown> = {};
+      for (const side of ['top', 'bottom', 'left', 'right'] as const) {
+        const v = m[side]?.value;
+        if (typeof v === 'number') out[side] = v;
+      }
+      next.cellMargins = out;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(p, 'look')) next.look = p.look ?? null;
+  if (Object.prototype.hasOwnProperty.call(p, 'bidi')) next.bidi = p.bidi ?? null;
+  return next;
+}
+
+/**
+ * Restore a prior `TableRowFormatting` snapshot onto a `tableRow`'s PM attrs
+ * (reject of `w:trPrChange`). `height.value` folds back to the flat twips
+ * `height`; `header` folds back to `isHeader`. `cantSplit`, `justification`,
+ * `hidden`, `conditionalFormat` have no PM attr — skipped per the file's
+ * congruent-shape convention.
+ */
+export function restoreTableRowPriorProperties(
+  attrs: Record<string, unknown>,
+  prior: TableRowFormatting
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...attrs };
+  const p = prior as unknown as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(p, 'height')) {
+    const h = p.height as { value?: unknown } | null;
+    next.height = typeof h?.value === 'number' ? h.value : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(p, 'heightRule')) next.heightRule = p.heightRule ?? null;
+  if (Object.prototype.hasOwnProperty.call(p, 'header')) next.isHeader = p.header ?? null;
+  return next;
+}
+
+/**
+ * Restore a prior `TableCellFormatting` snapshot onto a `tableCell`'s PM
+ * attrs (reject of `w:tcPrChange`). `width` and `margins` fold back to flat
+ * twips; `shading.fill.rgb` folds back to the hex `backgroundColor`.
+ * `gridSpan`, `vMerge`, `fitText`, `hideMark`, `conditionalFormat` have no
+ * PM attr — skipped per the file's congruent-shape convention.
+ */
+export function restoreTableCellPriorProperties(
+  attrs: Record<string, unknown>,
+  prior: TableCellFormatting
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...attrs };
+  const p = prior as unknown as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(p, 'width')) {
+    const w = p.width as { value?: unknown; type?: unknown } | null;
+    next.width = typeof w?.value === 'number' ? w.value : null;
+    next.widthType = typeof w?.type === 'string' ? w.type : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(p, 'verticalAlign'))
+    next.verticalAlign = p.verticalAlign ?? null;
+  if (Object.prototype.hasOwnProperty.call(p, 'shading')) {
+    const s = p.shading as { fill?: { rgb?: unknown } } | null;
+    const rgb = s?.fill?.rgb;
+    next.backgroundColor = typeof rgb === 'string' && rgb.length > 0 ? rgb : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(p, 'borders')) next.borders = p.borders ?? null;
+  if (Object.prototype.hasOwnProperty.call(p, 'margins')) {
+    const m = p.margins as Record<string, { value?: unknown } | null> | null;
+    if (m == null) {
+      next.margins = null;
+    } else {
+      const out: Record<string, unknown> = {};
+      for (const side of ['top', 'bottom', 'left', 'right'] as const) {
+        const v = m[side]?.value;
+        if (typeof v === 'number') out[side] = v;
+      }
+      next.margins = out;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(p, 'textDirection'))
+    next.textDirection = p.textDirection ?? null;
+  if (Object.prototype.hasOwnProperty.call(p, 'noWrap')) next.noWrap = p.noWrap ?? null;
+  return next;
+}
+
+/**
+ * Restore a prior `TableFormatting` snapshot onto a row's `tblPrEx` attr
+ * (reject of `w:tblPrExChange`). Both sides are model-shaped, so own-property
+ * copy is verbatim. A `null` prior field restores absence; when the merged
+ * exceptions object ends up empty it stays `{}` (the serializer drops an
+ * empty `<w:tblPrEx>` on write).
+ */
+export function restoreTableExceptionsPrior(
+  current: TableFormatting | null | undefined,
+  prior: TableFormatting
+): TableFormatting {
+  const next: Record<string, unknown> = { ...(current as unknown as Record<string, unknown>) };
+  const p = prior as unknown as Record<string, unknown>;
+  for (const key of Object.keys(p)) {
+    next[key] = p[key];
+  }
+  return next as unknown as TableFormatting;
 }
