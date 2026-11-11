@@ -4,9 +4,14 @@
  * When the user is drag-selecting text and moves the mouse near the
  * top or bottom edge of the scroll container, this hook auto-scrolls
  * the container and continues extending the selection.
+ *
+ * The per-frame loop stops itself when the pointer leaves the edge zone
+ * (delta back to 0) or the container can't scroll further, so no rAF
+ * traffic survives the gesture; any later mousemove re-arms it. Speed
+ * math lives in core (`computeAutoScrollDelta`) and is shared with Vue.
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { findVerticalScrollParent } from '@xcrong/docx-editor-core/utils/findVerticalScrollParent';
 import {
   AUTO_SCROLL_EDGE_ZONE as EDGE_ZONE,
@@ -16,8 +21,14 @@ import {
 export interface DragAutoScrollOptions {
   /** Ref to the pages container (used to find the scroll parent). */
   pagesContainerRef: React.RefObject<HTMLDivElement | null>;
-  /** Called during auto-scroll to extend the selection at the current mouse position. */
-  onScrollExtendSelection: (clientX: number, clientY: number) => void;
+  /**
+   * Called during auto-scroll to extend the selection at the current mouse position.
+   * `delta` is the signed px/frame scroll applied this frame — positive when
+   * scrolling down. Call sites use its sign to retry a miss inward when the
+   * pointer sits on the native scrollbar (`elementsFromPoint` hits nothing
+   * there, so a direct resolve would freeze the head mid-scroll).
+   */
+  onScrollExtendSelection: (clientX: number, clientY: number, delta: number) => void;
 }
 
 export function useDragAutoScroll({
@@ -45,25 +56,47 @@ export function useDragAutoScroll({
     }
   }, []);
 
+  // Never leak the rAF loop past unmount (e.g. doc reload mid-drag).
+  useEffect(() => stopAutoScroll, [stopAutoScroll]);
+
   const tick = useCallback(() => {
     if (!activeRef.current) return;
 
     const container = getScrollParent();
-    if (!container) return;
+    if (!container) {
+      stopAutoScroll();
+      return;
+    }
 
     const rect = container.getBoundingClientRect();
     const { x: mx, y: my } = lastMouseRef.current;
 
     const scrollDelta = computeAutoScrollDelta(rect, my);
 
-    if (scrollDelta !== 0) {
-      container.scrollTop += scrollDelta;
-      // After scrolling, extend the selection to the (now shifted) mouse position
-      onScrollExtendSelection(mx, my);
+    // Pointer left the edge zone — park the loop; the next mousemove
+    // inside the zone re-arms it via updateMousePosition.
+    if (scrollDelta === 0) {
+      stopAutoScroll();
+      return;
     }
 
+    // At the scroll limit there is nothing to reveal — stop instead of
+    // dispatching identical selection extensions at 60fps.
+    const maxTop = container.scrollHeight - container.clientHeight;
+    if (
+      (scrollDelta < 0 && container.scrollTop <= 0) ||
+      (scrollDelta > 0 && container.scrollTop >= maxTop - 1)
+    ) {
+      stopAutoScroll();
+      return;
+    }
+
+    container.scrollTop += scrollDelta;
+    // After scrolling, extend the selection to the (now shifted) mouse position
+    onScrollExtendSelection(mx, my, scrollDelta);
+
     rafIdRef.current = requestAnimationFrame(tick);
-  }, [getScrollParent, onScrollExtendSelection]);
+  }, [getScrollParent, onScrollExtendSelection, stopAutoScroll]);
 
   const startAutoScroll = useCallback(() => {
     if (activeRef.current) return;

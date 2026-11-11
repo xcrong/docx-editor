@@ -22,7 +22,6 @@ import { getSelectionRuns } from '@xcrong/docx-editor-core';
 import { HighlightRect } from '@xcrong/docx-editor-core/utils';
 import { isAutoSaveSupported } from '@xcrong/docx-editor-core';
 import { ParsedClipboardContent } from '@xcrong/docx-editor-core/utils';
-import * as React$1 from 'react';
 import React__default from 'react';
 import { RefObject } from 'react';
 import { SavedDocumentData } from '@xcrong/docx-editor-core';
@@ -43,7 +42,7 @@ export { createSelectionFromDOM }
 
 // @public
 export interface DragAutoScrollOptions {
-    onScrollExtendSelection: (clientX: number, clientY: number) => void;
+    onScrollExtendSelection: (clientX: number, clientY: number, delta: number) => void;
     pagesContainerRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -420,8 +419,12 @@ export function useTrackedChanges(state: EditorState | null): TrackedChangesResu
 
 // @public (undocumented)
 export function useVisualLineNavigation(input: VisualLineNavigationOptions): {
-    stickyXRef: React$1.RefObject<number | null>;
-    lastVisualLineIndexRef: React$1.RefObject<number>;
+    stickyXRef: {
+        current: number | null;
+    };
+    lastVisualLineIndexRef: {
+        current: number;
+    };
     getCaretClientX: (pmPos: number) => number | null;
     findLineElementAtPosition: (pmPos: number) => HTMLElement | null;
     findPositionOnLineAtClientX: (lineEl: HTMLElement, clientX: number) => number | null;
@@ -460,7 +463,7 @@ export interface UseWheelZoomReturn {
     zoomToFit: (containerWidth: number, contentWidth: number) => void;
 }
 
-// @public (undocumented)
+// @public
 export interface VisualLineNavigationOptions {
     // (undocumented)
     pagesContainerRef: React.RefObject<HTMLDivElement | null>;

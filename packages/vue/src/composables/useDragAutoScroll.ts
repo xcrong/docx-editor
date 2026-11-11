@@ -17,8 +17,14 @@ import {
 
 export interface DragAutoScrollOptions {
   pagesContainer: Ref<HTMLElement | null>;
-  /** Called during auto-scroll to extend the selection at the current mouse position. */
-  onScrollExtendSelection: (clientX: number, clientY: number) => void;
+  /**
+   * Called during auto-scroll to extend the selection at the current mouse position.
+   * `delta` is the signed px/frame scroll applied this frame — positive when
+   * scrolling down. Call sites use its sign to retry a miss inward when the
+   * pointer sits on the native scrollbar (`elementsFromPoint` hits nothing
+   * there, so a direct resolve would freeze the head mid-scroll).
+   */
+  onScrollExtendSelection: (clientX: number, clientY: number, delta: number) => void;
 }
 
 export interface UseDragAutoScrollReturn {
@@ -55,15 +61,34 @@ export function useDragAutoScroll({
   function tick() {
     if (!active) return;
     const container = getScrollParent();
-    if (!container) return;
+    if (!container) {
+      stopAutoScroll();
+      return;
+    }
 
     const rect = container.getBoundingClientRect();
     const scrollDelta = computeAutoScrollDelta(rect, lastMouseY);
 
-    if (scrollDelta !== 0) {
-      container.scrollTop += scrollDelta;
-      onScrollExtendSelection(lastMouseX, lastMouseY);
+    // Pointer left the edge zone — park the loop; the next mousemove
+    // inside the zone re-arms it via updateMousePosition.
+    if (scrollDelta === 0) {
+      stopAutoScroll();
+      return;
     }
+
+    // At the scroll limit there is nothing to reveal — stop instead of
+    // dispatching identical selection extensions at 60fps.
+    const maxTop = container.scrollHeight - container.clientHeight;
+    if (
+      (scrollDelta < 0 && container.scrollTop <= 0) ||
+      (scrollDelta > 0 && container.scrollTop >= maxTop - 1)
+    ) {
+      stopAutoScroll();
+      return;
+    }
+
+    container.scrollTop += scrollDelta;
+    onScrollExtendSelection(lastMouseX, lastMouseY, scrollDelta);
     rafId = requestAnimationFrame(tick);
   }
 

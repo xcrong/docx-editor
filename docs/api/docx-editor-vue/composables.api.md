@@ -76,7 +76,7 @@ export { createSelectionFromDOM }
 
 // @public (undocumented)
 export interface DragAutoScrollOptions {
-    onScrollExtendSelection: (clientX: number, clientY: number) => void;
+    onScrollExtendSelection: (clientX: number, clientY: number, delta: number) => void;
     // (undocumented)
     pagesContainer: Ref<HTMLElement | null>;
 }

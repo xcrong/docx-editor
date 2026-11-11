@@ -79,9 +79,14 @@ export function clearTextWidthCache(): void;
 export function clickToPosition(fragmentHit: FragmentHit | null, tableCellHit?: TableCellHit | null): number | null;
 
 // @public
-function clickToPositionDom(container: HTMLElement, clientX: number, clientY: number, zoom?: number): number | null;
+function clickToPositionDom(container: HTMLElement, clientX: number, clientY: number, zoom?: number, options?: ClickToPositionDomOptions): number | null;
 export { clickToPositionDom }
 export { clickToPositionDom as mouseToPosition }
+
+// @public
+export interface ClickToPositionDomOptions {
+    bodyOnly?: boolean;
+}
 
 // @public
 export function clickToPositionInParagraph(fragmentHit: FragmentHit): PositionResult | null;
