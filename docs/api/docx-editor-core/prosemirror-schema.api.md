@@ -240,6 +240,10 @@ export interface TableAttrs {
     _originalFormatting?: TableFormatting;
     styleId?: string;
     tableLayout?: 'fixed' | 'autofit' | null;
+    tblGridChange?: {
+        revisionId: number;
+        prior: number[];
+    } | null;
     tblPrChange?: TablePropertyChange[] | null;
     trailingBlockMarkers?: BlockBookmarkMarkers;
     width?: number;
@@ -292,6 +296,8 @@ export interface TableRowAttrs {
     heightRule?: string;
     isHeader?: boolean;
     _originalFormatting?: TableRowFormatting;
+    tblPrEx?: TableFormatting | null;
+    tblPrExChange?: TableExceptionsPropertyChange[] | null;
     // (undocumented)
     trDel?: RevisionInfo | null;
     trIns?: RevisionInfo | null;

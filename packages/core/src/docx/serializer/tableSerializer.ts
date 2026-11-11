@@ -310,33 +310,58 @@ export function serializeTableFormatting(
   formatting: TableFormatting | undefined,
   propertyChanges?: TablePropertyChange[]
 ): string {
+  // Children must follow the CT_TblPrBase sequence (wml.xsd):
+  // tblStyle, tblpPr, tblOverlap, bidiVisual, tblW, jc, tblCellSpacing,
+  // tblInd, tblBorders, shd, tblLayout, tblCellMar, tblLook. Word repairs
+  // out-of-order children, but strict validators reject them.
+  const parts = buildTableFormattingParts(formatting, false);
+
+  // OOXML allows at most one `<w:tblPrChange>` per `<w:tblPr>` (CT_TblPr
+  // maxOccurs="1"). Model array can carry multiple in-memory; emit one.
+  if (propertyChanges && propertyChanges.length > 0) {
+    parts.push(serializeTablePropertyChange(propertyChanges[0]));
+  }
+
+  if (parts.length === 0) return '';
+
+  return `<w:tblPr>${parts.join('')}</w:tblPr>`;
+}
+
+/**
+ * Shared ordered emitter for `CT_TblPrBase` / `CT_TblPrExBase` children.
+ * Row-level `<w:tblPrEx>` (`CT_TblPrExBase`) reuses the table-property
+ * element names in a subset order (tblW, jc, tblCellSpacing, tblInd,
+ * tblBorders, shd, tblLayout, tblCellMar, tblLook) — `exBaseOnly` skips
+ * the table-only heads (tblStyle, tblpPr, tblOverlap, bidiVisual).
+ */
+function buildTableFormattingParts(
+  formatting: TableFormatting | undefined,
+  exBaseOnly: boolean
+): string[] {
   const parts: string[] = [];
 
   if (formatting) {
-    // Children must follow the CT_TblPrBase sequence (wml.xsd):
-    // tblStyle, tblpPr, tblOverlap, bidiVisual, tblW, jc, tblCellSpacing,
-    // tblInd, tblBorders, shd, tblLayout, tblCellMar, tblLook. Word repairs
-    // out-of-order children, but strict validators reject them.
+    if (!exBaseOnly) {
+      // Table style (must be first)
+      if (formatting.styleId) {
+        parts.push(`<w:tblStyle w:val="${escapeXml(formatting.styleId)}"/>`);
+      }
 
-    // Table style (must be first)
-    if (formatting.styleId) {
-      parts.push(`<w:tblStyle w:val="${escapeXml(formatting.styleId)}"/>`);
-    }
+      // Floating table properties (w:tblpPr)
+      const floatingXml = serializeFloatingTableProperties(formatting.floating);
+      if (floatingXml) {
+        parts.push(floatingXml);
+      }
 
-    // Floating table properties (w:tblpPr)
-    const floatingXml = serializeFloatingTableProperties(formatting.floating);
-    if (floatingXml) {
-      parts.push(floatingXml);
-    }
+      // Overlap
+      if (formatting.overlap) {
+        parts.push(`<w:tblOverlap w:val="${formatting.overlap}"/>`);
+      }
 
-    // Overlap
-    if (formatting.overlap) {
-      parts.push(`<w:tblOverlap w:val="${formatting.overlap}"/>`);
-    }
-
-    // Bidirectional
-    if (formatting.bidi) {
-      parts.push('<w:bidiVisual/>');
+      // Bidirectional
+      if (formatting.bidi) {
+        parts.push('<w:bidiVisual/>');
+      }
     }
 
     // Table width
@@ -392,15 +417,7 @@ export function serializeTableFormatting(
     }
   }
 
-  // OOXML allows at most one `<w:tblPrChange>` per `<w:tblPr>` (CT_TblPr
-  // maxOccurs="1"). Model array can carry multiple in-memory; emit one.
-  if (propertyChanges && propertyChanges.length > 0) {
-    parts.push(serializeTablePropertyChange(propertyChanges[0]));
-  }
-
-  if (parts.length === 0) return '';
-
-  return `<w:tblPr>${parts.join('')}</w:tblPr>`;
+  return parts;
 }
 
 function extractTblPrInner(tblPrXml: string): string {
@@ -418,6 +435,38 @@ function serializeTablePropertyChange(change: TablePropertyChange): string {
     previousTblPrInner.length > 0 ? `<w:tblPr>${previousTblPrInner}</w:tblPr>` : '<w:tblPr/>';
 
   return `<w:tblPrChange ${attrs}>${normalizedPreviousTblPr}</w:tblPrChange>`;
+}
+
+/**
+ * Serialize row-level table-property exceptions (`<w:tblPrEx>`).
+ * `CT_Row` orders `<w:tblPrEx>` BEFORE `<w:trPr>`; `CT_TblPrEx` puts
+ * `<w:tblPrExChange>` last inside `<w:tblPrEx>`. Emits at most one change
+ * (same maxOccurs="1" clamp as the other `*Change` emitters).
+ */
+export function serializeTableRowExceptions(
+  exceptions: TableFormatting | undefined,
+  changes?: import('../../types/document').TableExceptionsPropertyChange[]
+): string {
+  const parts = buildTableFormattingParts(exceptions, true);
+
+  if (changes && changes.length > 0) {
+    parts.push(serializeTableExceptionsPropertyChange(changes[0]));
+  }
+
+  if (parts.length === 0) return '';
+
+  return `<w:tblPrEx>${parts.join('')}</w:tblPrEx>`;
+}
+
+function serializeTableExceptionsPropertyChange(
+  change: import('../../types/document').TableExceptionsPropertyChange
+): string {
+  const attrs = serializeTrackedChangeAttributes(change.info);
+  const priorParts = buildTableFormattingParts(change.previousFormatting, true);
+  const normalizedPrior =
+    priorParts.length > 0 ? `<w:tblPrEx>${priorParts.join('')}</w:tblPrEx>` : '<w:tblPrEx/>';
+
+  return `<w:tblPrExChange ${attrs}>${normalizedPrior}</w:tblPrExChange>`;
 }
 
 // ============================================================================
@@ -710,9 +759,17 @@ export function serializeTableCell(cell: TableCell): string {
 
 /**
  * Serialize a table row (w:tr)
+ *
+ * `CT_Row` orders `<w:tblPrEx>` BEFORE `<w:trPr>`, then the cells.
  */
 export function serializeTableRow(row: TableRow): string {
   const parts: string[] = [];
+
+  // Row-level table exceptions (before row properties per CT_Row)
+  const tblPrExXml = serializeTableRowExceptions(row.exceptions, row.tblPrExChange);
+  if (tblPrExXml) {
+    parts.push(tblPrExXml);
+  }
 
   // Row properties
   const trPrXml = serializeTableRowFormatting(
@@ -750,7 +807,7 @@ export function serializeTable(table: Table): string {
   // properties. Gated on the grid (not just rows) so a degenerate column-less
   // table never emits a tblPr with no following tblGrid.
   const tblPrXml = serializeTableFormatting(table.formatting, table.propertyChanges);
-  const tblGridXml = serializeTableGridForTable(table);
+  const tblGridXml = serializeTableGridForTable(table, table.gridChange);
   if (tblPrXml) {
     parts.push(tblPrXml);
   } else if (tblGridXml) {

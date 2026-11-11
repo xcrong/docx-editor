@@ -607,7 +607,8 @@
     "paragraphMarkPropertiesChanged": null,
     "runPropertiesChanged": null,
     "sectionPropertiesChanged": null,
-    "tableGridChanged": null
+    "tableGridChanged": null,
+    "tableExceptionsChanged": null
   },
   "contextMenu": {
     "ariaLabel": "Menu tindakan AI",

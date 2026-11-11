@@ -10,6 +10,8 @@ import type {
   TableRowPropertyChange,
   TableCellPropertyChange,
   TableStructuralChangeInfo,
+  TableExceptionsPropertyChange,
+  TableGridChange,
 } from './trackedChange';
 
 /**
@@ -39,8 +41,18 @@ export interface TableRow {
   type: 'tableRow';
   /** Row formatting */
   formatting?: TableRowFormatting;
+  /**
+   * Row-level table-property exceptions (`w:tblPrEx`, `CT_TblPrExBase`).
+   * Parsed from `<w:tr><w:tblPrEx>` (which precedes `<w:trPr>` per `CT_Row`)
+   * and re-emitted in the same position on save. Shaped as
+   * `TableFormatting` because the exception children reuse the same element
+   * names as table properties.
+   */
+  exceptions?: TableFormatting;
   /** Row-level tracked property changes (w:trPrChange) */
   propertyChanges?: TableRowPropertyChange[];
+  /** Per-row table-exception changes (`w:tblPrExChange`) */
+  tblPrExChange?: TableExceptionsPropertyChange[];
   /** Tracked structural changes (row insert/delete) */
   structuralChange?: TableStructuralChangeInfo;
   /** Cells in this row */
@@ -61,6 +73,8 @@ export interface Table {
   formatting?: TableFormatting;
   /** Table-level tracked property changes (w:tblPrChange) */
   propertyChanges?: TablePropertyChange[];
+  /** Table-grid change (`w:tblGridChange`, id only) */
+  gridChange?: TableGridChange;
   /** Column widths in twips */
   columnWidths?: number[];
   /** Table rows */

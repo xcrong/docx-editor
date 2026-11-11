@@ -14,6 +14,7 @@ import { type Command, type EditorState, type Transaction, TextSelection } from 
 import { getTableContext } from '../context';
 import { buildCellAttrsFromTemplate, buildParagraphAttrsFromTemplate } from './helpers';
 import { makeRevisionInfo as makeSuggestionInfo } from '../../../../plugins/revisionIds';
+import { SUGGESTION_META } from '../../../../plugins/suggestionMode/state';
 import {
   getDocumentStyleResolver,
   getDocumentTheme,
@@ -449,10 +450,10 @@ export function makeAddRowBelow(schema: Schema): Command {
   };
 }
 
-// TODO(Phase 2c): wrap with `makeSuggestionInfo` and set
-// `cellMarker: { kind: 'ins', info }` on each new cell when suggesting mode
-// is active. See `tracked-structural-tables/spec.md` — "Track column
-// insertion and deletion in suggesting mode."
+// Tracked column insertion: in suggesting mode every new cell carries
+// `cellMarker: { kind: 'ins' }` under one revision triple (matches the
+// "Track column insertion and deletion in suggesting mode" requirement).
+// Closed-mode behavior (plain cells, same geometry math) is unchanged.
 export function makeAddColumnLeft(schema: Schema): Command {
   return (state: EditorState, dispatch?: (tr: Transaction) => void): boolean => {
     const context = getTableContext(state);
@@ -466,6 +467,7 @@ export function makeAddColumnLeft(schema: Schema): Command {
 
     if (dispatch) {
       let tr = state.tr;
+      const suggestingInfo = makeSuggestionInfo(state);
       const newColumnCount = (context.columnCount || 1) + 1;
       // Width is stored as 50ths of a percent per ECMA-376 §17.18.111
       // (5000 = 100%) so resolveTableWidthPx can apply it directly.
@@ -494,6 +496,7 @@ export function makeAddColumnLeft(schema: Schema): Command {
               });
               cellAttrs.width = newColWidthPercent;
               cellAttrs.widthType = 'pct';
+              if (suggestingInfo) cellAttrs.cellMarker = { kind: 'ins', info: suggestingInfo };
               const newCell = schema.nodes.tableCell.create(cellAttrs, paragraph);
               tr = tr.insert(cellPos, newCell);
               inserted = true;
@@ -510,6 +513,7 @@ export function makeAddColumnLeft(schema: Schema): Command {
             );
             cellAttrs.width = newColWidthPercent;
             cellAttrs.widthType = 'pct';
+            if (suggestingInfo) cellAttrs.cellMarker = { kind: 'ins', info: suggestingInfo };
             const newCell = schema.nodes.tableCell.create(cellAttrs, paragraph);
             tr = tr.insert(cellPos, newCell);
           }
@@ -543,14 +547,15 @@ export function makeAddColumnLeft(schema: Schema): Command {
         });
       }
 
+      if (suggestingInfo) tr.setMeta(SUGGESTION_META, true);
       dispatch(tr.scrollIntoView());
     }
     return true;
   };
 }
 
-// TODO(Phase 2c): wrap with `makeSuggestionInfo` — same pattern as
-// `makeAddColumnLeft` above.
+// Tracked column insertion (right): same `cellMarker: ins` convention as
+// `makeAddColumnLeft`. Closed-mode behavior unchanged.
 export function makeAddColumnRight(schema: Schema): Command {
   return (state: EditorState, dispatch?: (tr: Transaction) => void): boolean => {
     const context = getTableContext(state);
@@ -564,6 +569,7 @@ export function makeAddColumnRight(schema: Schema): Command {
 
     if (dispatch) {
       let tr = state.tr;
+      const suggestingInfo = makeSuggestionInfo(state);
       const newColumnCount = (context.columnCount || 1) + 1;
       // Width is stored as 50ths of a percent per ECMA-376 §17.18.111
       // (5000 = 100%) so resolveTableWidthPx can apply it directly.
@@ -595,6 +601,7 @@ export function makeAddColumnRight(schema: Schema): Command {
               });
               cellAttrs.width = newColWidthPercent;
               cellAttrs.widthType = 'pct';
+              if (suggestingInfo) cellAttrs.cellMarker = { kind: 'ins', info: suggestingInfo };
               const newCell = schema.nodes.tableCell.create(cellAttrs, paragraph);
               tr = tr.insert(cellPos, newCell);
               inserted = true;
@@ -609,6 +616,7 @@ export function makeAddColumnRight(schema: Schema): Command {
             );
             cellAttrs.width = newColWidthPercent;
             cellAttrs.widthType = 'pct';
+            if (suggestingInfo) cellAttrs.cellMarker = { kind: 'ins', info: suggestingInfo };
             const newCell = schema.nodes.tableCell.create(cellAttrs, paragraph);
             tr = tr.insert(cellPos, newCell);
           }
@@ -642,6 +650,7 @@ export function makeAddColumnRight(schema: Schema): Command {
         });
       }
 
+      if (suggestingInfo) tr.setMeta(SUGGESTION_META, true);
       dispatch(tr.scrollIntoView());
     }
     return true;

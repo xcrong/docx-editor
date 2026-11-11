@@ -60,6 +60,54 @@ export const TRACKED_STRUCTURAL_FIXTURES = {
       `<w:sectPr><w:pgSz w:w="15840" w:h="12240" w:orient="landscape"/>` +
       `<w:sectPrChange w:id="206" w:author="Frank"><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:sectPrChange></w:sectPr>`
   ),
+
+  // -- T27-05 (issue #81): table row / cell revision fixtures -------------
+
+  /** Tracked row insertion + deletion (`w:trPr/w:ins`, `w:trPr/w:del`). */
+  tableRowInsDel: docXml(
+    `<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w="3000"/><w:gridCol w:w="3000"/></w:tblGrid>` +
+      `<w:tr><w:trPr><w:ins w:id="301" w:author="Jane" w:date="2024-05-06T07:08:09Z"/></w:trPr>` +
+      `<w:tc><w:p><w:r><w:t>new</w:t></w:r></w:p></w:tc>` +
+      `<w:tc><w:p><w:r><w:t>row</w:t></w:r></w:p></w:tc></w:tr>` +
+      `<w:tr><w:trPr><w:del w:id="302" w:author="Jane" w:date="2024-05-06T07:08:09Z"/></w:trPr>` +
+      `<w:tc><w:p><w:r><w:t>old</w:t></w:r></w:p></w:tc>` +
+      `<w:tc><w:p><w:r><w:t>row</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`
+  ),
+  /** Cell markers: `cellIns`, `cellDel`, and a `cellMerge` rest/cont pair. */
+  tableCellMarkers: docXml(
+    `<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w="3000"/><w:gridCol w:w="3000"/></w:tblGrid>` +
+      `<w:tr><w:tc><w:tcPr><w:cellIns w:id="310" w:author="Jane" w:date="2024-05-06T07:08:09Z"/></w:tcPr>` +
+      `<w:p><w:r><w:t>added</w:t></w:r></w:p></w:tc>` +
+      `<w:tc><w:tcPr><w:cellDel w:id="311" w:author="Jane" w:date="2024-05-06T07:08:09Z"/></w:tcPr>` +
+      `<w:p><w:r><w:t>removed</w:t></w:r></w:p></w:tc></w:tr>` +
+      `<w:tr><w:tc><w:tcPr><w:cellMerge w:vMerge="rest" w:id="312" w:author="Jane" w:date="2024-05-06T07:08:09Z"/></w:tcPr>` +
+      `<w:p><w:r><w:t>merged</w:t></w:r></w:p></w:tc>` +
+      `<w:tc><w:tcPr><w:cellMerge w:vMerge="cont" w:vMergeOrig="rest" w:id="312" w:author="Jane" w:date="2024-05-06T07:08:09Z"/></w:tcPr>` +
+      `<w:p><w:r><w:t>into</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`
+  ),
+  /** Property changes: `trPrChange`, `tcPrChange`, `tblPrChange`. */
+  tablePropertyChanges: docXml(
+    `<w:tbl><w:tblPr><w:jc w:val="left"/>` +
+      `<w:tblPrChange w:id="320" w:author="Cara" w:date="2024-06-07T08:09:10Z"><w:tblPr><w:jc w:val="center"/></w:tblPr></w:tblPrChange>` +
+      `</w:tblPr><w:tblGrid><w:gridCol w:w="3000"/><w:gridCol w:w="3000"/></w:tblGrid>` +
+      `<w:tr><w:trPr><w:trHeight w:val="500" w:hRule="atLeast"/>` +
+      `<w:trPrChange w:id="321" w:author="Cara" w:date="2024-06-07T08:09:10Z"><w:trPr><w:trHeight w:val="360" w:hRule="atLeast"/></w:trPr></w:trPrChange>` +
+      `</w:trPr><w:tc><w:tcPr><w:shd w:val="clear" w:fill="FFEB3B"/>` +
+      `<w:tcPrChange w:id="322" w:author="Cara" w:date="2024-06-07T08:09:10Z"><w:tcPr><w:shd w:val="clear" w:fill="FFFFFF"/></w:tcPr></w:tcPrChange>` +
+      `</w:tcPr><w:p><w:r><w:t>shaded</w:t></w:r></w:p></w:tc>` +
+      `<w:tc><w:p><w:r><w:t>plain</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`
+  ),
+  /** Row-level `tblPrEx` + `tblPrExChange`, and `tblGridChange` (id only). */
+  tableExAndGridChanges: docXml(
+    `<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w="3000"/><w:gridCol w:w="2000"/>` +
+      `<w:tblGridChange w:id="330"><w:tblGrid><w:gridCol w:w="2500"/><w:gridCol w:w="2500"/></w:tblGrid></w:tblGridChange>` +
+      `</w:tblGrid>` +
+      `<w:tr><w:tblPrEx><w:jc w:val="right"/>` +
+      `<w:tblPrExChange w:id="331" w:author="Dan" w:date="2024-07-08T09:10:11Z"><w:tblPrEx><w:jc w:val="center"/></w:tblPrEx></w:tblPrExChange>` +
+      `</w:tblPrEx>` +
+      `<w:tc><w:p><w:r><w:t>excepted</w:t></w:r></w:p></w:tc>` +
+      `<w:tc><w:p><w:r><w:t>row</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`
+  ),
 } as const;
 
 export type TrackedStructuralFixtureName = keyof typeof TRACKED_STRUCTURAL_FIXTURES;

@@ -308,6 +308,60 @@ function parseTableCellStructuralChange(
 }
 
 // ============================================================================
+// TABLE EXCEPTION / GRID REVISION PARSING (Phase 2)
+// ============================================================================
+
+/**
+ * Parse a per-row table-property exception change history
+ * (`<w:tblPrEx><w:tblPrExChange>`). `CT_TblPrExChange` (wml.xsd:866) extends
+ * `CT_TrackChange`, so info carries the full triple; the prior snapshot is
+ * a `CT_TblPrExBase` whose children reuse table-property element names.
+ */
+function parseTableRowExceptionsChanges(
+  tblPrExElement: XmlElement | null,
+  currentExceptions: TableFormatting | undefined
+): import('../types/document').TableExceptionsPropertyChange[] | undefined {
+  if (!tblPrExElement) return undefined;
+
+  const changes = findChildren(tblPrExElement, 'w', 'tblPrExChange')
+    .map((changeElement): import('../types/document').TableExceptionsPropertyChange => {
+      const previousTblPrEx = findChild(changeElement, 'w', 'tblPrEx');
+      return {
+        type: 'tableExceptionsPropertyChange',
+        info: parsePropertyChangeInfo(changeElement),
+        previousFormatting: parseTableProperties(previousTblPrEx),
+        currentFormatting: currentExceptions,
+      };
+    })
+    .filter((change) => change.previousFormatting || change.currentFormatting);
+
+  return changes.length > 0 ? changes : undefined;
+}
+
+/**
+ * Parse a table-grid change (`<w:tblGrid><w:tblGridChange>`).
+ * `CT_TblGridChange` (wml.xsd:893) extends `CT_Markup` — id ONLY, no
+ * author/date. The prior snapshot is the grid itself (column widths).
+ */
+function parseTableGridChange(
+  tblGridElement: XmlElement | null
+): import('../types/document').TableGridChange | undefined {
+  if (!tblGridElement) return undefined;
+  const changeElement = findChild(tblGridElement, 'w', 'tblGridChange');
+  if (!changeElement) return undefined;
+
+  const rawId = getAttribute(changeElement, 'w', 'id');
+  const parsedId = rawId ? parseInt(rawId, 10) : NaN;
+  if (!Number.isInteger(parsedId) || parsedId < 0) return undefined;
+  const previousGrid = findChild(changeElement, 'w', 'tblGrid');
+  return {
+    type: 'tableGridChange',
+    info: { id: parsedId },
+    previousColumnWidths: parseTableGrid(previousGrid),
+  };
+}
+
+// ============================================================================
 // TABLE ROW PROPERTIES PARSING (w:trPr)
 // ============================================================================
 
@@ -718,6 +772,15 @@ export function parseTableRow(
   row.propertyChanges = parseTableRowPropertyChanges(trPrElement, formatting);
   row.structuralChange = parseTableRowStructuralChange(trPrElement);
 
+  // Row-level table-property exceptions (`<w:tr><w:tblPrEx>`, precedes
+  // `<w:trPr>` per `CT_Row`) and their change history.
+  const tblPrExElement = findChild(trElement, 'w', 'tblPrEx');
+  if (tblPrExElement) {
+    const exceptions = parseTableProperties(tblPrExElement);
+    if (exceptions) row.exceptions = exceptions;
+    row.tblPrExChange = parseTableRowExceptionsChanges(tblPrExElement, exceptions);
+  }
+
   // Parse cells (capped: truncate absurd rows instead of OOMing)
   const cells = findChildren(trElement, 'w', 'tc');
   for (const cellElement of cells) {
@@ -846,10 +909,12 @@ export function parseTable(
   table.propertyChanges = parseTablePropertyChanges(tblPrElement, formatting);
 
   // Parse table grid (w:tblGrid)
-  const columnWidths = parseTableGrid(findChild(tblElement, 'w', 'tblGrid'));
+  const tblGridElement = findChild(tblElement, 'w', 'tblGrid');
+  const columnWidths = parseTableGrid(tblGridElement);
   if (columnWidths) {
     table.columnWidths = columnWidths;
   }
+  table.gridChange = parseTableGridChange(tblGridElement);
 
   // Parse rows (capped: truncate absurd tables instead of OOMing)
   const rows = findChildren(tblElement, 'w', 'tr');

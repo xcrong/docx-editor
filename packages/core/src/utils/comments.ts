@@ -104,6 +104,9 @@ export interface TrackedChangeEntry {
    *   (`<w:cellIns>` / `<w:cellDel>` / `<w:cellMerge>` / `<w:tcPrChange>`).
    * - `tablePropertiesChanged` — table-level formatting
    *   (`<w:tblPrChange>`).
+   * - `tableExceptionsChanged` — per-row table-property exceptions
+   *   (`<w:tblPrExChange>`).
+   * - `tableGridChanged` — table grid (`<w:tblGridChange>`, id only).
    * - `paragraphMarkPropertiesChanged` — formatting of the paragraph-mark
    *   glyph itself was changed (`w:pPr/w:rPr/w:rPrChange`,
    *   `CT_ParaRPrChange`).
@@ -127,6 +130,8 @@ export interface TrackedChangeEntry {
     | 'tableInserted'
     | 'tableDeleted'
     | 'tablePropertiesChanged'
+    | 'tableExceptionsChanged'
+    | 'tableGridChanged'
     | 'paragraphMarkPropertiesChanged'
     | 'sectionPropertiesChanged';
   /**

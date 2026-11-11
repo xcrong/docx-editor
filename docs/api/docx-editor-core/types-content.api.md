@@ -44,6 +44,16 @@ export interface BreakContent {
 }
 
 // @public
+export interface CellMarker {
+    // (undocumented)
+    info: RevisionInfo;
+    // (undocumented)
+    kind: 'ins' | 'del' | 'merge';
+    vMerge?: 'rest' | 'cont';
+    vMergeOrig?: 'rest' | 'cont';
+}
+
+// @public
 export interface Column {
     space?: number;
     width?: number;
@@ -501,6 +511,16 @@ export interface PropertyChangeInfo extends TrackedChangeInfo {
 }
 
 // @public
+export interface RevisionInfo {
+    // (undocumented)
+    author: string;
+    // (undocumented)
+    date: string | null;
+    // (undocumented)
+    revisionId: number;
+}
+
+// @public
 export interface Run {
     content: RunContent[];
     formatting?: TextFormatting;
@@ -747,6 +767,7 @@ export interface TabContent {
 export interface Table {
     columnWidths?: number[];
     formatting?: TableFormatting;
+    gridChange?: TableGridChange;
     leadingBlockMarkers?: (BookmarkStart | BookmarkEnd)[];
     propertyChanges?: TablePropertyChange[];
     rows: TableRow[];
@@ -775,6 +796,25 @@ export interface TableCellPropertyChange {
 }
 
 // @public
+export interface TableExceptionsPropertyChange {
+    currentFormatting?: TableFormatting;
+    info: PropertyChangeInfo;
+    previousFormatting?: TableFormatting;
+    // (undocumented)
+    type: 'tableExceptionsPropertyChange';
+}
+
+// @public
+export interface TableGridChange {
+    info: {
+        id: number;
+    };
+    previousColumnWidths?: number[];
+    // (undocumented)
+    type: 'tableGridChange';
+}
+
+// @public
 export interface TablePropertyChange {
     currentFormatting?: TableFormatting;
     info: PropertyChangeInfo;
@@ -786,9 +826,11 @@ export interface TablePropertyChange {
 // @public
 export interface TableRow {
     cells: TableCell[];
+    exceptions?: TableFormatting;
     formatting?: TableRowFormatting;
     propertyChanges?: TableRowPropertyChange[];
     structuralChange?: TableStructuralChangeInfo;
+    tblPrExChange?: TableExceptionsPropertyChange[];
     // (undocumented)
     type: 'tableRow';
 }

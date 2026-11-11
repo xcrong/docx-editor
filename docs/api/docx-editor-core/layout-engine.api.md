@@ -738,6 +738,11 @@ export type TableBlock = {
     bidi?: boolean;
     indent?: number;
     floating?: FloatingTablePosition;
+    tblPrChange?: TablePropertyChange[] | null;
+    tblGridChange?: {
+        revisionId: number;
+        prior: number[];
+    } | null;
     pmStart?: number;
     pmEnd?: number;
 };
@@ -762,6 +767,7 @@ export type TableCell = {
     };
     noWrap?: boolean;
     trackedMarker?: CellMarker;
+    tcPrChange?: TableCellPropertyChange[] | null;
 };
 
 // @public
@@ -806,6 +812,8 @@ export type TableRow = {
     cantSplit?: boolean;
     trackedIns?: RevisionInfo;
     trackedDel?: RevisionInfo;
+    trPrChange?: TableRowPropertyChange[] | null;
+    tblPrExChange?: TableExceptionsPropertyChange[] | null;
 };
 
 // @public

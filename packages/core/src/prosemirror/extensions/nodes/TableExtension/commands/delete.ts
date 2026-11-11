@@ -8,10 +8,12 @@
  * since they capture no state the wrap would be dead work.
  */
 
+import type { Node as PMNode } from 'prosemirror-model';
 import { type Command, type EditorState, type Transaction } from 'prosemirror-state';
 import { CellSelection, selectedRect } from 'prosemirror-tables';
 import { getTableContext } from '../context';
 import { makeRevisionInfo } from '../../../../plugins/revisionIds';
+import { SUGGESTION_META } from '../../../../plugins/suggestionMode/state';
 
 export const deleteRow: Command = (
   state: EditorState,
@@ -78,6 +80,9 @@ export const deleteRow: Command = (
           cellPos += cell.nodeSize;
         });
       }
+      // Tag the transaction so the suggesting-mode catch-all doesn't stamp
+      // the marked rows' text as an insertion.
+      tr.setMeta(SUGGESTION_META, true);
     } else {
       // Delete bottom-up so earlier rows' offsets stay valid.
       for (let r = lastRow; r >= firstRow; r--) {
@@ -91,11 +96,10 @@ export const deleteRow: Command = (
   return true;
 };
 
-// TODO(Phase 2c): when suggesting mode is active, set `cellMarker: { kind:
-// 'del', info }` on each cell in the column rather than removing them, so
-// the column stays visible until accept. See
-// `tracked-structural-tables/spec.md` — "Track column insertion and
-// deletion in suggesting mode."
+// Tracked column deletion: in suggesting mode set `cellMarker:
+// { kind: 'del' }` on each cell in the column rather than removing them,
+// so the column stays visible until accept. Closed-mode behavior
+// (physical removal + width redistribution) is unchanged.
 export const deleteColumn: Command = (
   state: EditorState,
   dispatch?: (tr: Transaction) => void
@@ -112,12 +116,15 @@ export const deleteColumn: Command = (
 
   if (dispatch) {
     let tr = state.tr;
+    const info = makeRevisionInfo(state);
     const newColumnCount = (context.columnCount || 2) - 1;
     // Width is stored as 50ths of a percent per ECMA-376 §17.18.111
     // (5000 = 100%) so resolveTableWidthPx can apply it directly.
     const newColWidthPercent = Math.floor(5000 / newColumnCount);
 
-    const deleteOps: { start: number; end: number }[] = [];
+    // Collect the cells covered by the target column first; the suggesting
+    // branch marks them, the closed branch deletes them.
+    const targetCells: { start: number; end: number; node: PMNode }[] = [];
     let rowPos = context.tablePos + 1;
 
     context.table.forEach((row) => {
@@ -131,7 +138,7 @@ export const deleteColumn: Command = (
           const cellColspan = cell.attrs.colspan || 1;
 
           if (colIdx <= context.columnIndex! && context.columnIndex! < colIdx + cellColspan) {
-            deleteOps.push({ start: cellStart, end: cellEnd });
+            targetCells.push({ start: cellStart, end: cellEnd, node: cell });
           }
 
           cellPos = cellEnd;
@@ -141,6 +148,24 @@ export const deleteColumn: Command = (
       rowPos += row.nodeSize;
     });
 
+    if (info) {
+      // Suggesting mode: keep the column, mark every covered cell as a
+      // tracked deletion under one revision triple. Widths are left alone
+      // — the grid still contains the column until accept removes it.
+      for (const { start, node } of targetCells) {
+        if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
+          tr = tr.setNodeMarkup(start, undefined, {
+            ...node.attrs,
+            cellMarker: { kind: 'del', info },
+          });
+        }
+      }
+      tr.setMeta(SUGGESTION_META, true);
+      dispatch(tr.scrollIntoView());
+      return true;
+    }
+
+    const deleteOps = targetCells.map(({ start, end }) => ({ start, end }));
     deleteOps.reverse().forEach(({ start, end }) => {
       tr = tr.delete(start, end);
     });

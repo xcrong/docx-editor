@@ -12,6 +12,10 @@ import type {
   ParagraphMarkPropertyChange,
   ParagraphPropertyChange,
   SectionPropertyChange,
+  TablePropertyChange,
+  TableRowPropertyChange,
+  TableCellPropertyChange,
+  TableExceptionsPropertyChange,
 } from '../types/content/trackedChange';
 
 export type { InlineSdtWidget } from './inlineSdtWidgets';
@@ -453,6 +457,13 @@ export type TableCell = {
   noWrap?: boolean;
   /** Tracked cell marker (`<w:cellIns>` / `<w:cellDel>` / `<w:cellMerge>`) — painter colors the top border. */
   trackedMarker?: import('../types/content/trackedChange').CellMarker;
+  /**
+   * Cell-property change history (`<w:tcPrChange>`). Same passthrough
+   * contract as `ParagraphAttrs.pPrChange` (same reference, no copy) so a
+   * future painter change-bar render and the measurement cache can
+   * discriminate without re-reading the PM doc.
+   */
+  tcPrChange?: TableCellPropertyChange[] | null;
 };
 
 /**
@@ -473,6 +484,10 @@ export type TableRow = {
   /** Tracked row ins / del (`<w:trPr><w:ins/>` / `<w:del/>`). */
   trackedIns?: import('../types/content/trackedChange').RevisionInfo;
   /** see trackedIns */ trackedDel?: import('../types/content/trackedChange').RevisionInfo;
+  /** Row-property change history (`<w:trPrChange>`) — same passthrough contract. */
+  trPrChange?: TableRowPropertyChange[] | null;
+  /** Per-row table-exception change history (`<w:tblPrExChange>`). */
+  tblPrExChange?: TableExceptionsPropertyChange[] | null;
 };
 
 /**
@@ -513,6 +528,16 @@ export type TableBlock = {
   indent?: number;
   /** Floating table properties (pixel values). */
   floating?: FloatingTablePosition;
+  /**
+   * Table-property change history (`<w:tblPrChange>`) — same passthrough
+   * contract as paragraph `pPrChange`.
+   */
+  tblPrChange?: TablePropertyChange[] | null;
+  /**
+   * Table-grid change (`<w:tblGridChange>`, id only). Carried so a future
+   * painter change-bar render can discriminate; measurement ignores it.
+   */
+  tblGridChange?: { revisionId: number; prior: number[] } | null;
   pmStart?: number;
   pmEnd?: number;
 };

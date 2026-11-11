@@ -10,10 +10,16 @@ import {
   acceptAllChanges,
   rejectAllChanges,
   addRowBelow,
+  addColumnRight,
+  mergeCells,
+  setCellFillColor,
   deleteRow,
   insertTable,
   insertImageNode,
 } from '@xcrong/docx-editor-core/prosemirror/commands';
+// Same deep-import path the React adapter uses for cell-drag selection —
+// the demo has no direct prosemirror-tables dep.
+import { applyCellSelection } from '@xcrong/docx-editor-core/prosemirror/cellDragSelection';
 import type { DocxEditorRef } from '@xcrong/docx-editor-react';
 import { templatePluginKey } from '@xcrong/docx-editor-react/plugin-api';
 import { createReviewBridge } from '@xcrong/docx-editor-agents/bridge';
@@ -419,6 +425,80 @@ export function installE2EHooks(
       const view = editorRef.current?.getEditorRef()?.getView?.();
       if (!view) return false;
       return deleteRow(view.state, view.dispatch);
+    },
+    // T27-05: dispatch `addColumnRight` (suggesting → `cellMarker: ins`).
+    addColumnRight: () => {
+      const view = editorRef.current?.getEditorRef()?.getView?.();
+      if (!view) return false;
+      return addColumnRight(view.state, view.dispatch);
+    },
+    // T27-05: select the first row's first two cells and dispatch
+    // `mergeCells` (suggesting → `ins` + `del` markers, no collapse).
+    mergeFirstRowCells: () => {
+      const view = editorRef.current?.getEditorRef()?.getView?.();
+      if (!view) return false;
+      const cellPositions: number[] = [];
+      view.state.doc.descendants((node, pos) => {
+        if (cellPositions.length >= 2) return false;
+        if (node.type.name === 'tableRow') {
+          if (cellPositions.length > 0) return false;
+          return true;
+        }
+        if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
+          cellPositions.push(pos);
+          return false;
+        }
+        return true;
+      });
+      if (cellPositions.length < 2) return false;
+      if (!applyCellSelection(view, cellPositions[0]!, cellPositions[1]!)) return false;
+      return mergeCells(view.state, view.dispatch);
+    },
+    // T27-05: dispatch `setCellFillColor` on the current cell selection.
+    setFirstCellFillColor: (color: string) => {
+      const view = editorRef.current?.getEditorRef()?.getView?.();
+      if (!view) return false;
+      return setCellFillColor(color)(view.state, view.dispatch);
+    },
+    // T27-05: snapshot the first table's revision attrs for assertions —
+    // row markers, per-cell markers, column counts, table-level changes.
+    getFirstTableSnapshot: () => {
+      const view = editorRef.current?.getEditorRef()?.getView?.();
+      if (!view) return null;
+      const rows: Array<Record<string, unknown>> = [];
+      const cells: Array<Array<unknown>> = [];
+      let tableAttrs: Record<string, unknown> | null = null;
+      let inFirstTable = false;
+      view.state.doc.descendants((node) => {
+        if (node.type.name === 'table') {
+          if (inFirstTable) return false;
+          inFirstTable = true;
+          tableAttrs = { ...(node.attrs as Record<string, unknown>) };
+          return true;
+        }
+        if (!inFirstTable) return false;
+        if (node.type.name === 'tableRow') {
+          const attrs = node.attrs as Record<string, unknown>;
+          rows.push({ trIns: attrs.trIns ?? null, trDel: attrs.trDel ?? null });
+          const markers: Array<unknown> = [];
+          node.forEach((cell) => {
+            markers.push((cell.attrs as Record<string, unknown>).cellMarker ?? null);
+          });
+          cells.push(markers);
+          return false;
+        }
+        return false;
+      });
+      if (tableAttrs == null) return null;
+      const colCount = cells.length > 0 ? cells[0]!.length : 0;
+      return {
+        rowCount: rows.length,
+        colCount,
+        rows,
+        cells,
+        tblPrChange: tableAttrs.tblPrChange ?? null,
+        tblGridChange: tableAttrs.tblGridChange ?? null,
+      };
     },
     // Test-only: plant trIns on the first table row in the document.
     // Returns false if no table exists.

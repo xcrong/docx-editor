@@ -1,4 +1,4 @@
-import type { Table } from '../../types/document';
+import type { Table, TableGridChange } from '../../types/document';
 import { DEFAULT_TABLE_WIDTH_DXA, distributeColumnWidths } from '../../utils/tableWidth';
 import { intAttr } from './xmlUtils';
 
@@ -78,11 +78,24 @@ function inferTableGridWidths(table: Table): number[] {
  * Serialize `w:tblGrid` for a table. A `w:tblGrid` is a required child of
  * `w:tbl`, so a grid is derived from explicit column widths, first-row cell
  * widths, or an even split of the table width when none are present.
+ *
+ * When `gridChange` is set, its `<w:tblGridChange>` (id ONLY — `CT_Markup`
+ * has no author/date) is appended as the last child of `<w:tblGrid>` per
+ * `CT_TblGrid`, carrying the prior grid.
  */
-export function serializeTableGridForTable(table: Table): string {
+export function serializeTableGridForTable(table: Table, gridChange?: TableGridChange): string {
   const columnWidths = inferTableGridWidths(table);
   if (columnWidths.length === 0) return '';
 
   const cols = columnWidths.map((w) => `<w:gridCol w:w="${intAttr(w)}"/>`);
-  return `<w:tblGrid>${cols.join('')}</w:tblGrid>`;
+  let changeXml = '';
+  if (gridChange) {
+    const priorCols = (gridChange.previousColumnWidths ?? [])
+      .filter((w) => Number.isFinite(w) && w > 0)
+      .map((w) => `<w:gridCol w:w="${intAttr(w)}"/>`);
+    changeXml =
+      `<w:tblGridChange w:id="${intAttr(gridChange.info.id)}">` +
+      `<w:tblGrid>${priorCols.join('')}</w:tblGrid></w:tblGridChange>`;
+  }
+  return `<w:tblGrid>${cols.join('')}${changeXml}</w:tblGrid>`;
 }
