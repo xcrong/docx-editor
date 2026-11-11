@@ -122,48 +122,48 @@ Three landable phases. Each phase is a separate PR. Phase 1 includes the snapsho
 
 ### Schema
 
-- [ ] Add `trIns`, `trDel`, `trPrChange[]`, `tblPrExChange[]` (per-row) to `table_row` node
-- [ ] Add `cellMarker` (`{ kind: 'ins' | 'del' | 'merge', info, vMerge?, vMergeOrig? }` discriminated union, mutually exclusive per schema), `tcPrChange[]` to `table_cell` node
-- [ ] Add `tblPrChange[]`, `tblGridChange` (id-only, no author/date) to `table` node
+- [x] Add `trIns`, `trDel`, `trPrChange[]`, `tblPrExChange[]` (per-row) to `table_row` node (T27-05: `trIns`/`trDel`/`trPrChange` pre-existed on main; added `tblPrEx` + `tblPrExChange[]` to `nodes.ts` + `TableExtension/specs.ts`)
+- [x] Add `cellMarker` (`{ kind: 'ins' | 'del' | 'merge', info, vMerge?, vMergeOrig? }` discriminated union, mutually exclusive per schema), `tcPrChange[]` to `table_cell` node (T27-05: pre-existed; extended shared `CellMarker` with `vMerge`/`vMergeOrig`)
+- [x] Add `tblPrChange[]`, `tblGridChange` (id-only, no author/date) to `table` node (T27-05: `tblPrChange` pre-existed; added `tblGridChange { revisionId, prior }` to `nodes.ts` + `specs.ts`)
 
 ### Parser
 
-- [ ] `tableParser.ts` — read `<w:trPr><w:ins/>` / `<w:del/>` (currently not read)
-- [ ] Wire existing parses of `trPrChange`, `cellIns`, `cellDel`, `cellMerge` (vertical only — `vMerge`/`vMergeOrig`, no `val` attribute), `tcPrChange`, `tblPrChange`, `tblGridChange` to model fields
-- [ ] **Relocate `tblPrExChange` from table-level to row-level** model storage
+- [x] `tableParser.ts` — read `<w:trPr><w:ins/>` / `<w:del/>` (currently not read) (T27-05: pre-existed as `parseTableRowStructuralChange`; verified by `tableRowInsDel` fixture)
+- [x] Wire existing parses of `trPrChange`, `cellIns`, `cellDel`, `cellMerge` (vertical only — `vMerge`/`vMergeOrig`, no `val` attribute), `tcPrChange`, `tblPrChange`, `tblGridChange` to model fields (T27-05: all but `tblGridChange` pre-existed; added `parseTableGridChange` id-only + `vMergeOrig` covered by `tableCellMarkers` fixture)
+- [x] **Relocate `tblPrExChange` from table-level to row-level** model storage (T27-05: no table-level parse existed — added fresh row-level `parseTableRowExceptionsChanges` on `w:tr/w:tblPrEx` + current `exceptions` via `parseTableProperties`)
 
 ### Conversion
 
-- [ ] `toProseDoc/table.ts` — map every table revision to attrs
-- [ ] `fromProseDoc/table.ts` — inverse
-- [ ] `extractTrackedChanges.ts` extends to walk table attrs
+- [x] `toProseDoc/table.ts` — map every table revision to attrs (T27-05: added `tblPrEx`/`tblPrExChange`/`tblGridChange`; rest pre-existed)
+- [x] `fromProseDoc/table.ts` — inverse (T27-05: same three + fixed the minimal-formatting early return dropping `tblPrChange`/`gridChange`)
+- [x] `extractTrackedChanges.ts` extends to walk table attrs (T27-05: added `tableExceptionsChanged` + `tableGridChanged` entries, priority map, `comments.ts` union)
 
 ### Cache key
 
-- [ ] `hashTableBlock` (or equivalent) — extend to include revision attrs
+- [x] `hashTableBlock` (or equivalent) — extend to include revision attrs (T27-05: verified absent — no table-block measure cache exists; `measureTable.ts` holds only a local grid lookup `Map`, `cache.ts` hashes paragraphs only. Same N/A treatment as T27-01)
 
 ### FlowBlock plumbing
 
-- [ ] `toFlowBlocks` — pass table revision attrs through to `TableBlock.attrs`
+- [x] `toFlowBlocks` — pass table revision attrs through to `TableBlock.attrs` (T27-05: `tblPrChange`/`tblGridChange` on `TableBlock`, `trPrChange`/`tblPrExChange` on `TableRow`, `tcPrChange` on `TableCell` (layout); same-reference passthrough, no new `FlowBlock` variant — the 3 `assertExhaustiveFlowBlock` switches untouched, `typecheck` green)
 
 ### Serializer
 
-- [ ] `tableSerializer.ts` — emit `<w:trPr><w:ins/>` / `<w:del/>` and all `*Change` markers
-- [ ] Emit `<w:cellIns/>`, `<w:cellDel/>` from `cellMarker.kind === 'ins' | 'del'`
-- [ ] Emit `<w:cellMerge w:vMerge="rest|cont"/>` from `cellMarker.kind === 'merge'` (**NOT `w:val`**); include `vMergeOrig` if present
-- [ ] Emit `<w:tblGridChange w:id="…"/>` **id only** — do not emit `w:author` or `w:date` (schema rejects)
-- [ ] Move `<w:tblPrExChange>` emission to per-row position
+- [x] `tableSerializer.ts` — emit `<w:trPr><w:ins/>` / `<w:del/>` and all `*Change` markers (T27-05: pre-existed; order verified against `CT_TrPr`: formatting, `ins`/`del`, `trPrChange` last)
+- [x] Emit `<w:cellIns/>`, `<w:cellDel/>` from `cellMarker.kind === 'ins' | 'del'` (T27-05: pre-existed; covered by `tableCellMarkers` fixture)
+- [x] Emit `<w:cellMerge w:vMerge="rest|cont"/>` from `cellMarker.kind === 'merge'` (**NOT `w:val`**); include `vMergeOrig` if present (T27-05: pre-existed; `w:val` absence asserted in `tracked-structural-tables-roundtrip.test.ts`)
+- [x] Emit `<w:tblGridChange w:id="…"/>` **id only** — do not emit `w:author` or `w:date` (schema rejects) (T27-05: added in `tableGrid.ts`; author-absence asserted)
+- [x] Move `<w:tblPrExChange>` emission to per-row position (T27-05: added `serializeTableRowExceptions`; per `CT_Row` the `<w:tblPrEx>` wrapper emits BEFORE `<w:trPr>`)
 
 ### Suggesting-aware table commands
 
-- [ ] `extensions/nodes/TableExtension.ts` — `addRow` sets `trIns` and `cellMarker: ins` on new cells
-- [ ] `deleteRow` sets `trDel` and `cellMarker: del` on the row's cells rather than removing
-- [ ] `addColumn` sets `cellMarker: ins` on each new cell
-- [ ] `deleteColumn` sets `cellMarker: del` on each affected cell
-- [ ] `mergeCells` horizontal: set `cellMarker: ins` on the merging cell and `cellMarker: del` on absorbed cells (matches Word's on-disk convention; no horizontal `cellMerge` element exists)
-- [ ] `mergeCells` vertical: set `cellMarker: { kind: 'merge', vMerge: 'rest' }` on the top cell and `cellMarker: { kind: 'merge', vMerge: 'cont' }` on each cell below
-- [ ] `splitCells` clears the relevant `cellMarker` entries
-- [ ] Wrap table/row/cell property commands with `withSuggestingSnapshot`
+- [x] `extensions/nodes/TableExtension.ts` — `addRow` sets `trIns` and `cellMarker: ins` on new cells (T27-05: pre-existed in `insert.ts:buildSuggestingRow`; covered by existing `tracked-changes-structural.spec.ts`)
+- [x] `deleteRow` sets `trDel` and `cellMarker: del` on the row's cells rather than removing (T27-05: pre-existed in `delete.ts`; added missing `SUGGESTION_META` so the catch-all doesn't stamp cell text as insertion — unit-pinned in `suggestingTableCommands.test.ts`)
+- [x] `addColumn` sets `cellMarker: ins` on each new cell (T27-05: added to `makeAddColumnLeft/Right` + `SUGGESTION_META`; unit + e2e)
+- [x] `deleteColumn` sets `cellMarker: del` on each affected cell (T27-05: added suggesting branch in `delete.ts`, widths untouched until accept; unit)
+- [x] `mergeCells` horizontal: set `cellMarker: ins` on the merging cell and `cellMarker: del` on absorbed cells (matches Word's on-disk convention; no horizontal `cellMerge` element exists) (T27-05: new `merge.ts`; unit + e2e)
+- [x] `mergeCells` vertical: set `cellMarker: { kind: 'merge', vMerge: 'rest' }` on the top cell and `cellMarker: { kind: 'merge', vMerge: 'cont' }` on each cell below (T27-05: new `merge.ts`; `formatting.vMerge` untouched per the continuation-rendering constraint; unit)
+- [x] `splitCells` clears the relevant `cellMarker` entries (T27-05: `merge.ts:splitCell` clears the split area via the new `TableMap`; dialog path `splitActiveTableCell` clears target-rect fragments when suggesting; unit)
+- [x] Wrap table/row/cell property commands with `withSuggestingSnapshot` (T27-05: new `tableSnapshot.ts` — `tblPrChange`/`trPrChange`/`tcPrChange`/`tblGridChange` with freeze-first/clear-no-op semantics; wrapped 17 commands at the `commands/table.ts` re-export layer covering both adapters; unit + `tcPrChange`-in-ZIP e2e)
 
 ### Accept / Reject
 
@@ -187,27 +187,27 @@ Three landable phases. Each phase is a separate PR. Phase 1 includes the snapsho
 
 ### Vue parity
 
-- [ ] Painter inherits transparently from core
-- [ ] Mirror any new sidebar item builders in Vue
+- [x] Painter inherits transparently from core (T27-05: painter untouched — core-only command/snapshot changes flow to Vue via the shared runtime + `commands/table.ts` layer; verified `typecheck` green for `vue`)
+- [x] Mirror any new sidebar item builders in Vue (T27-05: N/A — no sidebar builders; sidebar/painter rendering is T27-06)
 
 ### Agents package
 
-- [ ] Extend or defer (per Phase 1 decision); if extending, handle table revision attrs
+- [x] Extend or defer (per Phase 1 decision); if extending, handle table revision attrs (T27-05: DEFER per #120, same as Phase 1)
 
 ### Tests
 
-- [ ] Fixtures per marker type in `packages/core/src/docx/__tests__/fixtures/tracked-structural/`
-- [ ] Parser round-trip tests
-- [ ] Conversion unit tests
-- [ ] Playwright: add/delete row, add/delete column, horizontal/vertical merge in suggesting mode
-- [ ] Playwright: open fixture with table revisions, save, reopen
+- [x] Fixtures per marker type in `packages/core/src/docx/__tests__/fixtures/tracked-structural/` (T27-05: `tableRowInsDel`, `tableCellMarkers`, `tablePropertyChanges`, `tableExAndGridChanges` — self-generated strings, no third-party samples)
+- [x] Parser round-trip tests (T27-05: `tracked-structural-tables-roundtrip.test.ts` — 4 fixtures incl. `vMergeOrig` + id-only grid; the Phase-1 double-round-trip test covers the new fixtures automatically)
+- [x] Conversion unit tests (T27-05: PM attrs ↔ model for `tblPrEx`/`tblPrExChange`/`tblGridChange`/markers + extractor entries)
+- [x] Playwright: add/delete row, add/delete column, horizontal/vertical merge in suggesting mode (T27-05: narrow `tracked-changes-tables-suggesting.spec.ts` — addColumn, merge-H, fill→`tcPrChange`, deleteRow save→reload e2e; addRow pre-covered; merge-V/split/deleteColumn covered at unit level in `suggestingTableCommands.test.ts` + `tableSnapshot.test.ts`)
+- [x] Playwright: open fixture with table revisions, save, reopen (T27-05: deleteRow save → ZIP has `<w:del>` → reload keeps the marked row, covered in the narrow spec)
 - [ ] Single-row delete-row accept removes table node
 - [ ] Accept/reject coverage for each marker
-- [ ] `comments-sidebar.spec.ts` regression
+- [x] `comments-sidebar.spec.ts` regression (T27-05: ran green — 18 passed; no sidebar files touched)
 
 ### Release
 
-- [ ] `bun changeset` — minor bump
+- [x] `bun changeset` — minor bump (T27-05: `.changeset/t27-05-table-rev-81.md` — core minor)
 
 ---
 

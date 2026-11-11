@@ -12,12 +12,7 @@
  */
 
 import { chainCommands } from 'prosemirror-commands';
-import {
-  columnResizing,
-  tableEditing,
-  mergeCells as pmMergeCells,
-  splitCell as pmSplitCell,
-} from 'prosemirror-tables';
+import { columnResizing, tableEditing } from 'prosemirror-tables';
 import type { ExtensionContext, ExtensionRuntime } from '../../../types';
 import {
   makeInsertTable,
@@ -26,6 +21,7 @@ import {
   makeAddColumnLeft,
   makeAddColumnRight,
 } from './insert';
+import { mergeCells, splitCell } from './merge';
 import {
   deleteRow,
   deleteColumn,
@@ -89,8 +85,8 @@ export function setupTableRuntime(ctx: ExtensionContext): ExtensionRuntime {
       selectTable: () => selectTable,
       selectRow: () => selectRow,
       selectColumn: () => selectColumn,
-      mergeCells: () => pmMergeCells,
-      splitCell: () => pmSplitCell,
+      mergeCells: () => mergeCells,
+      splitCell: () => splitCell,
       setCellBorder,
       setTableBorders,
       setCellVerticalAlign,

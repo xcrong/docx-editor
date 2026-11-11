@@ -40,6 +40,8 @@ export const tableSpec: NodeSpec = {
     // Table-property change history (`<w:tblPrChange>`). Round-trip only;
     // accept/reject by id resolves the entry. Serializer clamps to one entry.
     tblPrChange: { default: null },
+    // Table-grid change (`<w:tblGridChange>`, id only). Round-trip only.
+    tblGridChange: { default: null },
   },
   parseDOM: [
     {
@@ -136,6 +138,10 @@ export const tableRowSpec: NodeSpec = {
     trIns: { default: null },
     trDel: { default: null },
     trPrChange: { default: null },
+    // Row-level table-property exceptions (`<w:tblPrEx>`, precedes `<w:trPr>`
+    // per `CT_Row`) and their change history (`<w:tblPrExChange>`).
+    tblPrEx: { default: null },
+    tblPrExChange: { default: null },
   },
   parseDOM: [{ tag: 'tr' }],
   toDOM(node) {

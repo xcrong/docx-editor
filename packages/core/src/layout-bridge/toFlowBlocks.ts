@@ -464,6 +464,10 @@ function convertTableCell(
     | import('../types/content/trackedChange').CellMarker
     | null
     | undefined;
+  const tcPrChange = attrs.tcPrChange as
+    | import('../types/content/trackedChange').TableCellPropertyChange[]
+    | null
+    | undefined;
 
   return {
     id: nextBlockId(),
@@ -479,6 +483,7 @@ function convertTableCell(
     padding,
     noWrap: (attrs.noWrap as boolean | undefined) || undefined,
     trackedMarker: cellMarker ?? undefined,
+    tcPrChange: tcPrChange ?? undefined,
   };
 }
 
@@ -505,6 +510,14 @@ function convertTableRow(
   // `w:cantSplit` (§17.4.6) is preserved only in _originalFormatting; surface it
   // so the layout engine keeps the row whole across page boundaries.
   const rowFormatting = attrs._originalFormatting as { cantSplit?: boolean } | null | undefined;
+  const trPrChange = attrs.trPrChange as
+    | import('../types/content/trackedChange').TableRowPropertyChange[]
+    | null
+    | undefined;
+  const tblPrExChange = attrs.tblPrExChange as
+    | import('../types/content/trackedChange').TableExceptionsPropertyChange[]
+    | null
+    | undefined;
   return {
     id: nextBlockId(),
     cells,
@@ -516,6 +529,8 @@ function convertTableRow(
       (attrs.trIns as import('../types/content/trackedChange').RevisionInfo | null) ?? undefined,
     trackedDel:
       (attrs.trDel as import('../types/content/trackedChange').RevisionInfo | null) ?? undefined,
+    trPrChange: trPrChange ?? undefined,
+    tblPrExChange: tblPrExChange ?? undefined,
   };
 }
 
@@ -605,6 +620,18 @@ function convertTable(node: PMNode, startPos: number, options: ToFlowBlocksOptio
       }
     : undefined;
 
+  const tblPrChange = node.attrs.tblPrChange as
+    | import('../types/content/trackedChange').TablePropertyChange[]
+    | null
+    | undefined;
+  const tblGridChange = node.attrs.tblGridChange as
+    | {
+        revisionId: number;
+        prior: number[];
+      }
+    | null
+    | undefined;
+
   return {
     kind: 'table',
     id: nextBlockId(),
@@ -616,6 +643,8 @@ function convertTable(node: PMNode, startPos: number, options: ToFlowBlocksOptio
     bidi: node.attrs.bidi || undefined,
     indent: indentPx,
     floating: floatingPx,
+    tblPrChange: tblPrChange ?? undefined,
+    tblGridChange: tblGridChange ?? undefined,
     pmStart: startPos,
     pmEnd: startPos + node.nodeSize,
   };

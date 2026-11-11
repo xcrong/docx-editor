@@ -292,6 +292,14 @@ export function convertPMTable(node: PMNode): Table {
     if (rowAttrs.trPrChange && rowAttrs.trPrChange.length > 0) {
       tr.propertyChanges = rowAttrs.trPrChange;
     }
+    // Row-level table-property exceptions (`<w:tblPrEx>`) and their change
+    // history (`<w:tblPrExChange>`, per-row storage per `CT_Row`).
+    if (rowAttrs.tblPrEx) {
+      tr.exceptions = rowAttrs.tblPrEx;
+    }
+    if (rowAttrs.tblPrExChange && rowAttrs.tblPrExChange.length > 0) {
+      tr.tblPrExChange = rowAttrs.tblPrExChange;
+    }
     rows.push(tr);
   }
 
@@ -312,6 +320,11 @@ export function convertPMTable(node: PMNode): Table {
           formatting: { borders: inferredBorders },
           rows,
         };
+        if (attrs.tblPrChange && attrs.tblPrChange.length > 0) {
+          minimal.propertyChanges = attrs.tblPrChange;
+        }
+        const minimalGridChange = pmGridChangeToModel(attrs.tblGridChange);
+        if (minimalGridChange) minimal.gridChange = minimalGridChange;
         applyBlockMarkers(minimal, attrs);
         return minimal;
       }
@@ -327,8 +340,27 @@ export function convertPMTable(node: PMNode): Table {
   if (attrs.tblPrChange && attrs.tblPrChange.length > 0) {
     result.propertyChanges = attrs.tblPrChange;
   }
+  // Table-grid change (`<w:tblGridChange>`, id only). `prior` is the grid
+  // (column widths in twips) before the change; empty means unknown.
+  const gridChange = pmGridChangeToModel(attrs.tblGridChange);
+  if (gridChange) result.gridChange = gridChange;
   applyBlockMarkers(result, attrs);
   return result;
+}
+
+/**
+ * Map the PM `tblGridChange` attr (`{ revisionId, prior }`) back to the
+ * model `Table.gridChange`. Shared by both `convertPMTable` return paths.
+ */
+function pmGridChangeToModel(
+  attr: TableAttrs['tblGridChange']
+): import('../../../types/document').TableGridChange | undefined {
+  if (!attr) return undefined;
+  return {
+    type: 'tableGridChange',
+    info: { id: attr.revisionId },
+    ...(attr.prior.length > 0 ? { previousColumnWidths: attr.prior } : {}),
+  };
 }
 
 /**

@@ -17,6 +17,8 @@ import {
   redistributeColumnWidths,
   sumColumnWidths,
 } from '../../utils/tableSplitAlgorithm';
+import { isSuggestionModeActive } from '../plugins/suggestionMode/commands';
+import { SUGGESTION_META } from '../plugins/suggestionMode/state';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -291,6 +293,15 @@ export function splitActiveTableCell(
 
   // Sort anchors and build row children
   const rowChildren = Array.from({ length: layout.newRowCount }, () => [] as PMNode[]);
+  // In suggesting mode the split resolves pending cell markers: every
+  // fragment of the split cell drops its `cellMarker` (the merge / insert /
+  // delete it tracked is undone by the split). Closed-mode behavior keeps
+  // attrs verbatim.
+  const clearSplitMarkers = isSuggestionModeActive(state);
+  const splitTop = activeCell.row;
+  const splitBottom = activeCell.row + rows;
+  const splitLeft = activeCell.col;
+  const splitRight = activeCell.col + cols;
   layout.anchors
     .sort((a, b) => (a.row === b.row ? a.col - b.col : a.row - b.row))
     .forEach((anchor) => {
@@ -301,6 +312,15 @@ export function splitActiveTableCell(
         anchor.rowspan,
         newColumnWidths
       );
+      if (
+        clearSplitMarkers &&
+        anchor.row >= splitTop &&
+        anchor.row < splitBottom &&
+        anchor.col >= splitLeft &&
+        anchor.col < splitRight
+      ) {
+        attrs.cellMarker = null;
+      }
       rowChildren[anchor.row].push(anchor.data.type.create(attrs, anchor.data.content));
     });
 
@@ -332,6 +352,11 @@ export function splitActiveTableCell(
     }
   }
 
+  // The replace covers the whole table: without the meta the
+  // suggesting-mode catch-all would stamp every cell's text as a fresh
+  // insertion. Tag unconditionally — the meta is a no-op gate when
+  // suggesting mode is off.
+  tr.setMeta(SUGGESTION_META, true);
   dispatch(tr.scrollIntoView());
   return true;
 }

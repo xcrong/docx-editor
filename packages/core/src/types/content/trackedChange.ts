@@ -48,11 +48,17 @@ export interface RevisionInfo {
  * `<w:cellMerge>` shape attached to a `TableCell` PM node and surfaced
  * to the layout model and painter for visual rendering.
  *
- * `kind` matches the OOXML element name (ins / del / merge).
+ * `kind` matches the OOXML element name (ins / del / merge). `vMerge` /
+ * `vMergeOrig` only apply to `merge` (`CT_CellMergeTrackChange`,
+ * `wml.xsd:811` — `ST_AnnotationVMerge`, NOT `w:val`).
  */
 export interface CellMarker {
   kind: 'ins' | 'del' | 'merge';
   info: RevisionInfo;
+  /** `<w:cellMerge w:vMerge="…">` — only meaningful for `merge`. */
+  vMerge?: 'rest' | 'cont';
+  /** `<w:cellMerge w:vMergeOrig="…">` — the pre-merge vMerge state. */
+  vMergeOrig?: 'rest' | 'cont';
 }
 
 /**
@@ -233,6 +239,36 @@ export interface TableRowPropertyChange {
   previousFormatting?: TableRowFormatting;
   /** Row properties after the tracked change (editor model convenience) */
   currentFormatting?: TableRowFormatting;
+}
+
+/**
+ * Per-row table-property exception change (`w:tblPrExChange`,
+ * `CT_TblPrExChange`, wml.xsd:866). Lives on the `table_row` node (NOT the
+ * table) because `<w:tblPrEx>` sits inside `<w:tr>` per `CT_Row`. The prior
+ * snapshot is a `TableFormatting` because `CT_TblPrExBase` children reuse the
+ * same element names the table-property parser already handles.
+ */
+export interface TableExceptionsPropertyChange {
+  type: 'tableExceptionsPropertyChange';
+  /** Tracked change metadata */
+  info: PropertyChangeInfo;
+  /** Row-level table exceptions before the tracked change */
+  previousFormatting?: TableFormatting;
+  /** Row-level table exceptions after the tracked change (editor convenience) */
+  currentFormatting?: TableFormatting;
+}
+
+/**
+ * Table-grid change (`w:tblGridChange`, `CT_TblGridChange`, wml.xsd:893).
+ * Extends `CT_Markup`, NOT `CT_TrackChange` — id only, no author/date.
+ * The prior snapshot is the grid itself (column widths in twips).
+ */
+export interface TableGridChange {
+  type: 'tableGridChange';
+  /** Id-only marker (no author/date on the wire) */
+  info: { id: number };
+  /** Grid (column widths in twips) before the tracked change */
+  previousColumnWidths?: number[];
 }
 
 /**

@@ -251,6 +251,13 @@ export function convertTable(
   if (table.propertyChanges && table.propertyChanges.length > 0) {
     attrs.tblPrChange = table.propertyChanges;
   }
+  // Table-grid change (`<w:tblGridChange>`, id only — no author/date).
+  if (table.gridChange) {
+    attrs.tblGridChange = {
+      revisionId: table.gridChange.info.id,
+      prior: table.gridChange.previousColumnWidths ?? [],
+    };
+  }
   // Block-level bookmark markers wrapping this table's `w:tbl` — carried
   // verbatim so they survive the edit round trip (serializer re-emits them).
   if (table.leadingBlockMarkers && table.leadingBlockMarkers.length > 0) {
@@ -388,6 +395,14 @@ function convertTableRow(
   // Row property change history (`<w:trPrChange>`).
   if (row.propertyChanges && row.propertyChanges.length > 0) {
     attrs.trPrChange = row.propertyChanges;
+  }
+  // Row-level table-property exceptions (`<w:tblPrEx>`) and their change
+  // history (`<w:tblPrExChange>`). `tblPrEx` precedes `trPr` per `CT_Row`.
+  if (row.exceptions) {
+    attrs.tblPrEx = row.exceptions;
+  }
+  if (row.tblPrExChange && row.tblPrExChange.length > 0) {
+    attrs.tblPrExChange = row.tblPrExChange;
   }
 
   const numCells = row.cells.length;

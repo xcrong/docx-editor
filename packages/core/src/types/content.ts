@@ -68,6 +68,8 @@ export type { MathEquation } from './content/math';
 
 export type {
   TrackedChangeInfo,
+  RevisionInfo,
+  CellMarker,
   PropertyChangeInfo,
   Insertion,
   Deletion,
@@ -85,6 +87,8 @@ export type {
   TablePropertyChange,
   TableRowPropertyChange,
   TableCellPropertyChange,
+  TableExceptionsPropertyChange,
+  TableGridChange,
   TableStructuralChangeInfo,
 } from './content/trackedChange';
 

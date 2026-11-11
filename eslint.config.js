@@ -217,11 +217,13 @@ export default [
   // modestly above the default to accommodate new revision-tracking and
   // table-pagination fields without forcing a split that would obscure the
   // schema. T27-01 added the pPrChange / paraRPrChange / sectPrChange /
-  // hasRevisionChange paragraph attrs (1113 lines).
+  // hasRevisionChange paragraph attrs (1113 lines). T27-05 added the
+  // table-side passthrough (tblPrChange / tblGridChange, trPrChange /
+  // tblPrExChange, tcPrChange).
   {
     files: ['packages/core/src/layout-engine/types.ts'],
     rules: {
-      'max-lines': ['error', { max: 1120, skipBlankLines: false, skipComments: false }],
+      'max-lines': ['error', { max: 1160, skipBlankLines: false, skipComments: false }],
     },
   },
 

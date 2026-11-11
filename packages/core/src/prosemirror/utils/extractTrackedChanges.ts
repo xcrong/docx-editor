@@ -221,6 +221,25 @@ export function extractTrackedChanges(state: EditorState | null): TrackedChanges
           });
         }
       }
+      // Per-row table-exception changes (`<w:tblPrExChange>`, stored on the
+      // row per `CT_Row` — never on the table).
+      const tblPrExChange = node.attrs.tblPrExChange as Array<{
+        info: { id: number; author: string; date?: string };
+      }> | null;
+      if (Array.isArray(tblPrExChange)) {
+        for (const entry of tblPrExChange) {
+          if (!entry?.info || typeof entry.info.id !== 'number') continue;
+          raw.push({
+            type: 'tableExceptionsChanged',
+            text: node.textContent || '',
+            author: entry.info.author || '',
+            date: entry.info.date ?? undefined,
+            from: pos,
+            to: pos + node.nodeSize,
+            revisionId: entry.info.id,
+          });
+        }
+      }
       // Descend into cells.
     }
 
@@ -269,7 +288,8 @@ export function extractTrackedChanges(state: EditorState | null): TrackedChanges
       }
     }
 
-    // Table-level property change (`<w:tblPrChange>`).
+    // Table-level property change (`<w:tblPrChange>`) and grid change
+    // (`<w:tblGridChange>`, id only — no author/date on the wire).
     if (node.type.name === 'table') {
       const tblPrChange = node.attrs.tblPrChange as Array<{
         info: { id: number; author: string; date?: string };
@@ -287,6 +307,21 @@ export function extractTrackedChanges(state: EditorState | null): TrackedChanges
             revisionId: entry.info.id,
           });
         }
+      }
+      const tblGridChange = node.attrs.tblGridChange as {
+        revisionId: number;
+        prior: number[];
+      } | null;
+      if (tblGridChange && typeof tblGridChange.revisionId === 'number') {
+        raw.push({
+          type: 'tableGridChanged',
+          text: '',
+          author: '',
+          date: undefined,
+          from: pos,
+          to: pos + node.nodeSize,
+          revisionId: tblGridChange.revisionId,
+        });
       }
 
       // Whole-table insertion / deletion: when every row carries a trIns
@@ -441,9 +476,11 @@ export function extractTrackedChanges(state: EditorState | null): TrackedChanges
     tableInserted: 6,
     tableDeleted: 6,
     tablePropertiesChanged: 5,
+    tableGridChanged: 5,
     rowInserted: 4,
     rowDeleted: 4,
     rowPropertiesChanged: 4,
+    tableExceptionsChanged: 4,
     cellInserted: 3,
     cellDeleted: 3,
     cellMerged: 3,

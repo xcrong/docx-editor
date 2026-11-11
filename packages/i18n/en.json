@@ -605,6 +605,7 @@
     "cellMerged": "Merged cells",
     "cellPropertiesChanged": "Changed cell properties",
     "tablePropertiesChanged": "Changed table properties",
+    "tableExceptionsChanged": "Changed table exceptions for row",
     "tableGridChanged": "Changed table grid",
     "tableInserted": "Inserted table",
     "tableDeleted": "Deleted table"

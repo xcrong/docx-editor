@@ -144,6 +144,17 @@ declare global {
       focusFirstTableCell: () => boolean;
       addRowBelow: () => boolean;
       deleteCurrentRow: () => boolean;
+      addColumnRight: () => boolean;
+      mergeFirstRowCells: () => boolean;
+      setFirstCellFillColor: (color: string) => boolean;
+      getFirstTableSnapshot: () => {
+        rowCount: number;
+        colCount: number;
+        rows: Array<Record<string, unknown>>;
+        cells: Array<Array<unknown>>;
+        tblPrChange: unknown;
+        tblGridChange: unknown;
+      } | null;
       // Built-in template plugin parity (?template=1): number of
       // docxtemplater tags in the PM plugin state (null = no view yet).
       getTemplateTagCount: () => number | null;

@@ -8,6 +8,8 @@
 
 import type { EditorState, Transaction } from 'prosemirror-state';
 import { singletonManager } from '../schema';
+import { withSuggestingSnapshot } from '../plugins/suggestionMode/snapshot';
+import { tablePropertySnapshotter } from '../plugins/suggestionMode/tableSnapshot';
 
 // Re-export types and query helpers from TableExtension
 export type { TableContextInfo, BorderPreset } from '../extensions/nodes/TableExtension';
@@ -80,55 +82,71 @@ export {
   splitActiveTableCell,
 } from './tableSplit';
 
-// Per-cell border editing
+// Per-cell border editing. Wrapped: border edits mint `tcPrChange` in
+// suggesting mode; closed-mode behavior unchanged.
 export function setCellBorder(
   side: 'top' | 'bottom' | 'left' | 'right' | 'all',
   spec: { style: string; size?: number; color?: { rgb: string } } | null,
   clearOthers?: boolean
 ): (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean {
-  return cmds.setCellBorder(side, spec, clearOthers);
+  return withSuggestingSnapshot(
+    cmds.setCellBorder(side, spec, clearOthers),
+    tablePropertySnapshotter
+  );
 }
 
-// Borders
+// Borders. All border commands target cells → `tcPrChange` when suggesting.
 export function setTableBorders(
   preset: import('../extensions/nodes/TableExtension').BorderPreset,
   borderSpec?: { style: string; size: number; color: { rgb: string } }
 ): (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean {
-  return cmds.setTableBorders(preset, borderSpec);
+  return withSuggestingSnapshot(cmds.setTableBorders(preset, borderSpec), tablePropertySnapshotter);
 }
 export function removeTableBorders(
   state: EditorState,
   dispatch?: (tr: Transaction) => void
 ): boolean {
-  return cmds.removeTableBorders()(state, dispatch);
+  return withSuggestingSnapshot(cmds.removeTableBorders(), tablePropertySnapshotter)(
+    state,
+    dispatch
+  );
 }
 export function setAllTableBorders(
   state: EditorState,
   dispatch?: (tr: Transaction) => void,
   borderSpec?: { style: string; size: number; color: { rgb: string } }
 ): boolean {
-  return cmds.setAllTableBorders(borderSpec)(state, dispatch);
+  return withSuggestingSnapshot(cmds.setAllTableBorders(borderSpec), tablePropertySnapshotter)(
+    state,
+    dispatch
+  );
 }
 export function setOutsideTableBorders(
   state: EditorState,
   dispatch?: (tr: Transaction) => void,
   borderSpec?: { style: string; size: number; color: { rgb: string } }
 ): boolean {
-  return cmds.setOutsideTableBorders(borderSpec)(state, dispatch);
+  return withSuggestingSnapshot(cmds.setOutsideTableBorders(borderSpec), tablePropertySnapshotter)(
+    state,
+    dispatch
+  );
 }
 export function setInsideTableBorders(
   state: EditorState,
   dispatch?: (tr: Transaction) => void,
   borderSpec?: { style: string; size: number; color: { rgb: string } }
 ): boolean {
-  return cmds.setInsideTableBorders(borderSpec)(state, dispatch);
+  return withSuggestingSnapshot(cmds.setInsideTableBorders(borderSpec), tablePropertySnapshotter)(
+    state,
+    dispatch
+  );
 }
 
 // Vertical alignment
 export function setCellVerticalAlign(
   align: 'top' | 'center' | 'bottom'
 ): (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean {
-  return cmds.setCellVerticalAlign(align);
+  return withSuggestingSnapshot(cmds.setCellVerticalAlign(align), tablePropertySnapshotter);
 }
 
 // Cell margins
@@ -138,14 +156,14 @@ export function setCellMargins(margins: {
   left?: number;
   right?: number;
 }): (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean {
-  return cmds.setCellMargins(margins);
+  return withSuggestingSnapshot(cmds.setCellMargins(margins), tablePropertySnapshotter);
 }
 
 // Text direction
 export function setCellTextDirection(
   direction: string | null
 ): (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean {
-  return cmds.setCellTextDirection(direction);
+  return withSuggestingSnapshot(cmds.setCellTextDirection(direction), tablePropertySnapshotter);
 }
 
 // No-wrap toggle
@@ -153,7 +171,7 @@ export function toggleNoWrap(): (
   state: EditorState,
   dispatch?: (tr: Transaction) => void
 ) => boolean {
-  return cmds.toggleNoWrap();
+  return withSuggestingSnapshot(cmds.toggleNoWrap(), tablePropertySnapshotter);
 }
 
 // Row height
@@ -161,7 +179,7 @@ export function setRowHeight(
   height: number | null,
   rule?: 'auto' | 'atLeast' | 'exact'
 ): (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean {
-  return cmds.setRowHeight(height, rule);
+  return withSuggestingSnapshot(cmds.setRowHeight(height, rule), tablePropertySnapshotter);
 }
 
 // Header row
@@ -169,7 +187,7 @@ export function toggleHeaderRow(): (
   state: EditorState,
   dispatch?: (tr: Transaction) => void
 ) => boolean {
-  return cmds.toggleHeaderRow();
+  return withSuggestingSnapshot(cmds.toggleHeaderRow(), tablePropertySnapshotter);
 }
 
 // Column distribution
@@ -177,13 +195,13 @@ export function distributeColumns(): (
   state: EditorState,
   dispatch?: (tr: Transaction) => void
 ) => boolean {
-  return cmds.distributeColumns();
+  return withSuggestingSnapshot(cmds.distributeColumns(), tablePropertySnapshotter);
 }
 export function autoFitContents(): (
   state: EditorState,
   dispatch?: (tr: Transaction) => void
 ) => boolean {
-  return cmds.autoFitContents();
+  return withSuggestingSnapshot(cmds.autoFitContents(), tablePropertySnapshotter);
 }
 
 // Table properties
@@ -192,7 +210,7 @@ export function setTableProperties(props: {
   widthType?: string | null;
   justification?: 'left' | 'center' | 'right' | null;
 }): (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean {
-  return cmds.setTableProperties(props);
+  return withSuggestingSnapshot(cmds.setTableProperties(props), tablePropertySnapshotter);
 }
 
 // Table style gallery
@@ -203,22 +221,22 @@ export function applyTableStyle(styleData: {
   look?: Record<string, boolean>;
 }): (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return cmds.applyTableStyle(styleData as any);
+  return withSuggestingSnapshot(cmds.applyTableStyle(styleData as any), tablePropertySnapshotter);
 }
 
 // Cell styling
 export function setCellFillColor(
   color: string | null
 ): (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean {
-  return cmds.setCellFillColor(color);
+  return withSuggestingSnapshot(cmds.setCellFillColor(color), tablePropertySnapshotter);
 }
 export function setTableBorderColor(
   color: string
 ): (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean {
-  return cmds.setTableBorderColor(color);
+  return withSuggestingSnapshot(cmds.setTableBorderColor(color), tablePropertySnapshotter);
 }
 export function setTableBorderWidth(
   size: number
 ): (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean {
-  return cmds.setTableBorderWidth(size);
+  return withSuggestingSnapshot(cmds.setTableBorderWidth(size), tablePropertySnapshotter);
 }

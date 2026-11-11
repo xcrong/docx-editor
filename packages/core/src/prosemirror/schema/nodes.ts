@@ -366,6 +366,12 @@ export interface TableAttrs {
    * stacking, serializer clamps to the first.
    */
   tblPrChange?: import('../../types/document').TablePropertyChange[] | null;
+  /**
+   * Table-grid change (`<w:tblGridChange>`, id only — `CT_TblGridChange`
+   * extends `CT_Markup`, wml.xsd:893). `prior` is the grid (column widths
+   * in twips) before the change.
+   */
+  tblGridChange?: { revisionId: number; prior: number[] } | null;
 }
 
 /**
@@ -389,6 +395,14 @@ export interface TableRowAttrs {
   trDel?: RevisionInfo | null;
   /** Row-property change history (`<w:trPrChange>`). */
   trPrChange?: import('../../types/document').TableRowPropertyChange[] | null;
+  /**
+   * Row-level table-property exceptions (`<w:tblPrEx>`, `CT_TblPrExBase`).
+   * Current exceptions parsed from `<w:tr><w:tblPrEx>` (precedes `<w:trPr>`
+   * per `CT_Row`); re-emitted in the same position on save.
+   */
+  tblPrEx?: import('../../types/document').TableFormatting | null;
+  /** Per-row table-exception change history (`<w:tblPrExChange>`). */
+  tblPrExChange?: import('../../types/document').TableExceptionsPropertyChange[] | null;
 }
 
 /**
