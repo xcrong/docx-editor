@@ -851,6 +851,14 @@ export function Toolbar(explicitProps: ToolbarProps) {
         >
           <MaterialSymbol name="link" size={ICON_SIZE} />
         </ToolbarButton>
+        <ToolbarButton
+          onClick={() => handleFormat('clearFormatting')}
+          disabled={disabled}
+          title={t('formattingBar.clearFormatting')}
+          ariaLabel={t('formattingBar.clearFormatting')}
+        >
+          <MaterialSymbol name="format_clear" size={ICON_SIZE} />
+        </ToolbarButton>
       </ToolbarGroup>
 
       {/* Superscript/Subscript Group */}
@@ -978,16 +986,6 @@ export function Toolbar(explicitProps: ToolbarProps) {
         disabled={disabled}
         onRefocusEditor={onRefocusEditor}
       />
-
-      {/* Clear Formatting */}
-      <ToolbarButton
-        onClick={() => handleFormat('clearFormatting')}
-        disabled={disabled}
-        title={t('formattingBar.clearFormatting')}
-        ariaLabel={t('formattingBar.clearFormatting')}
-      >
-        <MaterialSymbol name="format_clear" size={ICON_SIZE} />
-      </ToolbarButton>
 
       {/* Custom toolbar items */}
       {children}

@@ -249,7 +249,16 @@
       <MaterialSymbol name="link" />
     </button>
 
-    <!-- 10. Superscript / Subscript -->
+    <!-- 10. Clear Formatting -->
+    <button
+      :title="t('formattingBar.clearFormatting')"
+      :aria-label="t('formattingBar.clearFormatting')"
+      @mousedown.prevent="handleClearFormatting"
+    >
+      <MaterialSymbol name="format_clear" />
+    </button>
+
+    <!-- 11. Superscript / Subscript -->
     <button
       :title="t('formattingBar.superscriptShortcut')"
       :aria-label="t('formattingBar.superscript')"
@@ -269,7 +278,7 @@
 
     <span class="divider" />
 
-    <!-- 11. Alignment dropdown (current align icon + chevron) -->
+    <!-- 12. Alignment dropdown (current align icon + chevron) -->
     <div class="toolbar-dropdown" ref="alignDropdownRef">
       <button
         class="toolbar-dropdown__trigger align-trigger"
@@ -335,7 +344,7 @@
       </div>
     </div>
 
-    <!-- 12. Lists + Indent -->
+    <!-- 13. Lists + Indent -->
     <button
       :title="t('lists.bulletList')"
       :aria-label="t('lists.bulletList')"
@@ -368,7 +377,7 @@
       <MaterialSymbol name="format_indent_increase" />
     </button>
 
-    <!-- 13. Line Spacing -->
+    <!-- 14. Line Spacing -->
     <div class="toolbar-dropdown" ref="spacingDropdownRef">
       <button
         class="toolbar-dropdown__trigger"
@@ -408,15 +417,6 @@
         @review-next="$emit('review-next')"
       />
     </template>
-
-    <!-- 14. Clear Formatting -->
-    <button
-      :title="t('formattingBar.clearFormatting')"
-      :aria-label="t('formattingBar.clearFormatting')"
-      @mousedown.prevent="handleClearFormatting"
-    >
-      <MaterialSymbol name="format_clear" />
-    </button>
 
     <span class="divider" />
 
