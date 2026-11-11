@@ -76,6 +76,16 @@ export interface CellMargins {
 }
 
 // @public
+export interface CellMarker {
+    // (undocumented)
+    info: RevisionInfo;
+    // (undocumented)
+    kind: 'ins' | 'del' | 'merge';
+    vMerge?: 'rest' | 'cont';
+    vMergeOrig?: 'rest' | 'cont';
+}
+
+// @public
 export interface ColorValue {
     auto?: boolean;
     rgb?: string;
@@ -1114,6 +1124,7 @@ export interface TabContent {
 export interface Table {
     columnWidths?: number[];
     formatting?: TableFormatting;
+    gridChange?: TableGridChange;
     leadingBlockMarkers?: (BookmarkStart | BookmarkEnd)[];
     propertyChanges?: TablePropertyChange[];
     rows: TableRow[];
@@ -1177,6 +1188,15 @@ export interface TableCellPropertyChange {
 }
 
 // @public
+export interface TableExceptionsPropertyChange {
+    currentFormatting?: TableFormatting;
+    info: PropertyChangeInfo;
+    previousFormatting?: TableFormatting;
+    // (undocumented)
+    type: 'tableExceptionsPropertyChange';
+}
+
+// @public
 export interface TableFormatting {
     bidi?: boolean;
     borders?: TableBorders;
@@ -1191,6 +1211,16 @@ export interface TableFormatting {
     shading?: ShadingProperties;
     styleId?: string;
     width?: TableMeasurement;
+}
+
+// @public
+export interface TableGridChange {
+    info: {
+        id: number;
+    };
+    previousColumnWidths?: number[];
+    // (undocumented)
+    type: 'tableGridChange';
 }
 
 // @public
@@ -1227,9 +1257,11 @@ export interface TablePropertyChange {
 // @public
 export interface TableRow {
     cells: TableCell[];
+    exceptions?: TableFormatting;
     formatting?: TableRowFormatting;
     propertyChanges?: TableRowPropertyChange[];
     structuralChange?: TableStructuralChangeInfo;
+    tblPrExChange?: TableExceptionsPropertyChange[];
     // (undocumented)
     type: 'tableRow';
 }

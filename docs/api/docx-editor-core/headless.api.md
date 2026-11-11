@@ -1446,6 +1446,7 @@ export interface SuggestedAction {
 export interface Table {
     columnWidths?: number[];
     formatting?: TableFormatting;
+    gridChange?: TableGridChange;
     leadingBlockMarkers?: (BookmarkStart | BookmarkEnd)[];
     propertyChanges?: TablePropertyChange[];
     rows: TableRow[];
@@ -1467,9 +1468,11 @@ export interface TableCell {
 // @public
 export interface TableRow {
     cells: TableCell[];
+    exceptions?: TableFormatting;
     formatting?: TableRowFormatting;
     propertyChanges?: TableRowPropertyChange[];
     structuralChange?: TableStructuralChangeInfo;
+    tblPrExChange?: TableExceptionsPropertyChange[];
     // (undocumented)
     type: 'tableRow';
 }
