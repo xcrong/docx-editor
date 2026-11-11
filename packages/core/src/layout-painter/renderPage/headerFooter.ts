@@ -436,6 +436,15 @@ export function renderHeaderFooterContent(
       // Text boxes stack in the HF flow. headerFooterLayout already reserves
       // their height; without this branch they were measured but never
       // painted, so they showed in the inline editor but not the page view.
+      // A floating box is positioned, not in-flow: mirror the body pipeline
+      // (`layoutTextBox` in layout-engine), which carries `isFloating` + a
+      // `behind → -1` stack order on the fragment so `renderTextBoxFragment`
+      // paints it beneath body text instead of above it (#103). Without the
+      // fragment flags the painter falls back to `z-index: auto` and — because
+      // the header element is appended after the body content — a behind-doc
+      // watermark covers the text it should show through.
+      const behindBox = block.wrapType === 'behind';
+      const floatingBox = block.displayMode === 'float';
       const syntheticFragment: TextBoxFragment = {
         kind: 'textBox',
         blockId: block.id,
@@ -445,6 +454,8 @@ export function renderHeaderFooterContent(
         height: measure.height,
         pmStart: block.pmStart,
         pmEnd: block.pmEnd,
+        isFloating: floatingBox,
+        zIndex: floatingBox ? (behindBox ? -1 : 1) : undefined,
       };
       const fragEl = renderTextBoxFragment(
         syntheticFragment,
@@ -453,10 +464,14 @@ export function renderHeaderFooterContent(
         { ...context, positioning: 'absolute' },
         { document: doc }
       );
-      // Vertical position stays on the HF flow cursor (the anchor's positionV
-      // is not yet honored for HF text boxes); only the horizontal anchor is
-      // resolved here, which is what the reported page-centered banner needs.
-      fragEl.style.top = `${cursorY}px`;
+      // Resolve the anchor's vertical position (page/margin center, offsets)
+      // like floating images already do, instead of pinning the box to the
+      // HF flow cursor — a page-centered watermark belongs at page center,
+      // not at the top of the header band (#103).
+      fragEl.style.top = `${resolveHeaderFooterFloatTop(
+        { height: measure.height, paragraphY: cursorY, position: block.position ?? {} },
+        layout
+      )}px`;
       // Honor the anchor's horizontal position (e.g. centered relative to the
       // page) instead of pinning the box to the left.
       fragEl.style.left = resolveHeaderFooterFloatLeft(
