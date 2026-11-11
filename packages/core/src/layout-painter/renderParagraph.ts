@@ -161,6 +161,29 @@ export function renderParagraphFragment(
     if (rev.date) fragmentEl.dataset.revisionDate = rev.date;
   }
 
+  // Property-change cues (`w:pPrChange`, `CT_ParaRPrChange`,
+  // `w:sectPrChange`). A quiet margin change bar (`ep-revision-prop-change`,
+  // core editor.css) plus the first entry's triple as `data-revision-*` so
+  // sidebar anchoring, card highlight, and leader lines resolve the same way
+  // as paragraph-mark revisions. Only dataset names from the stable painter
+  // contract are used (`data-revision-id/author/date`) — no new names.
+  // NOTE: a distinct section gutter cue is intentionally NOT added:
+  // `sectPrChangeBodyLevel` does not exist (placement is structural per the
+  // T27-01 decision), so pPr-level and body-level changes share this bar.
+  const propRevInfo =
+    block.attrs?.pPrChange?.[0]?.info ??
+    block.attrs?.paraRPrChange?.[0]?.info ??
+    block.attrs?.sectPrChange?.info ??
+    null;
+  if (propRevInfo) {
+    fragmentEl.classList.add('ep-revision-prop-change');
+    if (!fragmentEl.dataset.revisionId) {
+      fragmentEl.dataset.revisionId = String(propRevInfo.id);
+      fragmentEl.dataset.revisionAuthor = propRevInfo.author;
+      if (propRevInfo.date) fragmentEl.dataset.revisionDate = propRevInfo.date;
+    }
+  }
+
   // Text wrapping around floating images is handled at measurement time via
   // per-line leftOffset/rightOffset in MeasuredLine. Floating images themselves
   // skip inline rendering - they're rendered at page level.
@@ -547,13 +570,22 @@ export function renderParagraphFragment(
   // the glyph (the mark belongs to the terminating ¶). Append as an inline
   // span inside the last line element so it sits on the same baseline as the
   // text instead of pushing a new block-level row below the line.
+  // The span carries the spec'd `ep-revision-pilcrow ep-revision-ins/del`
+  // classes alongside the layout classes (visuals stay on the layout hooks),
+  // plus the revision triple as `data-revision-*` (stable contract, no new
+  // dataset names) so sidebar highlight/leader-line queries hit the glyph.
   if ((pPrIns || pPrDel) && !fragment.continuesOnNext) {
     const lastLineEl = fragmentEl.lastElementChild as HTMLElement | null;
     if (lastLineEl) {
+      const rev = pPrIns ?? pPrDel!;
       const glyph = doc.createElement('span');
       glyph.className = 'layout-revision-pmark-glyph';
       if (pPrIns) glyph.classList.add('layout-revision-ins');
       else glyph.classList.add('layout-revision-del');
+      glyph.classList.add('ep-revision-pilcrow', pPrIns ? 'ep-revision-ins' : 'ep-revision-del');
+      glyph.dataset.revisionId = String(rev.revisionId);
+      glyph.dataset.revisionAuthor = rev.author;
+      if (rev.date) glyph.dataset.revisionDate = rev.date;
       glyph.textContent = '¶';
       glyph.setAttribute('aria-hidden', 'true');
       lastLineEl.appendChild(glyph);

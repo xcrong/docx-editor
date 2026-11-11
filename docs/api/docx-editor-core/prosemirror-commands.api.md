@@ -13,13 +13,16 @@ import { Node as Node_2 } from 'prosemirror-model';
 import { Transaction } from 'prosemirror-state';
 
 // @public
-export function acceptAllChanges(): Command;
+export function acceptAllChanges(): (state: EditorState, dispatch?: (tr: Transaction) => void) => number;
 
 // @public
 export function acceptChange(from: number, to: number): Command;
 
 // @public
 export function acceptChangeById(revisionId: number): Command;
+
+// @public
+export function acceptChangesInRange(from: number, to: number): (state: EditorState, dispatch?: (tr: Transaction) => void) => number;
 
 // @public (undocumented)
 export function addColumnLeft(state: EditorState, dispatch?: (tr: Transaction) => void): boolean;
@@ -246,13 +249,16 @@ export function mergeCells(state: EditorState, dispatch?: (tr: Transaction) => v
 export const oneAndHalfSpacing: Command;
 
 // @public
-export function rejectAllChanges(): Command;
+export function rejectAllChanges(): (state: EditorState, dispatch?: (tr: Transaction) => void) => number;
 
 // @public
 export function rejectChange(from: number, to: number): Command;
 
 // @public
 export function rejectChangeById(revisionId: number): Command;
+
+// @public
+export function rejectChangesInRange(from: number, to: number): (state: EditorState, dispatch?: (tr: Transaction) => void) => number;
 
 // @public
 export function removeCommentMark(commentId: number): Command;

@@ -144,6 +144,8 @@ export {
   rejectChange,
   acceptChangeById,
   rejectChangeById,
+  acceptChangesInRange,
+  rejectChangesInRange,
   acceptAllChanges,
   rejectAllChanges,
   findNextChange,

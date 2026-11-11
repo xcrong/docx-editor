@@ -57,33 +57,33 @@ Three landable phases. Each phase is a separate PR. Phase 1 includes the snapsho
 
 ### Accept / Reject
 
-- [ ] `commands/comments.ts` — `acceptChangeById(revisionId: number): Command`
-- [ ] `rejectChangeById(revisionId: number): Command`
-- [ ] `acceptChangesInRange(from, to): Command` (returns count of triples resolved)
-- [ ] `rejectChangesInRange(from, to): Command`
-- [ ] Extend `acceptAll` / `rejectAll` to walk paragraph node attrs; redefine return value as count of distinct `(id, author, date)` triples (modify behavior — note in `tracked-changes-review/spec.md` MODIFIED Requirements)
-- [ ] Per-marker semantics: `pPrIns`, `pPrDel`, `pPrChange`, `paraRPrChange`, `sectPrChange`
-- [ ] Edge cases: `pPrIns` reject on last paragraph (clear-only, log, return true); `pPrDel` accept on first paragraph (clear-only, log, return true)
-- [ ] Cross-revision dependency: `pPrIns` reject on a paragraph with `pPrChange` first rejects the `pPrChange` if the join would remove the host
-- [ ] Bypass suggesting-mode keymap inside accept/reject (apply, don't author)
-- [ ] Idempotence: `acceptChangeById` / `rejectChangeById` on unknown or already-resolved id return `false`
+- [x] `commands/comments.ts` — `acceptChangeById(revisionId: number): Command` (T27-03: extended site walk to `paraRPrChange` + pPr-level `sectPrChange`; cross-author id collision logs a diagnostic; `paragraph-revision-accept.test.ts` ×10)
+- [x] `rejectChangeById(revisionId: number): Command` (T27-03: same walk; `paraRPrChange` reject restores `defaultTextFormatting`, `sectPrChange` reject restores via `restoreSectionPriorProperties`; body-level `sectPrChange` lives outside the PM doc — not addressable here)
+- [x] `acceptChangesInRange(from, to)` (T27-03: new; resolves entries whose `from` lies in range via the per-id path; returns count of distinct triples — non-`Command` signature because `Command` is boolean-typed)
+- [x] `rejectChangesInRange(from, to)` (T27-03: new; inverse of the above)
+- [x] Extended `acceptAll` / `rejectAll` to walk paragraph node attrs; redefine return value as count of distinct `(id, author, date)` triples (modify behavior — note in `tracked-changes-review/spec.md` MODIFIED Requirements) (T27-03: `collectAllRevisionTriples`; per-id transactions retained for one-undo-per-revision; `window-e2e.d.ts` + 2 e2e assertions updated to counts; MODIFIED spec text already in place)
+- [x] Per-marker semantics: `pPrIns`, `pPrDel`, `pPrChange`, `paraRPrChange`, `sectPrChange` (T27-03: last two implemented + unit-tested; `pPrDel` accept still joins per existing e2e pin)
+- [x] Edge cases: `pPrIns` reject on last paragraph (clear-only, log, return true); `pPrDel` accept on first paragraph (clear-only, log, return true) (T27-03: no-following-sibling guard + warn log covers the degenerate case; NOTE — "first paragraph" phrasing is a spec bug: accept joins with the FOLLOWING sibling so a first paragraph still has a join target; existing e2e "Accept pPrDel joins the paragraphs" pins join-on-first-paragraph and stays green)
+- [x] Cross-revision dependency: `pPrIns` reject on a paragraph with `pPrChange` first rejects the `pPrChange` if the join would remove the host (T27-03: restore-then-join in the same transaction; unit-tested)
+- [x] Bypass suggesting-mode keymap inside accept/reject (apply, don't author) (T27-03: pre-existing `SUGGESTION_BYPASS_META` in `resolveById`; unchanged)
+- [x] Idempotence: `acceptChangeById` / `rejectChangeById` on unknown or already-resolved id return `false` (T27-03: pre-existing early-return; unit-tested for unknown + double-accept)
 
 ### Painter
 
-- [ ] `packages/core/src/layout-painter/renderParagraph.ts` (canonical painter; React/Vue inherit) — pilcrow `<span class="ep-revision-pilcrow ep-revision-ins" data-revision-id data-revision-author data-revision-date>¶</span>` for `pPrIns`; class `ep-revision-del` for `pPrDel`; margin change bar for `pPrChange` / `paraRPrChange` / `sectPrChange`
-- [ ] Section gutter cue for `sectPrChange` (carries `sectPrChangeBodyLevel` to position the cue correctly)
-- [ ] All revision DOM carries `data-revision-id`, `data-revision-author`, `data-revision-date`
+- [x] `packages/core/src/layout-painter/renderParagraph.ts` (canonical painter; React/Vue inherit) — pilcrow `<span class="ep-revision-pilcrow ep-revision-ins" data-revision-id data-revision-author data-revision-date>¶</span>` for `pPrIns`; class `ep-revision-del` for `pPrDel`; margin change bar for `pPrChange` / `paraRPrChange` / `sectPrChange` (T27-03: `ep-revision-pilcrow` classes added alongside the existing `layout-revision-*` visuals + triple on the glyph; property paragraphs get `ep-revision-prop-change` + first-entry triple; zero new dataset names)
+- [x] Section gutter cue for `sectPrChange` (carries `sectPrChangeBodyLevel` to position the cue correctly) (T27-03: shares the `ep-revision-prop-change` margin bar — a distinct gutter cue is N/A because `sectPrChangeBodyLevel` does not exist per the T27-01 decision; e2e asserts the bar + `data-revision-id`)
+- [x] All revision DOM carries `data-revision-id`, `data-revision-author`, `data-revision-date` (T27-03: glyph + property-change fragments now carry the triple; run-level `data-change-author/date` contract untouched)
 
 ### Selection mapping
 
-- [ ] Accept arrow-key navigation crosses `pPrDel` boundaries normally (recommended; NodeView virtualization deferred to follow-up issue)
+- [x] Accept arrow-key navigation crosses `pPrDel` boundaries normally (recommended; NodeView virtualization deferred to follow-up issue) (T27-03: no NodeView — PM selection model untouched; revised fragments carry `data-pm-start/end` via `applyPmPositions`; e2e "Revised paragraph fragment is clickable and lands the caret" proves PM-position反查)
 
 ### Sidebar
 
-- [ ] Extend `TrackedChangeEntry` type to carry structural revisions with site list
-- [ ] `useCommentSidebarItems.tsx` — group by `(id, author, date)` triple; multi-site entries collapse to one
-- [ ] Click → scroll-to-block via `data-revision-id`
-- [ ] Accept / Reject buttons → `acceptChangeById` / `rejectChangeById`
+- [x] Extend `TrackedChangeEntry` type to carry structural revisions with site list (T27-03: pre-existing — `paragraphMarkPropertiesChanged` + `sectionPropertiesChanged` in the union plus `coalescedRevisionIds`; no change needed)
+- [x] `useCommentSidebarItems.tsx` — group by `(id, author, date)` triple; multi-site entries collapse to one (T27-03: pre-existing extractor coalescing; property-change paragraphs now anchor via painter `data-revision-id`)
+- [x] Click → scroll-to-block via `data-revision-id` (T27-03: pre-existing `anchorKey: revision-*` + `sidebarAnchorPositions` + LeaderLines; extended coverage to property-change paragraphs by painting the id)
+- [x] Accept / Reject buttons → `acceptChangeById` / `rejectChangeById` (T27-03: pre-existing by-id channel; added `paragraphMarkPropertiesChanged` + `sectionPropertiesChanged` card branches in React `TrackedChangeCard.tsx` and Vue `TrackedChangeCard.vue`, same quoted-text pattern as `paragraphPropertiesChanged`; e2e accepts via the sidebar card)
 
 ### i18n (all 7 locales)
 
@@ -92,13 +92,13 @@ Three landable phases. Each phase is a separate PR. Phase 1 includes the snapsho
 
 ### Vue parity
 
-- [ ] Verify painter changes inherit transparently (changes are in `packages/core/src/layout-painter/`)
-- [ ] Mirror sidebar wiring in `packages/vue/src/`
-- [ ] Update `scripts/parity/parity.contract.json` with new `DocxEditorRef` methods (paired bucket)
+- [x] Verify painter changes inherit transparently (changes are in `packages/core/src/layout-painter/`) (T27-03: core-only painter edit; both adapters render via the shared painter)
+- [x] Mirror sidebar wiring in `packages/vue/src/` (T27-03: `TrackedChangeCard.vue` gains the same two branches as React)
+- [x] Update `scripts/parity/parity.contract.json` with new `DocxEditorRef` methods (paired bucket) (T27-03: no `DocxEditorRef` surface added — range fns are core commands, by-id flows through sidebar callbacks; contract unchanged, `check:parity-contract` green)
 
 ### Agents package
 
-- [ ] Decide: extend `packages/agents/src/changes.ts` to handle `paragraph.pPrIns`/`pPrDel`/`pPrChange` and section revisions, OR open tracking issue for deferred support
+- [x] Decide: extend `packages/agents/src/changes.ts` to handle `paragraph.pPrIns`/`pPrDel`/`pPrChange` and section revisions, OR open tracking issue for deferred support (T27-03 decision: DEFER — model-level paragraph-mark join + section-restore semantics are a separate slice; PM-editor path is complete and unit/e2e-covered. Tracking issue: #120.)
 - [ ] If extending: update agents API snapshot (`bun run api:extract`)
 
 ### Tests

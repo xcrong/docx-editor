@@ -201,6 +201,17 @@ export default [
     },
   },
 
+  // tracked-changes-structural.spec.ts is the structural-revision e2e suite —
+  // one describe per T27 slice (paragraph split/join, accept/reject, table
+  // scopes), growing per slice by design so each slice's acceptance lives
+  // next to its siblings. Headroom while the cap still enforces a ceiling.
+  {
+    files: ['e2e/tests/tracked-changes-structural.spec.ts'],
+    rules: {
+      'max-lines': ['error', { max: 1200, skipBlankLines: false, skipComments: false }],
+    },
+  },
+
   // layout-engine/types.ts is the canonical schema definition for the
   // layout model — single file by design (cross-referencing types). Bumped
   // modestly above the default to accommodate new revision-tracking and

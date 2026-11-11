@@ -71,6 +71,18 @@ export function restoreParagraphPriorProperties(
       next[f as string] = prior[f] ?? null;
     }
   }
+  // T27-02 legacy, in-slice (T27-03): the suggesting-mode snapshotter
+  // captures `sectionBreakType` under a cast alongside `ParagraphFormatting`
+  // fields so section-break edits are tracked as `pPrChange`. Reject must
+  // restore it too. NOTE: this is in-memory only — `CT_PPrBase` (the schema
+  // of a `w:pPrChange` prior snapshot) forbids `w:sectPr`, so the prior
+  // cannot carry the break on disk; the paragraph serializer drops unknown
+  // prior keys on write (full `sectPrChange` authoring rides
+  // `_sectionProperties`, handled by the sectPrChange reject path).
+  const priorWithBreak = prior as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(priorWithBreak, 'sectionBreakType')) {
+    next.sectionBreakType = priorWithBreak.sectionBreakType ?? null;
+  }
   if (current?.numPr && !Object.prototype.hasOwnProperty.call(prior, 'numPr')) {
     next.numPr = null;
   }
