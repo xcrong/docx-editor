@@ -40,6 +40,7 @@ import type { TableAction } from './ui/TableToolbar';
 import { cn } from '../lib/utils';
 import { EditorToolbarContext } from './EditorToolbarContext';
 import { ToolbarReview, type ReviewCallbacks } from './ToolbarReview';
+import type { EditorMode } from './DocxEditor/internals/editing-modes';
 
 const ICON_SIZE = 18;
 
@@ -248,6 +249,8 @@ export interface ToolbarProps extends ReviewCallbacks {
   onTableAction?: (action: TableAction) => void;
   /** Whether to show the tracked-changes review group (default: true when any review callback is set) */
   showReviewControls?: boolean;
+  /** Current editing mode: hides the review group in 'viewing' (read-only); explicit showReviewControls still wins. Omit for standalone use. */
+  editingMode?: EditorMode;
 }
 
 /**
@@ -447,6 +450,7 @@ export function Toolbar(explicitProps: ToolbarProps) {
     onPreviousChange,
     onNextChange,
     showReviewControls,
+    editingMode,
     inline = false,
   } = props;
 
@@ -965,6 +969,7 @@ export function Toolbar(explicitProps: ToolbarProps) {
           onNextChange,
         }}
         showReviewControls={showReviewControls}
+        editingMode={editingMode}
         inTrackedChange={inTrackedChange}
         disabled={disabled}
         onRefocusEditor={onRefocusEditor}

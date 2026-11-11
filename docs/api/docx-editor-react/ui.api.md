@@ -1196,6 +1196,7 @@ export interface ToolbarProps extends ReviewCallbacks {
     disabled?: boolean;
     documentFonts?: readonly FontOption[];
     documentStyles?: Style[];
+    editingMode?: EditorMode;
     editorRef?: React__default.RefObject<HTMLElement>;
     enableShortcuts?: boolean;
     fontFamilies?: ReadonlyArray<string | FontOption>;

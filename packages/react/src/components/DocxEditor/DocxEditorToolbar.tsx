@@ -167,6 +167,7 @@ export function DocxEditorToolbar({
       <EditorToolbar
         className={agentPanelOpen ? 'rounded-br-2xl' : undefined}
         style={toolbarStyle}
+        editingMode={editingMode}
         currentFormatting={selectionFormatting}
         onFormat={onFormat}
         onUndo={onUndo}
