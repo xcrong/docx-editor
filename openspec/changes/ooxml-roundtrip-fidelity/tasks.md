@@ -2,12 +2,12 @@
 
 ## Investigation
 
-- [ ] Audit highlight serialization — check if `w:highlight` or `w:shd` is used
-- [ ] Audit theme color roundtrip — check if theme attributes preserved alongside resolved color
-- [ ] Audit `w:rFonts` parsing — check if all 4 font categories are read
-- [ ] Audit field serialization in headers/footers
-- [ ] Audit image parser — check deduplication key (cNvPr ID vs relationship ID)
-- [ ] Check if settings.xml `w:view` is parsed/preserved
+- [x] Audit highlight serialization — check if `w:highlight` or `w:shd` is used
+- [x] Audit theme color roundtrip — check if theme attributes preserved alongside resolved color
+- [x] Audit `w:rFonts` parsing — check if all 4 font categories are read
+- [x] Audit field serialization in headers/footers
+- [x] Audit image parser — check deduplication key (cNvPr ID vs relationship ID)
+- [x] Check if settings.xml `w:view` is parsed/preserved
 
 ## Highlight fix
 
@@ -30,28 +30,28 @@
 
 ## Field code fix
 
-- [ ] Verify complex fields in headers/footers roundtrip as field structures
-- [ ] Fix serializer to reconstruct `w:fldChar`/`w:instrText` sequence
-- [ ] Test with PAGE, NUMPAGES fields in footer
+- [x] Verify complex fields in headers/footers roundtrip as field structures
+- [x] Fix serializer to reconstruct `w:fldChar`/`w:instrText` sequence
+- [x] Test with PAGE, NUMPAGES fields in footer
 
 ## Image ID fix
 
-- [ ] Use relationship ID (r:embed) as unique key, not pic:cNvPr id
-- [ ] Accept non-standard relationship ID formats
-- [ ] Test with document containing multiple images with id="0"
+- [x] Use relationship ID (r:embed) as unique key, not pic:cNvPr id
+- [x] Accept non-standard relationship ID formats
+- [x] Test with document containing multiple images with id="0"
 
 ## w:view fix
 
-- [ ] Parse `w:view` from settings.xml
-- [ ] Store in document model
-- [ ] Write back on export
-- [ ] Test roundtrip preservation
+- [x] Parse `w:view` from settings.xml
+- [x] Store in document model
+- [x] Write back on export
+- [x] Test roundtrip preservation
 
 ## Testing
 
 - [x] E2E test: custom highlight color roundtrip
 - [x] E2E test: theme color roundtrip
 - [x] E2E test: East Asian font preservation
-- [ ] E2E test: footer with field codes roundtrip
-- [ ] E2E test: multiple images with duplicate IDs
+- [x] E2E test: footer with field codes roundtrip
+- [x] E2E test: multiple images with duplicate IDs
 - [x] Run `bun run typecheck`
