@@ -29,6 +29,13 @@ import {
   forEachNoteParagraph,
   type TrackedChangeItem,
 } from './utils';
+import {
+  maxStructuralRevisionId,
+  resolveAllBodySectionChanges,
+  resolveAllStructural,
+  resolveBodySectionChangeById,
+  resolveStructuralById,
+} from './structural';
 
 // ============================================================================
 // ACCEPT / REJECT
@@ -44,6 +51,10 @@ import {
  * `ReviewChange` with no `noteType` resolves in the body, like the numeric form.
  *
  * Insertion: keep text, remove wrapper. Deletion: remove text and wrapper.
+ * Paragraph-level revisions follow the PM-side semantics: accept `pPrIns`
+ * clears the marker (split kept); accept `pPrDel` joins with the following
+ * paragraph (second paragraph's properties win); accept `pPrChange` /
+ * `paraRPrChange` / `sectPrChange` clears the entry (current values win).
  */
 export function acceptChange(
   body: DocumentBody,
@@ -58,6 +69,10 @@ export function acceptChange(
 /**
  * Reject a tracked change. See {@link acceptChange} for body-vs-note targeting.
  * Insertion: remove text and wrapper. Deletion: keep text, remove wrapper.
+ * Paragraph-level revisions follow the PM-side semantics: reject `pPrIns`
+ * joins with the following paragraph (second paragraph's properties win);
+ * reject `pPrDel` clears the marker (split kept); reject `pPrChange` /
+ * `paraRPrChange` / `sectPrChange` restores the entry's prior values.
  */
 export function rejectChange(
   body: DocumentBody,
@@ -70,7 +85,9 @@ export function rejectChange(
 }
 
 /**
- * Accept all tracked changes in the body. Pass `{ includeFootnotes,
+ * Accept all tracked changes in the body — inline and paragraph-level
+ * (`pPrIns` / `pPrDel` / `pPrChange` / `paraRPrChange` / `sectPrChange`,
+ * including the body-level section change). Pass `{ includeFootnotes,
  * includeEndnotes }` (and the `notes` stores) to also resolve changes inside
  * note bodies. Returns the total count processed.
  */
@@ -149,6 +166,8 @@ function processAllChanges(
   forEachParagraph(body, (para) => {
     count += processParagraph(para, mode, () => true);
   });
+  count += resolveAllStructural(body.content, mode);
+  count += resolveAllBodySectionChanges(body, mode);
   if (opts?.includeFootnotes && notes?.footnotes) {
     for (const fn of notes.footnotes) {
       forEachNoteParagraph(fn, (para) => {
@@ -170,7 +189,9 @@ function processAllChanges(
  * Find and process a tracked change by revision id in the document body.
  * Processes ALL items with matching id within the first paragraph that contains
  * it (a revision can span multiple items), then stops — the body's established
- * semantics.
+ * semantics. Paragraph-level revisions are resolved everywhere they appear
+ * (mirroring the PM by-id resolver, which walks every site in one
+ * transaction), as are body-level section-property changes.
  */
 function processChangeById(body: DocumentBody, id: number, mode: 'accept' | 'reject'): boolean {
   let found = false;
@@ -179,6 +200,8 @@ function processChangeById(body: DocumentBody, id: number, mode: 'accept' | 'rej
     // Stop traversal once we've found and processed the change
     if (found) return false;
   });
+  if (resolveStructuralById(body.content, id, mode) > 0) found = true;
+  if (resolveBodySectionChangeById(body, id, mode)) found = true;
   return found;
 }
 
@@ -197,6 +220,7 @@ function processChangeInNote(
   forEachNoteParagraph(note, (para) => {
     if (processParagraph(para, mode, (item) => item.info.id === id) > 0) found = true;
   });
+  if (resolveStructuralById(note.content, id, mode) > 0) found = true;
   return found;
 }
 
@@ -325,6 +349,9 @@ function nextRevisionId(body: DocumentBody): number {
         }
       }
     });
+    // New proposals share the `w:id` space with structural revisions —
+    // a stale max would mint a colliding id.
+    maxId = Math.max(maxId, maxStructuralRevisionId(body));
   }
   const next = maxId + 1;
   // Reserve both next and next+1 (replacement uses two IDs)

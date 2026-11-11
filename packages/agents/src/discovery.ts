@@ -19,6 +19,7 @@ import {
   forEachParagraph,
   forEachNoteParagraph,
 } from './utils';
+import { collectBodySectionChange, collectStructuralChanges } from './structural';
 
 /** The footnote/endnote stores a change walk can reach beyond the body. */
 export interface ChangeNotes {
@@ -90,25 +91,37 @@ export function getChanges(
     }
   };
 
-  forEachParagraph(body, (para, paragraphIndex) => collect(para, paragraphIndex, {}));
+  // Structural (paragraph-level) revisions live on the paragraph itself,
+  // not in its content — one entry per marker / stacked property entry. They
+  // bypass the inline `grouped` map (whose key has no kind segment) and are
+  // concatenated below.
+  const structural: ReviewChange[] = [];
+
+  forEachParagraph(body, (para, paragraphIndex) => {
+    collect(para, paragraphIndex, {});
+    collectStructuralChanges(para, paragraphIndex, {}, structural);
+  });
+  collectBodySectionChange(body, structural);
 
   if (filter?.includeFootnotes && notes?.footnotes) {
     for (const fn of notes.footnotes) {
-      forEachNoteParagraph(fn, (para, i) =>
-        collect(para, i, { noteId: fn.id, noteType: 'footnote' })
-      );
+      forEachNoteParagraph(fn, (para, i) => {
+        collect(para, i, { noteId: fn.id, noteType: 'footnote' });
+        collectStructuralChanges(para, i, { noteId: fn.id, noteType: 'footnote' }, structural);
+      });
     }
   }
 
   if (filter?.includeEndnotes && notes?.endnotes) {
     for (const en of notes.endnotes) {
-      forEachNoteParagraph(en, (para, i) =>
-        collect(para, i, { noteId: en.id, noteType: 'endnote' })
-      );
+      forEachNoteParagraph(en, (para, i) => {
+        collect(para, i, { noteId: en.id, noteType: 'endnote' });
+        collectStructuralChanges(para, i, { noteId: en.id, noteType: 'endnote' }, structural);
+      });
     }
   }
 
-  const changes = Array.from(grouped.values());
+  const changes = [...Array.from(grouped.values()), ...structural];
 
   return changes.filter((c) => {
     if (filter?.author && c.author !== filter.author) return false;

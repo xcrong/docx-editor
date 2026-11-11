@@ -37,6 +37,8 @@ export type {
   GetContentOptions,
   // Discovery
   ReviewChange,
+  ReviewChangeKind,
+  StructuralChangeKind,
   ReviewComment,
   // Batch (main LLM interface)
   BatchReviewOptions,
