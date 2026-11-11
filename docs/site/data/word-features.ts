@@ -560,7 +560,7 @@ export const wordFeatures: WordFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Editable note bodies with auto-numbering; tracked changes work inside notes; note references inside tables paginate correctly.',
+      'Editable note bodies with auto-numbering; tracked changes work inside notes; note references inside tables paginate correctly. Endnote bodies render in a document-end sheet with reference/body cross-navigation (#89; sectEnd placement and endnotePr numFmt follow up).',
   },
   {
     id: 'layout.columns',

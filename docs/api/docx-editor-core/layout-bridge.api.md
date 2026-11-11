@@ -17,6 +17,16 @@ export function applyCellSelectionHighlight(pagesContainer: HTMLElement, state: 
 export function applyFootnotePresentation(blocks: FlowBlock[], displayNumber: number): FlowBlock[];
 
 // @public
+export function buildEndnoteContentMap(endnotes: Endnote[], endnoteRefs: Array<{
+    endnoteId: number;
+}>, contentWidth: number, options: ConvertFootnoteOptions): Map<number, FootnoteContent>;
+
+// @public
+export function buildEndnoteRenderItems(endnoteRefs: Array<{
+    endnoteId: number;
+}>, endnoteContentMap: Map<number, FootnoteContent>, doc: Document_2 | null): FootnoteRenderItem[];
+
+// @public
 export function buildFontString(style: FontStyle): string;
 
 // @public
@@ -93,6 +103,9 @@ export function clipRectToTableWindow(spanEl: Element, rect: {
 } | null;
 
 // @public
+export function collectEndnoteRefs(blocks: FlowBlock[]): EndnoteRefLocation[];
+
+// @public
 export function collectFootnoteRefs(blocks: FlowBlock[]): FootnoteRefLocation[];
 
 // @public (undocumented)
@@ -134,6 +147,9 @@ export function convertBorderSpecToLayout(border: {
         themeShade?: string;
     };
 }, theme?: Theme | null): BorderStyle | undefined;
+
+// @public
+export function convertEndnoteToContent(endnote: Endnote, displayNumber: number, contentWidth: number, options: ConvertFootnoteOptions): FootnoteContent;
 
 // @public
 export type ConvertFootnoteOptions = {
@@ -211,6 +227,14 @@ export interface DomSelectionRect {
     // (undocumented)
     y: number;
 }
+
+// @public
+export type EndnoteRefLocation = {
+    endnoteId: number;
+    pmPos: number;
+    tableBlockId?: BlockId;
+    rowIndex?: number;
+};
 
 // @public
 export function extendMarginsForHeaderFooter(input: ExtendMarginsForHeaderFooterInput): ExtendMarginsForHeaderFooterResult;

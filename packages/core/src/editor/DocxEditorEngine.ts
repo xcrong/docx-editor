@@ -653,6 +653,9 @@ export class DocxEditorEngine {
         footerDistancePx,
         pageBorders,
         footnotesByPage,
+        endnotesSection,
+        endnoteIds,
+        endnoteRefPmPos,
       } = computation;
       const lookup = buildBlockLookup(newBlocks, newMeasures);
       host.onLayout(newLayout, newBlocks, newMeasures, lookup);
@@ -675,6 +678,9 @@ export class DocxEditorEngine {
           showShadow?: boolean;
           blockLookup?: BlockLookup;
           footnotesByPage?: Map<number, FootnoteRenderItem[]>;
+          endnotesSection?: FootnoteRenderItem[];
+          endnoteIds?: number[];
+          endnoteRefPmPos?: Map<number, number>;
           resolvedCommentIds?: Set<number>;
         } = {
           pageGap: host.getPageGap(),
@@ -692,6 +698,9 @@ export class DocxEditorEngine {
           theme,
           watermark,
           footnotesByPage,
+          endnotesSection,
+          endnoteIds,
+          endnoteRefPmPos,
           resolvedCommentIds,
         };
         const renderPagesKind = renderPages(newLayout.pages, pagesEl, pageOptions);

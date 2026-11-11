@@ -136,6 +136,16 @@ export interface BookmarkStart {
 }
 
 // @public
+export function buildEndnoteContentMap(endnotes: Endnote[], endnoteRefs: Array<{
+    endnoteId: number;
+}>, contentWidth: number, options: ConvertFootnoteOptions): Map<number, FootnoteContent>;
+
+// @public
+export function buildEndnoteRenderItems(endnoteRefs: Array<{
+    endnoteId: number;
+}>, endnoteContentMap: Map<number, FootnoteContent>, doc: Document_2 | null): FootnoteRenderItem[];
+
+// @public
 export function buildExtendedSelectionContext(doc: Document_2, range: Range_2, options?: SelectionContextOptions): ExtendedSelectionContext;
 
 // @public
@@ -225,6 +235,9 @@ export interface ClipboardSelection {
 }
 
 // @public
+export function collectEndnoteRefs(blocks: FlowBlock[]): EndnoteRefLocation[];
+
+// @public
 export function collectFootnoteRefs(blocks: FlowBlock[]): FootnoteRefLocation[];
 
 // @public
@@ -274,6 +287,9 @@ export interface CommentRangeStart {
     // (undocumented)
     type: 'commentRangeStart';
 }
+
+// @public
+export function convertEndnoteToContent(endnote: Endnote, displayNumber: number, contentWidth: number, options: ConvertFootnoteOptions): FootnoteContent;
 
 // @public
 export type ConvertFootnoteOptions = {
@@ -554,6 +570,14 @@ export interface Endnote {
     type: 'endnote';
     verbatimXml?: string;
 }
+
+// @public
+export type EndnoteRefLocation = {
+    endnoteId: number;
+    pmPos: number;
+    tableBlockId?: BlockId;
+    rowIndex?: number;
+};
 
 // @public
 export function ensureHexPrefix(hex: string): string;

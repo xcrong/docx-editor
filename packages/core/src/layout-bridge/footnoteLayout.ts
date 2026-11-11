@@ -25,11 +25,11 @@ import type {
   TextRun,
 } from '../layout-engine/types';
 import { layoutDocument, type LayoutOptions } from '../layout-engine';
-import type { Document, Footnote, StyleDefinitions, Theme } from '../types/document';
+import type { Document, Endnote, Footnote, StyleDefinitions, Theme } from '../types/document';
 import type { FootnoteRenderItem } from '../layout-painter';
 import { footnoteToProseDoc } from '../prosemirror/conversion/toProseDoc';
 import { toFlowBlocks } from './toFlowBlocks';
-import { getFootnoteText } from '../docx/footnoteParser';
+import { getEndnoteText, getFootnoteText } from '../docx/footnoteParser';
 
 /** Separator line height + vertical padding in pixels. */
 export const FOOTNOTE_SEPARATOR_HEIGHT = 12;
@@ -97,24 +97,17 @@ function mergeFootnoteReservedHeights(
  */
 const FOOTNOTE_FONT_SIZE_PT = 8;
 
-// ============================================================================
-// 1. Scan FlowBlocks for footnote references
-// ============================================================================
-
 /**
- * Where a footnote reference lives, as found by {@link collectFootnoteRefs}.
+ * Where an endnote reference lives, as found by {@link collectEndnoteRefs}.
  *
- * `pmPos` alone is enough to attribute a reference to a page for ordinary
- * (paragraph) content, whose fragments carry a per-page pm sub-range. A table
- * is different: it splits across pages by ROW, but every `TableFragment` keeps
- * the whole table's `pmStart`/`pmEnd` (those drive selection mapping and must
- * not be narrowed). So for a reference authored inside a table cell we also
- * record the OUTERMOST table's id and the index of the row that contains it,
- * letting {@link mapFootnotesToPages} attribute the reference to the page that
- * actually laid out that row.
+ * Same shape as {@link FootnoteRefLocation} (table context included) but
+ * keyed by endnote id. Endnotes render in a document-end section rather
+ * than per-page footnote areas, so no page mapping consumes the table
+ * context today — it is recorded anyway so a future per-section (`sectEnd`)
+ * layout can reuse it without rescanning.
  */
-export type FootnoteRefLocation = {
-  footnoteId: number;
+export type EndnoteRefLocation = {
+  endnoteId: number;
   pmPos: number;
   /** Id of the outermost enclosing table block, when the ref is in a table cell. */
   tableBlockId?: BlockId;
@@ -122,23 +115,24 @@ export type FootnoteRefLocation = {
   rowIndex?: number;
 };
 
+type NoteRefKind = 'footnote' | 'endnote';
+
 /**
- * Scan FlowBlocks for runs with footnoteRefId set.
- * Returns a list of {@link FootnoteRefLocation} in document order.
- *
- * Recurses into container blocks (table cells, text boxes) so footnote
- * references authored anywhere in the body reach the page-reservation
- * pass. Without this, a `footnoteRefId` nested inside a table cell never
- * gets mapped to a page and the per-page `.layout-footnote-area` silently
- * drops that entry even though the body still renders the in-line ref
- * marker.
- *
- * For refs inside a table, the OUTERMOST table's id and row index are
- * recorded (a nested table keeps the outer context, since the outer row is
- * what the paginator splits into per-page fragments).
+ * Shared FlowBlock walker behind {@link collectFootnoteRefs} and
+ * {@link collectEndnoteRefs}. `kind` selects which run marker
+ * (`footnoteRefId` vs `endnoteRefId`) is collected; the id is stored
+ * under a neutral `noteId` key and renamed by the wrappers.
  */
-export function collectFootnoteRefs(blocks: FlowBlock[]): FootnoteRefLocation[] {
-  const refs: FootnoteRefLocation[] = [];
+function collectNoteRefs(
+  blocks: FlowBlock[],
+  kind: NoteRefKind
+): Array<{ noteId: number; pmPos: number; tableBlockId?: BlockId; rowIndex?: number }> {
+  const refs: Array<{
+    noteId: number;
+    pmPos: number;
+    tableBlockId?: BlockId;
+    rowIndex?: number;
+  }> = [];
 
   const walk = (
     input: FlowBlock[],
@@ -147,9 +141,11 @@ export function collectFootnoteRefs(blocks: FlowBlock[]): FootnoteRefLocation[] 
     for (const block of input) {
       if (block.kind === 'paragraph') {
         for (const run of block.runs) {
-          if (run.kind === 'text' && run.footnoteRefId != null) {
+          if (run.kind !== 'text') continue;
+          const noteId = kind === 'footnote' ? run.footnoteRefId : run.endnoteRefId;
+          if (noteId != null) {
             refs.push({
-              footnoteId: run.footnoteRefId,
+              noteId,
               pmPos: run.pmStart ?? 0,
               ...(tableCtx ?? {}),
             });
@@ -172,6 +168,77 @@ export function collectFootnoteRefs(blocks: FlowBlock[]): FootnoteRefLocation[] 
   walk(blocks);
 
   return refs;
+}
+
+/**
+ * Where a footnote reference lives, as found by {@link collectFootnoteRefs}.
+ *
+ * `pmPos` alone is enough to attribute a reference to a page for ordinary
+ * (paragraph) content, whose fragments carry a per-page pm sub-range. A table
+ * is different: it splits across pages by ROW, but every `TableFragment` keeps
+ * the whole table's `pmStart`/`pmEnd` (those drive selection mapping and must
+ * not be narrowed). So for a reference authored inside a table cell we also
+ * record the OUTERMOST table's id and the index of the row that contains it,
+ * letting {@link mapFootnotesToPages} attribute the reference to the page that
+ * actually laid out that row.
+ */
+export type FootnoteRefLocation = {
+  footnoteId: number;
+  pmPos: number;
+  /** Id of the outermost enclosing table block, when the ref is in a table cell. */
+  tableBlockId?: BlockId;
+  /** Index (into the outermost table's `rows`) of the row holding the ref. */
+  rowIndex?: number;
+};
+
+// ============================================================================
+// 1. Scan FlowBlocks for footnote / endnote references
+// ============================================================================
+
+/**
+ * Scan FlowBlocks for runs with footnoteRefId set.
+ * Returns a list of {@link FootnoteRefLocation} in document order.
+ *
+ * Recurses into container blocks (table cells, text boxes) so footnote
+ * references authored anywhere in the body reach the page-reservation
+ * pass. Without this, a `footnoteRefId` nested inside a table cell never
+ * gets mapped to a page and the per-page `.layout-footnote-area` silently
+ * drops that entry even though the body still renders the in-line ref
+ * marker.
+ *
+ * For refs inside a table, the OUTERMOST table's id and row index are
+ * recorded (a nested table keeps the outer context, since the outer row is
+ * what the paginator splits into per-page fragments).
+ */
+export function collectFootnoteRefs(blocks: FlowBlock[]): FootnoteRefLocation[] {
+  return collectNoteRefs(blocks, 'footnote').map((r) => ({
+    footnoteId: r.noteId,
+    pmPos: r.pmPos,
+    ...(r.tableBlockId != null && r.rowIndex != null
+      ? { tableBlockId: r.tableBlockId, rowIndex: r.rowIndex }
+      : {}),
+  }));
+}
+
+/**
+ * Scan FlowBlocks for runs with endnoteRefId set.
+ * Returns a list of {@link EndnoteRefLocation} in document order.
+ *
+ * This is the endnote half of the pipeline the viewer was missing (#89):
+ * `toProseDoc`/`toFlowBlocks` already stamp `endnoteRefId` on reference
+ * runs (so the in-line superscript markers paint), but nothing collected
+ * them — so the note bodies in `word/endnotes.xml` never reached layout.
+ * Shares the table/textBox recursion with {@link collectFootnoteRefs} via
+ * the private walker above.
+ */
+export function collectEndnoteRefs(blocks: FlowBlock[]): EndnoteRefLocation[] {
+  return collectNoteRefs(blocks, 'endnote').map((r) => ({
+    endnoteId: r.noteId,
+    pmPos: r.pmPos,
+    ...(r.tableBlockId != null && r.rowIndex != null
+      ? { tableBlockId: r.tableBlockId, rowIndex: r.rowIndex }
+      : {}),
+  }));
 }
 
 // ============================================================================
@@ -419,6 +486,117 @@ export function buildFootnoteContentMap(
   }
 
   return contentMap;
+}
+
+// ============================================================================
+// 3b. Endnote content for the document-end section (#89)
+// ============================================================================
+
+/**
+ * Convert an Endnote to renderable FootnoteContent via the body pipeline.
+ *
+ * `Endnote.content` carries the same `BlockContent[]` model as
+ * `Footnote.content` (paragraph + table + image + textBox per ECMA-376
+ * §17.11.4), so this reuses {@link convertFootnoteToContent} directly —
+ * the `as unknown as Footnote` cast only bridges the nominal `type`
+ * discriminant (`'endnote'` vs `'footnote'`), which the pipeline never
+ * reads. Display numbers are decimal by first-appearance order, mirroring
+ * footnotes; honoring `w:endnotePr w:numFmt` (Word defaults to lowerRoman)
+ * is a follow-up.
+ */
+export function convertEndnoteToContent(
+  endnote: Endnote,
+  displayNumber: number,
+  contentWidth: number,
+  options: ConvertFootnoteOptions
+): FootnoteContent {
+  return convertFootnoteToContent(
+    endnote as unknown as Footnote,
+    displayNumber,
+    contentWidth,
+    options
+  );
+}
+
+/**
+ * Build endnote content for all endnotes referenced in the document.
+ * Display numbers are assigned by first-appearance order, mirroring
+ * {@link buildFootnoteContentMap}. Separators and dangling references
+ * (no matching `w:endnote` part) are skipped.
+ */
+export function buildEndnoteContentMap(
+  endnotes: Endnote[],
+  endnoteRefs: Array<{ endnoteId: number }>,
+  contentWidth: number,
+  options: ConvertFootnoteOptions
+): Map<number, FootnoteContent> {
+  const contentMap = new Map<number, FootnoteContent>();
+  const endnoteById = new Map<number, Endnote>();
+
+  for (const en of endnotes) {
+    if (en.noteType === 'normal' || en.noteType == null) {
+      endnoteById.set(en.id, en);
+    }
+  }
+
+  let displayNumber = 1;
+  const seen = new Set<number>();
+
+  for (const ref of endnoteRefs) {
+    if (seen.has(ref.endnoteId)) continue;
+    seen.add(ref.endnoteId);
+
+    const endnote = endnoteById.get(ref.endnoteId);
+    if (!endnote) continue;
+
+    contentMap.set(
+      ref.endnoteId,
+      convertEndnoteToContent(endnote, displayNumber, contentWidth, options)
+    );
+    displayNumber++;
+  }
+
+  return contentMap;
+}
+
+/**
+ * Turn the endnote content map into the ordered render payload for the
+ * document-end section (first-appearance order). Mirrors
+ * {@link buildFootnoteRenderItems} but returns a flat list — endnotes
+ * belong to the document end (`docEnd`, the default), not to any page.
+ *
+ * Lives in core so React + Vue both call the same helper.
+ */
+export function buildEndnoteRenderItems(
+  endnoteRefs: Array<{ endnoteId: number }>,
+  endnoteContentMap: Map<number, FootnoteContent>,
+  doc: Document | null
+): FootnoteRenderItem[] {
+  const result: FootnoteRenderItem[] = [];
+  if (!doc?.package?.endnotes) return result;
+
+  const enLookup = new Map<number, Endnote>();
+  for (const en of doc.package.endnotes) {
+    if (en.noteType && en.noteType !== 'normal') continue;
+    enLookup.set(en.id, en);
+  }
+
+  const seen = new Set<number>();
+  for (const ref of endnoteRefs) {
+    if (seen.has(ref.endnoteId)) continue;
+    seen.add(ref.endnoteId);
+    const en = enLookup.get(ref.endnoteId);
+    if (!en) continue;
+    const content = endnoteContentMap.get(ref.endnoteId);
+    const displayNum = content?.displayNumber ?? 0;
+    result.push({
+      displayNumber: String(displayNum),
+      text: getEndnoteText(en),
+      content,
+    });
+  }
+
+  return result;
 }
 
 // ============================================================================

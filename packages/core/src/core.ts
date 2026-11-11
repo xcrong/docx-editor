@@ -374,10 +374,14 @@ export type {
 
 export {
   collectFootnoteRefs,
+  collectEndnoteRefs,
   mapFootnotesToPages,
   calculateFootnoteReservedHeights,
   buildFootnoteContentMap,
   buildFootnoteRenderItems,
+  buildEndnoteContentMap,
+  buildEndnoteRenderItems,
+  convertEndnoteToContent,
   footnoteReservedHeightsEqual,
   stabilizeFootnoteLayout,
   convertHeaderFooterToContent,
@@ -387,6 +391,7 @@ export {
 
 export type {
   FootnoteRefLocation,
+  EndnoteRefLocation,
   MeasureBlocksFn,
   ConvertFootnoteOptions,
   StabilizeFootnoteLayoutArgs,

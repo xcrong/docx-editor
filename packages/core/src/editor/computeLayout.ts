@@ -32,10 +32,13 @@ import {
   computePerBlockWidths,
   demoteBlockLikeFloatingTables,
   collectFootnoteRefs,
+  collectEndnoteRefs,
   convertHeaderFooterToContent,
   convertHeaderFooterPmDocToContent,
   buildFootnoteContentMap,
   buildFootnoteRenderItems,
+  buildEndnoteContentMap,
+  buildEndnoteRenderItems,
   stabilizeFootnoteLayout,
   FOOTNOTE_COLUMN_GAP_PX,
   extendMarginsForHeaderFooter,
@@ -107,6 +110,19 @@ export interface LayoutComputation {
   footerDistancePx: number | undefined;
   pageBorders: SectionProperties['pageBorders'] | undefined;
   footnotesByPage: Map<number, FootnoteRenderItem[]> | undefined;
+  /**
+   * Document-end endnotes for the trailing sheet (#89), in display order
+   * with parallel `endnoteIds` for the `data-endnote-id` hooks. `undefined`
+   * when the document has no endnote references (or no endnotes part).
+   */
+  endnotesSection: FootnoteRenderItem[] | undefined;
+  endnoteIds: number[] | undefined;
+  /**
+   * First-reference PM position per endnote id, for backref clicks
+   * (lets adapters `scrollToPositionImpl` without depending on the
+   * reference page being painted — see `RenderEndnotesSectionOptions`).
+   */
+  endnoteRefPmPos: Map<number, number> | undefined;
 }
 
 /**
@@ -207,6 +223,13 @@ export function computeLayout(inputs: ComputeLayoutInputs): LayoutComputation {
   // Step 2.5: Footnote references.
   const footnoteRefs = collectFootnoteRefs(blocks);
   const hasFootnotes = footnoteRefs.length > 0 && !!document?.package?.footnotes;
+
+  // Step 2.6: Endnote references (#89). Same collection point as footnotes,
+  // but endnotes skip the page-mapping + reservation loop entirely — they
+  // render in a document-end sheet with their own space (see the docEnd
+  // rationale in `buildEndnoteRenderItems`).
+  const endnoteRefs = collectEndnoteRefs(blocks);
+  const hasEndnotes = endnoteRefs.length > 0 && !!document?.package?.endnotes;
 
   // Step 2.75: Header/footer content for rendering (needed before layout to
   // compute effective margins when HF content exceeds available space).
@@ -315,6 +338,43 @@ export function computeLayout(inputs: ComputeLayoutInputs): LayoutComputation {
     ? buildFootnoteRenderItems(pageFootnoteMap, footnoteContentMap, document)
     : undefined;
 
+  // Endnote bodies (#89): measured at the full content width (endnotes span
+  // the whole width — there is no `w15:footnoteColumns` equivalent) and
+  // returned as a flat display-ordered list for the trailing sheet. No
+  // reservation loop: the sheet owns its own space after the last page.
+  let endnotesSection: FootnoteRenderItem[] | undefined;
+  let endnoteIds: number[] | undefined;
+  let endnoteRefPmPos: Map<number, number> | undefined;
+  if (hasEndnotes) {
+    const endnoteContentMap = buildEndnoteContentMap(
+      document!.package.endnotes!,
+      endnoteRefs,
+      contentWidth,
+      {
+        styles: styles ?? undefined,
+        theme: theme ?? null,
+        measureBlocks,
+        defaultTabStopTwips,
+      }
+    );
+    endnotesSection = buildEndnoteRenderItems(endnoteRefs, endnoteContentMap, document);
+    if (endnotesSection.length === 0) {
+      endnotesSection = undefined;
+    } else {
+      // Content-map keys are inserted in first-appearance order — the same
+      // order `buildEndnoteRenderItems` renders (both skip the same
+      // non-normal notes) — so they double as the parallel id list for
+      // the `data-endnote-id` hooks.
+      endnoteIds = [...endnoteContentMap.keys()];
+      endnoteRefPmPos = new Map<number, number>();
+      for (const ref of endnoteRefs) {
+        if (!endnoteRefPmPos.has(ref.endnoteId) && endnoteContentMap.has(ref.endnoteId)) {
+          endnoteRefPmPos.set(ref.endnoteId, ref.pmPos);
+        }
+      }
+    }
+  }
+
   return {
     blocks,
     measures,
@@ -337,5 +397,8 @@ export function computeLayout(inputs: ComputeLayoutInputs): LayoutComputation {
         : undefined,
     pageBorders: sectionProperties?.pageBorders,
     footnotesByPage: footnotesByPage?.size ? footnotesByPage : undefined,
+    endnotesSection,
+    endnoteIds,
+    endnoteRefPmPos,
   };
 }

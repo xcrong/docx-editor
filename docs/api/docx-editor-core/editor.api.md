@@ -263,6 +263,10 @@ export interface LayoutComputation {
     // (undocumented)
     blocks: FlowBlock[];
     // (undocumented)
+    endnoteIds: number[] | undefined;
+    endnoteRefPmPos: Map<number, number> | undefined;
+    endnotesSection: FootnoteRenderItem[] | undefined;
+    // (undocumented)
     firstPageFooterForRender: HeaderFooterContent | undefined;
     // (undocumented)
     firstPageHeaderForRender: HeaderFooterContent | undefined;

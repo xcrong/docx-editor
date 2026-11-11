@@ -93,12 +93,16 @@ export type { SelectionRect, CaretPosition } from './selectionRects';
 // own platform measureBlocks function.
 export {
   collectFootnoteRefs,
+  collectEndnoteRefs,
   mapFootnotesToPages,
   calculateFootnoteReservedHeights,
   applyFootnotePresentation,
   convertFootnoteToContent,
+  convertEndnoteToContent,
   buildFootnoteContentMap,
   buildFootnoteRenderItems,
+  buildEndnoteContentMap,
+  buildEndnoteRenderItems,
   footnoteReservedHeightsEqual,
   stabilizeFootnoteLayout,
   distributeFootnotesIntoColumns,
@@ -108,6 +112,7 @@ export {
 } from './footnoteLayout';
 export type {
   FootnoteRefLocation,
+  EndnoteRefLocation,
   MeasureBlocksFn,
   ConvertFootnoteOptions,
   StabilizeFootnoteLayoutArgs,
