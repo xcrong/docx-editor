@@ -75,6 +75,14 @@ and no company ownership**:
    ```
 6. **Submit a PR** against `main` — no CLA to sign; submitting the PR is your agreement to the [contribution terms](#contribution-terms--community-project) above
 
+### Proposal ↔ Issue Governance (`T<N>`)
+
+Every `openspec` proposal is dispatched through exactly one issue:
+
+1. Each proposal must have a corresponding issue titled `T<N>【分类】<change-name>（N tasks）` — the issue is the sole dispatch entry; work without an issue number is not scheduled.
+2. One issue = one independently mergeable PR = 15–25 checkboxes. Oversized work is sliced and named `T<N>-NN`.
+3. Before an issue closes, that proposal's `tasks.md` must be fully checked, or carry an explicit handover record naming the receiving issue.
+
 ## Architecture Overview
 
 The editor has two rendering systems:

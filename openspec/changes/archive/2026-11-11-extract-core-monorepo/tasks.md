@@ -75,11 +75,20 @@
 
 ## 9. Cross-Framework E2E Test Reuse (deferred — Vue package not yet implemented)
 
+> T26-03 (#76) verdict 2026-11-11: COVERED — a superset of this section landed, so all boxes are
+> checked without new code. `examples/vue/` ships (Vite + Vue on port 5174); `playwright.config.ts`
+> has `vue` (testMatch `vue/**`) + `parity` (testMatch `parity/**`) projects; shared specs live in
+> `e2e/tests/parity/` (13 specs via `parity-fixture.ts` `ADAPTERS` [react 5173, vue 5174],
+> `forEachAdapter`/`openEditor`) with adapter-specific suites in `e2e/tests/vue/` (33 specs) and the
+> root react specs; `examples/parity/{react,vue}` share fixtures. Smoke-verified 2026-11-11:
+> `smoke/mount` + `smoke/toggle-bold` pass on `[vue]`; `[react]` hit a `page.goto` 15s timeout once
+> (dev-server contention, same flake class as the #33 close-out notes) and went green on retry.
+
 - [x] 9.4 Create `examples/vue/` with a minimal Vite + Vue scaffold app on port 5174
-- [ ] 9.1 Separate test files into `tests/shared/` vs `tests/react/` — deferred until Vue editor exists
-- [ ] 9.2 Add `vue` project to `playwright.config.ts` — deferred (TODO comment added)
-- [ ] 9.3 Configure shared tests for both projects — deferred until Vue editor exists
-- [ ] 9.5 Verify shared tests pass against Vue app — deferred until Vue editor exists
+- [x] 9.1 Separate test files into `tests/shared/` vs `tests/react/` — deferred until Vue editor exists → LANDED AS `e2e/tests/parity/` (shared) + `e2e/tests/vue/` + root react specs
+- [x] 9.2 Add `vue` project to `playwright.config.ts` — deferred (TODO comment added) → LANDED (`vue` + `parity` projects)
+- [x] 9.3 Configure shared tests for both projects — deferred until Vue editor exists → LANDED via `parity-fixture.ts` (`ADAPTERS` + `forEachAdapter`)
+- [x] 9.5 Verify shared tests pass against Vue app — deferred until Vue editor exists → VERIFIED (smoke `mount` + `toggle-bold` green on `[vue]` 2026-11-11)
 
 ## 10. Backwards Compatibility Verification
 
