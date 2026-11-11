@@ -305,6 +305,14 @@ export function renderTextRun(
   applyRunStyles(span, run, resolvedCommentIds);
   applyPmPositions(span, run.pmStart, run.pmEnd);
   applyInlineSdtWidgetAttrs(span, run);
+  // Endnote reference hook (#89): tag the in-line marker with its note id
+  // so adapter click handlers can scroll to the document-end endnote body.
+  // Visuals stay Word-faithful (superscript comes from the run's own
+  // formatting); only a pointer cursor betrays clickability.
+  if (run.endnoteRefId != null) {
+    span.dataset.endnoteRef = String(run.endnoteRefId);
+    span.style.cursor = 'pointer';
+  }
 
   // Handle hyperlinks (re-sanitize: TextRun hrefs arrive via PM attrs that
   // may bypass the hyperlinkParser boundary)

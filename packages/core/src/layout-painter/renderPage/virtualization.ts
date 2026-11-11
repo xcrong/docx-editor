@@ -18,9 +18,22 @@ import {
   type RenderPageOptions,
 } from '../renderPage';
 import type { FootnoteRenderItem } from './footnotes';
+import { renderEndnotesSection } from './endnotes';
+import { pageGeometryFromPage } from '../anchoredObjectPosition';
 
 type FullPageOptions = RenderPageOptions & {
   footnotesByPage?: Map<number, FootnoteRenderItem[]>;
+  /**
+   * Document-end endnotes (#89). Rendered as a trailing sheet after the
+   * last page — not per page — so this rides alongside (not inside)
+   * `footnotesByPage`. `endnoteIds` carries the parallel note ids for the
+   * `data-endnote-id` navigation hooks. `endnoteRefPmPos` carries the
+   * first-reference PM position per id for backref clicks (works even
+   * when the reference page is a virtualization shell).
+   */
+  endnotesSection?: FootnoteRenderItem[];
+  endnoteIds?: number[];
+  endnoteRefPmPos?: Map<number, number>;
 };
 
 /**
@@ -153,6 +166,15 @@ function computeOptionsHash(options: RenderPageOptions): string {
   if (options.headerDistance !== undefined) parts.push(`hd:${options.headerDistance}`);
   if (options.footerDistance !== undefined) parts.push(`fd:${options.footerDistance}`);
 
+  // Document-end endnotes (#89): any change rebuilds fully (the incremental
+  // path only re-syncs identical content to the container end).
+  const fullOpts = options as FullPageOptions;
+  if (fullOpts.endnotesSection && fullOpts.endnotesSection.length > 0) {
+    const ids = (fullOpts.endnoteIds ?? []).join(',');
+    const textLen = fullOpts.endnotesSection.reduce((n, fn) => n + fn.text.length, 0);
+    parts.push(`en:${ids}#${fullOpts.endnotesSection.length}+${textLen}`);
+  }
+
   return parts.join('|');
 }
 
@@ -187,12 +209,59 @@ export type RenderPagesUpdateKind = 'incremental' | 'full';
  * An IntersectionObserver watches page elements and populates/clears
  * content as pages scroll into and out of view.
  */
+/**
+ * Sync the trailing document-end endnote sheet (#89) to the container end.
+ *
+ * The sheet is NOT a `.layout-page` (page count, scroll-to-page, and
+ * virtualization shells must not see it) and its content is NOT inside
+ * `.layout-page-content` (body-scoped PM queries must not match note runs).
+ * Idempotent: removes the stale sheet when there is nothing to show, else
+ * (re)renders fresh and appends last — so the incremental path, which
+ * appends grown pages via `appendChild`, can call this afterwards to keep
+ * the sheet trailing.
+ */
+function syncEndnotesSection(
+  container: HTMLElement,
+  pages: Page[],
+  totalPages: number,
+  options: FullPageOptions
+): void {
+  const existing = container.querySelector(':scope > .layout-endnotes-section');
+  const items = options.endnotesSection;
+  if (!items || items.length === 0 || pages.length === 0) {
+    existing?.remove();
+    return;
+  }
+  const lastPage = pages[pages.length - 1];
+  const geometry = pageGeometryFromPage(lastPage);
+  const context: RenderContext = {
+    pageNumber: totalPages + 1,
+    totalPages: totalPages + 1,
+    section: 'body',
+    resolvedCommentIds: options.resolvedCommentIds,
+  };
+  const doc = options.document ?? document;
+  const fresh = renderEndnotesSection(items, options.endnoteIds ?? [], context, doc, {
+    contentWidth: geometry.contentWidth,
+    pageWidth: lastPage.size.w,
+    refPmPos: options.endnoteRefPmPos,
+  });
+  if (existing) {
+    existing.replaceWith(fresh);
+  } else {
+    container.appendChild(fresh);
+  }
+}
+
 export function renderPages(
   pages: Page[],
   container: HTMLElement,
   options: RenderPageOptions & {
     pageGap?: number;
     footnotesByPage?: Map<number, FootnoteRenderItem[]>;
+    endnotesSection?: FootnoteRenderItem[];
+    endnoteIds?: number[];
+    endnoteRefPmPos?: Map<number, number>;
   } = {}
 ): RenderPagesUpdateKind {
   const totalPages = pages.length;
@@ -308,6 +377,10 @@ export function renderPages(
     prevState.totalPages = totalPages;
     prevState.currentOptions = options;
 
+    // Grown pages appended above land after the endnote sheet; re-sync it
+    // trailing (content is unchanged here — the options hash covers that).
+    syncEndnotesSection(container, pages, totalPages, options);
+
     return 'incremental';
   }
 
@@ -356,6 +429,7 @@ export function renderPages(
   if (!useVirtualization) {
     // Store state for potential future incremental updates (won't be used
     // since small docs skip the incremental path, but keeps data consistent)
+    syncEndnotesSection(container, pages, totalPages, options);
     return 'full';
   }
 
@@ -462,6 +536,9 @@ export function renderPages(
   for (let i = 0; i < initialRenderCount; i++) {
     populatePageShell(pageShells[i], pageDataMap, totalPages, options);
   }
+
+  // The endnote sheet is never virtualized (few items, always trailing).
+  syncEndnotesSection(container, pages, totalPages, options);
 
   return 'full';
 }

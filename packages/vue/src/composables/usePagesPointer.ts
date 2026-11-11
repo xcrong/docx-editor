@@ -326,6 +326,35 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
    * ending on links do not unexpectedly leave the document.
    */
   function handlePagesClick(event: MouseEvent) {
+    // Endnote cross-navigation (#89). Mirrors React's `usePagesPointer`:
+    // body markers carry `data-endnote-ref`, section items
+    // `data-endnote-id`, each item's number `data-endnote-backref`.
+    // Backref jumps ride the `data-ref-pmpos` painted on the item
+    // (layout-based scroll, so it works even when the reference page is
+    // a virtualization shell).
+    const clickTarget = event.target as HTMLElement | null;
+    const backrefEl = clickTarget?.closest('[data-endnote-backref]') as HTMLElement | null;
+    if (backrefEl) {
+      event.preventDefault();
+      const itemEl = backrefEl.closest('[data-endnote-id]') as HTMLElement | null;
+      const pmStart = Number(itemEl?.dataset.refPmpos);
+      if (Number.isFinite(pmStart)) {
+        scrollVisiblePositionIntoView(pmStart);
+        setPmSelection(pmStart);
+      }
+      return;
+    }
+    const endnoteRefEl = clickTarget?.closest('[data-endnote-ref]') as HTMLElement | null;
+    if (endnoteRefEl) {
+      event.preventDefault();
+      const id = endnoteRefEl.dataset.endnoteRef;
+      const pagesEl = opts.pagesRef.value;
+      const itemEl = (id &&
+        pagesEl?.querySelector(`[data-endnote-id="${id}"]`)) as HTMLElement | null;
+      itemEl?.scrollIntoView({ block: 'center' });
+      return;
+    }
+
     const anchor = (event.target as HTMLElement | null)?.closest(
       'a[href]'
     ) as HTMLAnchorElement | null;
@@ -627,6 +656,14 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
 
     // Click outside an image clears the image selection.
     opts.selectedImage.value = null;
+
+    // Document-end endnote sheet (#89): display-only — never resolve a caret
+    // here (note runs live in the note's own PM space). Backref clicks
+    // navigate on mouseup via handlePagesClick.
+    if (target.closest('.layout-endnotes-section')) {
+      event.preventDefault();
+      return;
+    }
 
     event.preventDefault();
 

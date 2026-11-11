@@ -449,6 +449,14 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
       setSelectedImageInfo(null);
       e.preventDefault();
 
+      // Document-end endnote sheet (#89): display-only. Note runs live in
+      // the note's own PM space, so never plant the body caret here (the
+      // null branch below would yank it to doc end). Backref clicks
+      // navigate on mouseup via handlePagesClick.
+      if (target.closest('.layout-endnotes-section')) {
+        return;
+      }
+
       const pmPos = getPositionFromMouse(e.clientX, e.clientY);
       if (pmPos !== null) {
         // Track for potential text-drag → cell-drag promotion.
@@ -638,6 +646,37 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
     (e: React.MouseEvent) => {
       const surface = activeSurface();
 
+      // Endnote cross-navigation (#89). Body markers carry
+      // `data-endnote-ref`, section items `data-endnote-id`, and each
+      // item's number `data-endnote-backref` — all painted in core, so
+      // this branch is identical in both adapters. Backref jumps ride the
+      // `data-ref-pmpos` painted on the item (layout-based scroll, so it
+      // works even when the reference page is a virtualization shell).
+      const backrefEl = (e.target as HTMLElement).closest(
+        '[data-endnote-backref]'
+      ) as HTMLElement | null;
+      if (backrefEl && surface) {
+        const itemEl = backrefEl.closest('[data-endnote-id]') as HTMLElement | null;
+        const pmStart = Number(itemEl?.dataset.refPmpos);
+        if (Number.isFinite(pmStart)) {
+          scrollToPositionImpl(pmStart);
+          surface.setSelection(pmStart);
+        }
+        return;
+      }
+      const endnoteRefEl = (e.target as HTMLElement).closest(
+        '[data-endnote-ref]'
+      ) as HTMLElement | null;
+      if (endnoteRefEl) {
+        const id = endnoteRefEl.dataset.endnoteRef;
+        const itemEl = (id &&
+          pagesContainerRef.current?.querySelector(
+            `[data-endnote-id="${id}"]`
+          )) as HTMLElement | null;
+        if (itemEl) itemEl.scrollIntoView({ block: 'center' });
+        return;
+      }
+
       // Hyperlink: bookmark anchor (#name) or external href.
       const anchorEl = (e.target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null;
       if (anchorEl && surface) {
@@ -740,6 +779,7 @@ export function usePagesPointer(opts: UsePagesPointerOptions): UsePagesPointerRe
       onHeaderFooterDoubleClick,
       onHyperlinkClick,
       findCellPosFromPmPos,
+      pagesContainerRef,
       scrollToPositionImpl,
     ]
   );

@@ -37,7 +37,14 @@ export interface FootnoteRenderItem {
   content?: FootnoteContent;
 }
 
-function renderMeasuredFootnoteContent(
+/**
+ * Measured note-content painter shared by the footnote area and the
+ * document-end endnote section (#89). Both route note bodies through the
+ * same body pipeline (`footnoteToProseDoc → toFlowBlocks → measure`),
+ * so one renderer paints both — callers only differ in where the
+ * container lands (page bottom vs after the last page).
+ */
+export function renderMeasuredFootnoteContent(
   content: FootnoteContent,
   contentWidth: number,
   context: RenderContext,

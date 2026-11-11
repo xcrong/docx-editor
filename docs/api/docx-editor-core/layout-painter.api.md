@@ -216,10 +216,13 @@ export interface RenderPageOptions {
     watermark?: Watermark;
 }
 
-// @public
+// @public (undocumented)
 export function renderPages(pages: Page[], container: HTMLElement, options?: RenderPageOptions & {
     pageGap?: number;
     footnotesByPage?: Map<number, FootnoteRenderItem[]>;
+    endnotesSection?: FootnoteRenderItem[];
+    endnoteIds?: number[];
+    endnoteRefPmPos?: Map<number, number>;
 }): RenderPagesUpdateKind;
 
 // @public
