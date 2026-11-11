@@ -251,6 +251,8 @@ export interface ToolbarProps extends ReviewCallbacks {
   showReviewControls?: boolean;
   /** Current editing mode: hides the review group in 'viewing' (read-only); explicit showReviewControls still wins. Omit for standalone use. */
   editingMode?: EditorMode;
+  /** Whether the comments sidebar is open: false hides the review group; omit for standalone use (keeps callback-sniffing behavior). Explicit showReviewControls still wins. */
+  commentsSidebarOpen?: boolean;
 }
 
 /**
@@ -451,6 +453,7 @@ export function Toolbar(explicitProps: ToolbarProps) {
     onNextChange,
     showReviewControls,
     editingMode,
+    commentsSidebarOpen,
     inline = false,
   } = props;
 
@@ -970,6 +973,7 @@ export function Toolbar(explicitProps: ToolbarProps) {
         }}
         showReviewControls={showReviewControls}
         editingMode={editingMode}
+        commentsSidebarOpen={commentsSidebarOpen}
         inTrackedChange={inTrackedChange}
         disabled={disabled}
         onRefocusEditor={onRefocusEditor}

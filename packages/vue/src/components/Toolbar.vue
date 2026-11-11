@@ -519,8 +519,9 @@ const props = defineProps<{
   zoomPresets?: number[];
   showZoomControl?: boolean;
   editorMode?: EditorMode;
-  /** Whether the comments sidebar is currently open — drives the
-      active state on the comments toolbar button. */
+  /** Whether the comments sidebar is open — drives the active state
+      on the comments toolbar button, and hides the review group when
+      false (explicit `showReviewControls` still wins). */
   commentsSidebarOpen?: boolean;
   /** Image-node selection context — when non-null, the image group
       (wrap dropdown + properties button) renders inline inside the
@@ -546,7 +547,8 @@ const props = defineProps<{
   /**
    * Whether to show the tracked-changes review group. When omitted, the
    * group shows iff the host wires any `review-*` listener (mirrors React's
-   * "any review callback" rule) — except in `viewing` mode, where it hides.
+   * "any review callback" rule) — except in `viewing` mode or when the
+   * sidebar is closed (`commentsSidebarOpen === false`), where it hides.
    * Note: presence is read from raw vnode
    * props, since Vue Boolean-casts an absent optional boolean to `false`.
    */
@@ -641,9 +643,9 @@ const ctx = computed<SelectionContext>(() => {
 // cursor is not inside an insertion/deletion.
 const inTrackedChange = computed(() => ctx.value.inInsertion || ctx.value.inDeletion);
 // Mirror React: show the review group when the host wires any review
-// listener, except in `viewing` mode (read-only — the buttons would be
-// disabled dead UI), unless `showReviewControls` explicitly overrides.
-// Two Vue
+// listener, except in `viewing` mode or when the sidebar is closed
+// (`commentsSidebarOpen === false`), unless `showReviewControls`
+// explicitly overrides. Two Vue
 // gotchas documented here: (1) `useAttrs()` cannot be used — declared emit
 // listeners are excluded from attrs by `setFullProps` (`!isEmitListener`
 // guard), so `vnode.props` (raw props, listeners included) is the only
@@ -671,9 +673,13 @@ const showReviewGroup = computed(() => {
   );
   // `viewing` is read-only: hide the group. `editing`/`suggesting` (and an
   // absent `editorMode`, for standalone `<Toolbar>` use) keep the legacy
-  // listener-sniffing behavior.
-  if (props.editorMode !== undefined) return props.editorMode !== 'viewing' && hasListeners;
-  return hasListeners;
+  // listener-sniffing behavior. A closed sidebar hides the group; an
+  // absent `commentsSidebarOpen` (standalone use) keeps legacy behavior.
+  if (props.editorMode !== undefined)
+    return (
+      props.editorMode !== 'viewing' && props.commentsSidebarOpen !== false && hasListeners
+    );
+  return props.commentsSidebarOpen !== false && hasListeners;
 });
 
 // =========================================================================
