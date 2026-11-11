@@ -99,22 +99,22 @@ Three landable phases. Each phase is a separate PR. Phase 1 includes the snapsho
 ### Agents package
 
 - [x] Decide: extend `packages/agents/src/changes.ts` to handle `paragraph.pPrIns`/`pPrDel`/`pPrChange` and section revisions, OR open tracking issue for deferred support (T27-03 decision: DEFER — model-level paragraph-mark join + section-restore semantics are a separate slice; PM-editor path is complete and unit/e2e-covered. Tracking issue: #120.)
-- [ ] If extending: update agents API snapshot (`bun run api:extract`)
+- [x] If extending: update agents API snapshot (`bun run api:extract`) (T27-04: N/A — deferred to #120, no agents API change; `DocxReviewer.structural-paragraph-mark.test.ts` pins the propose path crash-free + marker-preserving; `api:check` green)
 
 ### Tests
 
-- [ ] Fixtures in `packages/core/src/docx/__tests__/fixtures/tracked-structural/`: minimal `<w:pPr><w:rPr><w:ins/>` and `<w:del/>` DOCX, `pPrChange` DOCX, `paraRPrChange` DOCX, `sectPrChange` (pPr-level and body-level) DOCX
-- [ ] Add `assertOoxmlEquivalent(a, b)` helper using canonical XML comparison
-- [ ] Parser round-trip tests per fixture (parse → re-serialize → assert semantically equivalent)
-- [ ] Conversion unit tests in `packages/core/src/__tests__/conversion/` — Document ↔ PM, including array-shaped attrs
-- [ ] Playwright: `packages/react/src/__tests__/playwright/tracked-changes-structural.spec.ts` — Enter in suggesting mode produces `pPrIns`; Backspace/Delete produce `pPrDel`; accept clears; reject reverses; last-paragraph and first-paragraph edge cases
-- [ ] Playwright: open fixture with structural revisions, save, reopen — markers preserved
-- [ ] Required regression: `comments-sidebar.spec.ts` (per CLAUDE.md, sidebar files are touched)
-- [ ] `bun run typecheck && bun run i18n:validate && bun run check:parity-contract && bun run api:check && bun run format`
+- [x] Fixtures in `packages/core/src/docx/__tests__/fixtures/tracked-structural/`: minimal `<w:pPr><w:rPr><w:ins/>` and `<w:del/>` DOCX, `pPrChange` DOCX, `paraRPrChange` DOCX, `sectPrChange` (pPr-level and body-level) DOCX (T27-04: `fixtures/tracked-structural/index.ts` — 5 string fixtures + `buildFixtureDocx` zip scaffolding)
+- [x] Add `assertOoxmlEquivalent(a, b)` helper using canonical XML comparison (T27-04: `packages/core/src/docx/__tests__/assertOoxmlEquivalent.ts` — drops declarations/envelope namespaces, collapses inter-tag whitespace, sorts attributes, normalizes empty-element spellings)
+- [x] Parser round-trip tests per fixture (parse → re-serialize → assert semantically equivalent) (T27-04: `tracked-structural-roundtrip.test.ts` — 7 tests incl. double round-trip stability; pre-existing `paragraph-mark-revision-roundtrip.test.ts` covers the attr↔model channel)
+- [x] Conversion unit tests in `packages/core/src/__tests__/conversion/` — Document ↔ PM, including array-shaped attrs (T27-04: two-author `pPrChange` stack preserves array shape + order through `toProseDoc`/`fromProseDoc`, appended to `paragraph-mark-revision-roundtrip.test.ts`; single-entry arrays covered since T27-01)
+- [x] Playwright: `packages/react/src/__tests__/playwright/tracked-changes-structural.spec.ts` — Enter in suggesting mode produces `pPrIns`; Backspace/Delete produce `pPrDel`; accept clears; reject reverses; last-paragraph and first-paragraph edge cases (T27-02/03: landed as `e2e/tests/tracked-changes-structural.spec.ts` — 30 tests; T27-04 adds `e2e/tests/tracked-changes-structural-closeout.spec.ts` — cross-page split, table-cell save→reload, undo/redo, multi-author — plus `e2e/tests/vue/tracked-changes-structural.spec.ts` Vue parity. NOTE: the path in this item is stale, specs live under `e2e/tests/`)
+- [x] Playwright: open fixture with structural revisions, save, reopen — markers preserved (T27-04: closeout spec "table-cell paragraph revision survives save → reload" — asserts `<w:ins>` in `w:pPr/w:rPr` in the saved ZIP, reloads, markers repaint; inline-level save→reload covered by `track-changes-comments-roundtrip.spec.ts` §8.6)
+- [x] Required regression: `comments-sidebar.spec.ts` (per CLAUDE.md, sidebar files are touched) (T27-04: ran green — no sidebar files touched by this slice, regression confirmed)
+- [x] `bun run typecheck && bun run i18n:validate && bun run check:parity-contract && bun run api:check && bun run format` (T27-04: all green; no i18n keys added so `i18n:fix` unneeded)
 
 ### Release
 
-- [ ] `bun changeset` — minor bump (additive API)
+- [x] `bun changeset` — minor bump (additive API) (T27-04: `.changeset/t27-04-closeout-80.md` — core minor; `review.tracked-changes` already `full/full/full` with structural-revision notes so no matrix upgrade; `guides/tracked-changes.mdx` range-command table synced in the same change)
 
 ---
 

@@ -193,4 +193,40 @@ describe('T27-01: paragraph-mark revision round trip', () => {
       expect(xml).toContain(`w:id="${id}"`);
     }
   });
+
+  test('two-author pPrChange stack preserves array shape through conversion', async () => {
+    // T27-04 (issue #80): conversion unit test for array-shaped attrs +
+    // multi-author stacking. The parser yields one entry (OOXML allows a
+    // single w:pPrChange); a second author's edit appends at model level and
+    // the full Document ↔ PM round trip must keep both entries in order.
+    const doc = await parseDocx(await buildFixtureDocx());
+    const paras = doc.package.document.content.filter(
+      (b): b is Paragraph => b.type === 'paragraph'
+    );
+    paras[2]!.propertyChanges!.push({
+      type: 'paragraphPropertyChange',
+      info: { id: 107, author: 'Grace', date: '2024-05-06T07:08:09Z' },
+      previousFormatting: { alignment: 'left' },
+      currentFormatting: { alignment: 'right' },
+    });
+
+    const pmDoc = toProseDoc(doc);
+    const p3 = pmDoc.maybeChild(2);
+    expect(p3?.attrs.pPrChange).toHaveLength(2);
+    expect(p3?.attrs.pPrChange[1].info).toMatchObject({ id: 107, author: 'Grace' });
+
+    const backToModel = fromProseDoc(pmDoc, doc);
+    const backParas = backToModel.package.document.content.filter(
+      (b): b is Paragraph => b.type === 'paragraph'
+    );
+    expect(backParas[2]!.propertyChanges).toHaveLength(2);
+    expect(backParas[2]!.propertyChanges![0]!.info).toMatchObject({
+      id: 104,
+      author: 'Cara',
+    });
+    expect(backParas[2]!.propertyChanges![1]!.info).toMatchObject({
+      id: 107,
+      author: 'Grace',
+    });
+  });
 });

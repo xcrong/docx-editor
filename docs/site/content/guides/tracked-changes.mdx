@@ -68,8 +68,10 @@ The accept/reject operations behind the sidebar buttons are exported as ProseMir
 |---|---|
 | `acceptChangeById(revisionId)` | Accept one revision by id |
 | `rejectChangeById(revisionId)` | Reject one revision by id |
-| `acceptAllChanges()` | Accept every revision, all revision types |
-| `rejectAllChanges()` | Reject every revision, all revision types |
+| `acceptChangesInRange(from, to)` | Accept every revision in a ProseMirror range; returns the count of distinct `(id, author, date)` triples resolved |
+| `rejectChangesInRange(from, to)` | Reject every revision in a ProseMirror range; same count return |
+| `acceptAllChanges()` | Accept every revision, all revision types; returns the triple count |
+| `rejectAllChanges()` | Reject every revision, all revision types; returns the triple count |
 
 Each returns a `Command` you run against the editor's view. Capture the view with the `onEditorViewReady` prop:
 
