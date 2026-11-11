@@ -367,6 +367,12 @@ function applyContentAreaStyles(element: HTMLElement, page: Page): void {
   element.style.right = `${margins.right}px`;
   element.style.bottom = `${margins.bottom}px`;
   element.style.overflow = 'visible';
+  element.style.zIndex = '1';
+  // Body content paints above page-anchored "behind" shapes (e.g. a header
+  // watermark at z-index 0) but below nothing else new: children keep their
+  // relative order, and overlays use explicit high z-indexes. Without this,
+  // a behind shape can only hide behind the page background (z-index -1) or
+  // cover the text (z-index 0) — there is no in-between (#103 follow-up).
 }
 
 /**
@@ -909,7 +915,14 @@ export function renderPage(
       headerContentEl.style.top = `${-headerVisualTop}px`;
       // Do not clip header containers that include media. Their measured content
       // height can exclude absolutely positioned runs, which causes visible cut-off.
-      if (headerContentEl.querySelector('img')) {
+      // Floating text boxes count too: a page-anchored behind-doc shape (e.g. the
+      // demo CONFIDENTIAL watermark) is positioned at page center, far below the
+      // header band — clipping would cut it off entirely (#103 follow-up).
+      // Blocks-data check (not a DOM query) so inline boxes keep clipping.
+      const hasHeaderFloat = (options.headerContent?.blocks ?? []).some(
+        (b) => b.kind === 'textBox' && b.displayMode === 'float'
+      );
+      if (headerContentEl.querySelector('img') || hasHeaderFloat) {
         shouldClipHeader = false;
       }
       headerEl.appendChild(headerContentEl);
@@ -972,7 +985,12 @@ export function renderPage(
       // the content up by the same amount to keep it painted in place (a normal
       // footer with no float has a zero delta, so this is a no-op there).
       footerContentEl.style.top = `${-footerVisualTop - (actualFooterHeight - interactiveFooterHeight)}px`;
-      if (footerContentEl.querySelector('img')) {
+      // Same as the header: floating text boxes escape the band (positions are
+      // page/margin-anchored), so they must not be clipped with it (#103).
+      const hasFooterFloat = (options.footerContent?.blocks ?? []).some(
+        (b) => b.kind === 'textBox' && b.displayMode === 'float'
+      );
+      if (footerContentEl.querySelector('img') || hasFooterFloat) {
         shouldClipFooter = false;
       }
       footerEl.appendChild(footerContentEl);

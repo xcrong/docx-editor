@@ -438,11 +438,14 @@ export function renderHeaderFooterContent(
       // painted, so they showed in the inline editor but not the page view.
       // A floating box is positioned, not in-flow: mirror the body pipeline
       // (`layoutTextBox` in layout-engine), which carries `isFloating` + a
-      // `behind → -1` stack order on the fragment so `renderTextBoxFragment`
-      // paints it beneath body text instead of above it (#103). Without the
-      // fragment flags the painter falls back to `z-index: auto` and — because
-      // the header element is appended after the body content — a behind-doc
-      // watermark covers the text it should show through.
+      // stack order on the fragment. `behind` paints at z-index 0 — above the
+      // page background but below the body content area (which sits at
+      // z-index 1), matching Word's behind-text watermark. z-index -1 would
+      // hide the box behind the page element's own white background (#103
+      // follow-up). Without the fragment flags the painter falls back to
+      // `z-index: auto` and — because the header element is appended after
+      // the body content — a behind-doc watermark covers the text it should
+      // show through. `inFront` stays at 1.
       const behindBox = block.wrapType === 'behind';
       const floatingBox = block.displayMode === 'float';
       const syntheticFragment: TextBoxFragment = {
@@ -455,7 +458,7 @@ export function renderHeaderFooterContent(
         pmStart: block.pmStart,
         pmEnd: block.pmEnd,
         isFloating: floatingBox,
-        zIndex: floatingBox ? (behindBox ? -1 : 1) : undefined,
+        zIndex: floatingBox ? (behindBox ? 0 : 1) : undefined,
       };
       const fragEl = renderTextBoxFragment(
         syntheticFragment,
