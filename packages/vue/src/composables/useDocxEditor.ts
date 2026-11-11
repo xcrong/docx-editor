@@ -67,6 +67,7 @@ import type {
   TextBoxBlock,
 } from '@xcrong/docx-editor-core/layout-engine/types';
 import { enclosingSdtGroupIds, applySdtFocus } from '@xcrong/docx-editor-core/layout-painter';
+import { suggestingCommandFactories } from './suggestingCommands';
 import type { Document, HeaderFooter } from '@xcrong/docx-editor-core/types/document';
 import type { LayoutSelectionGate } from '@xcrong/docx-editor-core/prosemirror';
 
@@ -795,8 +796,13 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     destroy();
   });
 
-  function getCommands() {
-    return mgr.getCommands();
+  function getCommands(): CommandMap {
+    // Overlay the suggesting-tracked `commands/*` wrappers (issue #127)
+    // over the manager's bare commands so name-based callers (Toolbar,
+    // TableToolbar, menus, context menus) mint revisions in suggesting
+    // mode — the same wrappers React calls directly. Closed-mode
+    // behavior is unchanged: the wrappers run the bare command untouched.
+    return { ...mgr.getCommands(), ...suggestingCommandFactories };
   }
 
   return {
