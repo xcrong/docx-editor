@@ -242,8 +242,13 @@ describe('engine body view lifecycle', () => {
       });
       const view = engine2.mountBodyView(host, bodyDoc('t'));
       const tr = view.state.tr.insertText('more', 1);
-      tr.setMeta('scrollIntoView', true);
+      // `scrollIntoView()` sets the real UPDATED_SCROLL bit (4); the plain
+      // `setMeta('scrollIntoView', …)` form does not, so it would make the
+      // strip assertion vacuous. See prosemirror-state Transaction.
+      tr.scrollIntoView();
+      expect((tr as unknown as { updated: number }).updated & 4).not.toBe(0);
       view.dispatch(tr);
+      expect((tr as unknown as { updated: number }).updated & 4).toBe(0);
       expect(view.state.doc.textContent).toContain('more');
       expect(states.length).toBe(1);
       engine2.destroyBodyView();
