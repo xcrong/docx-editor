@@ -95,7 +95,9 @@ export class EditorPage {
     // helper works regardless of which is mounted.
     this.toolbar = page.locator('[data-testid="toolbar"], [data-testid="formatting-bar"]');
     this.variablePanel = page.locator('.variable-panel');
-    this.zoomControl = page.locator('.zoom-control');
+    // ZoomControl renders no wrapper class — the Select trigger (aria-label
+    // "Zoom: {label}") is the stable handle for the control.
+    this.zoomControl = page.locator('button[aria-label^="Zoom:"]');
 
     // Toolbar buttons
     this.boldButton = page.locator('[data-testid="toolbar-bold"]');
@@ -1411,26 +1413,42 @@ export class EditorPage {
   // ============================================================================
 
   /**
-   * Set zoom level
+   * Set zoom level.
+   *
+   * Drives the ZoomControl Radix Select in the toolbar: the middle % is a
+   * dropdown trigger (aria-label "Zoom: {label}", e.g. "Zoom: 100%") listing
+   * the preset levels (50%/75%/100%/125%/150%/200%).
+   *
+   * @param level - Zoom factor where 1 = 100% (matches ZoomControl's `value`
+   *   prop). Percent values (> 10, e.g. 150) are also accepted and normalized.
    */
   async setZoom(level: number): Promise<void> {
-    const zoomInput = this.page.locator('.zoom-control input');
-    await zoomInput.fill(level.toString());
-    await zoomInput.press('Enter');
+    const fraction = level > 10 ? level / 100 : level;
+    const label = `${Math.round(fraction * 100)}%`;
+    // The trigger's aria-label embeds the current label ("Zoom: 100%"), so
+    // match by prefix. Mirrors setFontFamily/setLineSpacing.
+    const trigger = this.page.locator('button[aria-label^="Zoom:"]');
+    await trigger.click();
+    const option = this.page.getByRole('option', { name: label, exact: true });
+    await option.waitFor({ state: 'visible', timeout: 5000 });
+    await option.click();
+    await this.page.waitForTimeout(150);
   }
 
   /**
-   * Zoom in
+   * Zoom in (steps to the next preset level via the toolbar − / + stepper).
    */
   async zoomIn(): Promise<void> {
-    await this.page.locator('.zoom-control [aria-label="Zoom in"]').click();
+    await this.page.locator('button[aria-label="Zoom in"]').click();
+    await this.page.waitForTimeout(150);
   }
 
   /**
-   * Zoom out
+   * Zoom out (steps to the previous preset level via the toolbar − / + stepper).
    */
   async zoomOut(): Promise<void> {
-    await this.page.locator('.zoom-control [aria-label="Zoom out"]').click();
+    await this.page.locator('button[aria-label="Zoom out"]').click();
+    await this.page.waitForTimeout(150);
   }
 
   // ============================================================================
