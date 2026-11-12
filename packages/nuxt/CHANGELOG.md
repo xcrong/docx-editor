@@ -1,5 +1,24 @@
 # @xcrong/nuxt-docx-editor
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies [0464a1c]
+- Updated dependencies [15afb74]
+- Updated dependencies [52bbc3c]
+- Updated dependencies [e9abd61]
+- Updated dependencies [86201f1]
+- Updated dependencies [0310c20]
+- Updated dependencies [2c91b11]
+- Updated dependencies [f3a586f]
+- Updated dependencies [43d24db]
+- Updated dependencies [a627ace]
+- Updated dependencies [1e60aa2]
+- Updated dependencies [b574dec]
+- Updated dependencies [32c8642]
+  - @xcrong/docx-editor-vue@2.0.0
+
 ## 1.10.3
 
 ### Patch Changes
