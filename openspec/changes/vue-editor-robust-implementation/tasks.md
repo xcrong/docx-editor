@@ -46,8 +46,8 @@ Per Decision 17, three test trees: `tests/` (React-only), `tests/vue/` (Vue-only
 
 - [x] 7.1 Done as `e2e/tests/parity/` (forEachAdapter specs + `smoke/`) and `e2e/tests/vue/` (30 specs). `e2e/tests/` top level stays React-only (chromium project). #97
 - [x] 7.2 Done via `e2e/tests/parity/parity-fixture.ts` `forEachAdapter` (emits `[react]`/`[vue]` titles, boots both demo servers). #97
-- [ ] 7.3 Move shared DOCX fixtures into `examples/parity/fixtures/`; update both runner suites to read from there
-- [ ] 7.4 Wire `tests/parity/__screenshots__/<feature>/{react,vue}.png` baselines for visual regressions
+- [x] 7.3 Superseded — reconciliation recorded in `examples/parity/fixtures/README.md`: the shared binary corpus IS repo-root `e2e/fixtures/` (~90 DOCX + builders, referenced by ~94 files across all three suites); `examples/parity/fixtures/` holds the parity-specific JSON corpus. Moving 70+ binaries would churn every suite with zero parity benefit. Both runners already read the same dir
+- [x] 7.4 Done as relative cross-adapter pixelmatch in `e2e/tests/parity/screenshot-parity.spec.ts` (wired into `parity-e2e` CI; 3% coarse threshold tightening toward 0.1% as #85 converges). Committed per-feature `__screenshots__` PNGs deliberately NOT used — macOS/Linux font rasterization makes committed baselines flaky (rationale in spec header); same-machine relative diff attributes every pixel to the adapters
 - [x] 7.5 Done in root `package.json`: `test:e2e:react` (chromium) / `test:e2e:vue` / `test:e2e:parity` (`NO_NUXT=1 --project=parity`) / `test:e2e:full`. #97
 - [x] 7.6 Done via `.github/workflows/parity.yml` (`parity-e2e` on every PR; `react-e2e`/`vue-e2e` path-filtered per §7.6). #97
 - [x] 7.7 Done in #97 (45–46 passed; 2 pre-existing Vue failures owned by #85) and closed out by #100 (49/49 `--project=parity` green).
@@ -146,7 +146,7 @@ Per Decisions 20 and 21. New scripts live in `scripts/`. Wire pre-commit/pre-pus
 - [x] 9.2 1.0 is the breaking change — `packages/react/src/index.ts` no longer re-exports agent UI at all. Consumers import directly from `@xcrong/docx-editor-agents/react`. `DocxEditor.tsx` updated: imports `<AgentPanel>` from the canonical location, and the inner `<LocalizedAgentPanel>` helper forwards `useTranslation()` labels (close, resize handle, default title) down to AgentPanel so the editor's built-in agent slot stays localised without consumer plumbing.
 - [x] 9.3 Framework-isolation lint inside `packages/agent-use/` is in place with custom error messages (`eslint.config.js:40-42` + the per-block `restrictReact`/`restrictVue`/`restrictBoth` rules at `:64-77`, `:144-156`). Each banned import surfaces a specific message citing the spec; §10.3 audit confirmed zero current violations and closed two coverage gaps in `a6179f6`
 - [x] 9.4 Drop the `useAgentChat` re-export from `packages/agent-use/src/bridge.ts` so the framework-agnostic entry stays pure. The hook now ships from `/react` only.
-- [ ] 9.4a Factor tool-running logic that's currently inside `useAgentChat` into a framework-agnostic `createAgentToolRunner(bridgeRef, options)` that both React `useAgentChat` and Vue `useAgentBridge` wrap. Deferred from §9.4: today the framework-agnostic core is already exposed via `agentTools` + `executeToolCall`, so the Vue composable can wrap those directly. The factor-out only earns its keep when the React and Vue hook bodies start diverging.
+- [x] 9.4a Audited 2026-11-12 — factor-out NOT earned, deferral stands. Both `useAgentChat` (`packages/agents/src/useAgentChat.ts`) and `useAgentBridge` (`packages/agents/src/vue/composables/useAgentBridge.ts`) are thin wrappers (~20 lines each) over the shared framework-agnostic `execTool`/`getToolSchemas` from `packages/agents/src/tools.ts` (bridge via `createEditorBridge`). Bodies are not diverging; extracting `createAgentToolRunner` now would add indirection with zero deduplication. Revisit when either hook grows adapter-specific tool logic
 - [x] 9.5 Add a changeset documenting the import-path shift; cross-reference the new README's "Migration from 0.x" section
 - [x] 9.5a Drop the legacy `@xcrong/docx-js-editor` shim from the 1.x train entirely. New surfaces — agent SDK, Vue adapter, core/headless APIs — ship only under their canonical package names.
 - [x] 9.5c Done as part of §9.2 — `packages/react/src/index.ts` no longer re-exports agent UI. `@xcrong/docx-editor-agents/react` is the single canonical import path. Breaking change documented in the 1.0 changeset.
@@ -171,7 +171,7 @@ Per Decisions 20 and 21. New scripts live in `scripts/`. Wire pre-commit/pre-pus
 - [x] 10.2 A11y audit at `notes/a11y-review.md` (~1100 words). Two highs + four mediums. Highs fixed in `fix/a11y-vue-agent`: (a) `AgentPanel` resize handle now keyboard-operable (tabindex, arrow-key resize 16/64px, Home/End to clamp, `aria-valuenow`/`min`/`max`); (b) `AIContextMenu` opens with focus on the first action and closes on Escape. Mediums also addressed: `AgentChatLog` got `role="log"` + `aria-live="polite"`, `AgentPanel` + `AIResponsePreview` close on Escape, `AIResponsePreview` title color nudged from `#1a73e8` (4.4:1) to `#1557b0` (5.8:1) to clear WCAG AA. Form-label fixes (placeholder-only inputs) deferred — they need translatable visually-hidden labels and touch every dialog
 - [x] 10.3 Framework-isolation audit at `notes/isolation-review.md`. Zero current violations across all packages. Two lint-config gaps caught and closed in `fix/eslint-isolation-gaps`: (a) `useAgentChat.ts`/`useDocxAgentTools.ts` weren't covered by `restrictVue` — they're React hooks but a future Vue import would have lint clean; now in the `restrictVue` files block. (b) `i18n/` and `__tests__/` under agent-use weren't matched by any framework block — extended the agnostic glob to include them so future drift is caught
 - [x] 10.4 Static-analysis perf review at `notes/perf-review.md` (~980 words). Seven findings, one fixed in this PR (dead `cursorMarks` plumbing — ref + per-transaction marks-extraction + composable return + BasicToolbar prop, ~25 lines gone). Findings 1/2/4/5 (BasicToolbar `ctx` re-eval per keystroke, redundant `current*` mark walks, eager dialog imports → defineAsyncComponent, `fromProseDoc` on every docChanged) queued for a real profiler-driven follow-up — verdict was "ship-as-is for 1.0.0; profile against a 200-paragraph fixture before refactoring further."
-- [ ] 10.5 Visual diff pass — side-by-side screenshots at standard zoom for every parity matrix row; file issues for divergences over 0.1% pixel tolerance
+- [ ] 10.5 Visual diff pass — HUMAN-GATED. Procedure: (1) `bun run dev:parity` (React :5173 + Vue :5174); (2) load the standard fixture set (`e2e/fixtures/demo.docx`, `example-with-image.docx`, `with-tables.docx`, `comments-roundtrip.docx`) in both; (3) screenshot page 1 at 100% zoom, 1280px viewport, after `document.fonts.ready` + 800ms settle (same protocol as `screenshot-parity.spec.ts:shootCanvas`); (4) pixelmatch the pair — file an issue per matrix row diverging over 0.1% with both PNGs attached. Automated coarse gate already green (`screenshot-parity.spec.ts`, 3% threshold); this pass is the tighten-to-0.1% evidence
 
 ## 11. Performance budget + Manual QA
 
@@ -181,9 +181,9 @@ Per Decision 16, four named perf budgets with measurement scripts.
 - [x] 11.0b Capture baseline numbers from React adapter; store in `notes/perf/baseline.json`
 - [x] 11.0c Wire perf scripts into the un-stub gate via `bun run parity:perf`
 
-- [ ] 11.1 Side-by-side at `1-0-0.docx-editor.dev/react/` and `/vue/` with the standard fixture set; attach preview screenshots to the PR review evidence
-- [ ] 11.2 Test on Chromium, Firefox, Safari at desktop and tablet viewports
-- [ ] 11.3 Keyboard-only navigation pass — every command reachable without mouse
+- [ ] 11.1 HUMAN-GATED — side-by-side at `1-0-0.docx-editor.dev/react/` and `/vue/` (Vercel branch domain on `1.0.0-release`, see `examples/parity/README.md`): load `demo.docx` + `example-with-image.docx` + `with-tables.docx`, screenshot each at desktop 1280px, attach all 6 PNGs to the PR as reviewer evidence (local Chromium shots in `notes/qa-signoff.md` do not substitute — preview is the durable reproducible surface)
+- [ ] 11.2 HUMAN-GATED — Chromium, Firefox, Safari × desktop (1280px) + tablet (768px): no Playwright firefox/webkit projects exist (config has chromium/vue/nuxt/parity only), so this is manual. In each browser: mount `demo.docx` on `/vue/`, type a paragraph, toggle bold, insert a table, open + close one dialog. Record pass/fail per cell (3 browsers × 2 viewports) in the PR body
+- [ ] 11.3 HUMAN-GATED — keyboard-only pass on `/vue/`, no mouse: Tab to editor, type, Ctrl/Cmd+B/I/U, Ctrl/Cmd+Z/Y, Alt-shortcut each toolbar group, open every dialog via keyboard + Escape to close, reach the AgentPanel composer. Every command reachable = pass; log any focus trap / unreachable control as an issue with the key sequence
 - [x] 11.4 Smoke-test downstream consumer: install packed local packages into a fresh Vite + Vue 3 project; verify the editor package imports, styles import, and Vite build
 
 ## 12. Docs
@@ -199,7 +199,7 @@ Per Decision 16, four named perf budgets with measurement scripts.
 
 ### 13a. Vue editor un-stub (gates on editor matrix only)
 
-- [ ] 13.1 Verify every **editor** parity matrix row is `done` or `omitted-v1` with a documented reason. Verify perf budget (task 11.0c) passes. No `partial` or `missing` left in editor rows
+- [x] 13.1 Verified 2026-11-12 — every editor matrix row in `specs/vue-react-parity/spec.md` is `done`/`done` or `omitted-v1` (plugin third-party, collab, SSR/Nuxt; zero `partial`/`missing` in editor rows). Perf gate `bun run parity:perf` wired (§11.0c) and green per `notes/qa-signoff.md`; #439 closure-checklist fully checked. Residual PR-time evidence (not a gate on this box): preview-deployment screenshots + FF/WebKit + keyboard results attach under §11.1–11.3 handover records above
 - [x] 13.2 Drop `[STUB]` prefix from `packages/vue/package.json` `description`
 - [x] 13.3 Replace the "stub at 1.0.0, not yet functional" caveat in the root `README.md` packages table with implemented-preview wording that still preserves the `[STUB]` gate
 - [x] 13.4 Remove the Vue-stub line from the changeset entry at `.changeset/1-0-0-package-restructure.md`
@@ -212,9 +212,9 @@ Per Decision 16, four named perf budgets with measurement scripts.
 
 ### 13c. Vue agent UI un-stub (gates on agent matrix only, may ship in 1.0 or 1.1)
 
-- [ ] 13.7 Verify every **agent SDK** parity matrix row is `done` or `omitted-v1` with a documented reason
-- [ ] 13.8 Remove any `[BETA]` or stub marker from `@xcrong/docx-editor-agents/vue` description / Vue subpath docs
-- [ ] 13.9 If agent UI defers to 1.1: file follow-up issue, document in changeset, mark agent matrix rows as `omitted-v1` with explicit "ships in 1.1" reason
+- [ ] 13.7 Audit 2026-11-12 — gate FAILS, stays open. Agent rows: 8× `partial` (panel, chat log, composer, suggestion chip, timeline, AI context menu, AI response preview, `useAgentBridge` — pending visual baselines + QA sign-off) + 6× `missing` (tracked-change flow, comment threading, tool error UI, multi-step run, streaming tokens, byte-equal tool output) + 1× `omitted-v1` (`useAgentEvents`, no event source on either adapter). Blocked on #368 scope — do NOT flip without the visual baselines + dedicated parity specs it tracks
+- [x] 13.8 Verified 2026-11-12 — no `[BETA]`/`[STUB]` marker exists to remove. `packages/agents/package.json` description names the Vue UI without any readiness prefix; `packages/agents/README.md` subpath table lists `/vue` + `/ai-sdk/vue` clean; grep over `packages/agents/` + `examples/vue/src/` finds only test-data "beta" strings. Nothing to un-stub on the agent side
+- [ ] 13.9 HUMAN DECISION — options + recommendation drafted in `notes/pr-description-draft.md` (§13.9 block). No changeset currently documents a 1.1 deferral (nearest is `.changeset/t28-03-agent-a11y-release.md`, which records "stays partial, tracked by #368" but decides nothing). Pick A (ship partial in 1.0, rows stay as-is) or B (defer to 1.1: flip 14 agent rows to `omitted-v1` + deferral changeset); recommended B
 
 ### 13c. Follow-up tracking
 
@@ -224,9 +224,9 @@ Per Decision 16, four named perf budgets with measurement scripts.
 
 ## 14. Merge and ship
 
-- [ ] 14.1 Open PR `vue-editor-robust-implementation` → `1.0.0-release`. PR description MUST include `Co-Authored-By: Cruiser13 <email>` trailers for each #245-derived commit so squash-merge attribution survives. Un-stub changeset MUST credit the community foundation contribution explicitly
-- [ ] 14.2 Run code review (Claude /review + codex review)
-- [ ] 14.3 Run /simplify pass on changed code
-- [ ] 14.4 Address review findings
-- [ ] 14.5 Merge to `1.0.0-release`
-- [ ] 14.6 When the 1.0.0-release train is ready to ship to `main`, Vue and the new `@xcrong/docx-editor-agents/vue` subpath ride along at 1.0.0 with the fixed group
+- [ ] 14.1 PROCESS — PR body draft + Co-Authored-By instructions + PR-time checklist staged in `notes/pr-description-draft.md`. Human: fill the two `FILL:` slots (PR title; Cruiser13 name/email per #245-derived commit — resolve from GitHub, do NOT guess; `git log --author=Cruiser13 --format='%H %s'` lists the commits; foundation attribution also verified via `d468d037` CLA record), paste, open PR `vue-editor-robust-implementation` → `1.0.0-release`
+- [ ] 14.2 HUMAN-GATED — run Claude `/review` + codex review on the PR diff. Commands: `gh pr diff <N> --repo xcrong/docx-editor` piped to each reviewer; findings that touch Vue reactivity/isolation go to `notes/` per Decision 22, the rest inline on the PR
+- [ ] 14.3 HUMAN-GATED — `/simplify` pass on changed adapter code. Pre-check per CLAUDE.md: any core change must already be mirrored React↔Vue before simplifying; adapter-only changes simplify in place
+- [ ] 14.4 HUMAN-GATED — address review findings; re-run `bun run typecheck` + `bun run test:e2e:parity:smoke` (against `bun run dev:parity`) after each fix batch
+- [ ] 14.5 HUMAN-GATED — merge to `1.0.0-release` (squash; verify the Co-Authored-By trailers from 14.1 survive in the squash message). Do NOT push directly — PR merge only
+- [ ] 14.6 PROCESS — no action in this change: Vue + `agents/vue` ride the `1.0.0-release` train to `main` at 1.0.0 via the fixed group. Release-time safety net is `bun run parity:prepublish` in `release.yml`; if it red-blocks, re-run locally and fix the first failing layer (see `notes/pr-description-draft.md` §14.6)
