@@ -255,6 +255,15 @@ async function collectShowcase(page: Page): Promise<ShowcaseEvidence> {
       )) {
         if (id) commentIds.add(id);
       }
+      // Overlapping ranges stack: the painter exposes every unresolved id
+      // (parent + reply) space-separated via `data-comment-ids` while
+      // `data-comment-id` carries only the first (runs.ts §9.4). Collect both
+      // so a reply thread counts as the two comment entities it is.
+      for (const ids of [
+        ...document.querySelectorAll('.layout-page-content [data-comment-ids]'),
+      ].map((e) => (e as HTMLElement).dataset.commentIds ?? '')) {
+        for (const id of ids.split(/\s+/)) if (id) commentIds.add(id);
+      }
       for (const t of [...document.querySelectorAll('.layout-sdt-widget')].map(
         (e) => (e as HTMLElement).dataset.sdtTag ?? ''
       )) {
