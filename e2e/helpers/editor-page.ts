@@ -9,6 +9,21 @@ import { Page, Locator, expect } from '@playwright/test';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
+/**
+ * Selector for the BODY ProseMirror surface only.
+ *
+ * The editor mounts one hidden ProseMirror EditorView off-screen for the body
+ * (host: `.paged-editor__hidden-pm`, shared by the React and Vue adapters)
+ * plus one hidden view per distinct header/footer part. Unscoped `.ProseMirror`
+ * selectors therefore resolve to 3 surfaces on documents with a header and
+ * footer (e.g. the demo fixture), which trips Playwright strict mode and can
+ * target the wrong surface via `querySelector`. Always scope body-editing
+ * queries through this selector, falling back to unscoped `.ProseMirror` only
+ * for legacy (non-paged) editor markup.
+ */
+const BODY_PM_SELECTOR = '.paged-editor__hidden-pm .ProseMirror';
+const BODY_EDITABLE_SELECTOR = '.paged-editor__hidden-pm [contenteditable="true"]';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -151,10 +166,15 @@ export class EditorPage {
   // ============================================================================
 
   /**
-   * Get the first editable content area
+   * Get the first editable content area (the BODY surface — never a
+   * header/footer hidden PM).
    */
   getContentArea(): Locator {
-    return this.page.locator('[contenteditable="true"]').first();
+    return this.page
+      .locator(
+        `${BODY_EDITABLE_SELECTOR}, .docx-editor-pages [contenteditable="true"], .docx-ai-editor [contenteditable="true"]`
+      )
+      .first();
   }
 
   /**
@@ -246,6 +266,7 @@ export class EditorPage {
   async selectAll(): Promise<void> {
     await this.page.evaluate(() => {
       const contentArea =
+        document.querySelector('.paged-editor__hidden-pm .ProseMirror') ||
         document.querySelector('.ProseMirror') ||
         document.querySelector('.docx-editor-pages') ||
         document.querySelector('.docx-ai-editor');
@@ -284,9 +305,10 @@ export class EditorPage {
   async selectText(searchText: string): Promise<boolean> {
     // First, get the bounding rect of the text we want to select
     const textInfo = await this.page.evaluate((text) => {
-      // Search only within the editor content area (not toolbar which contains icon text like "format_bold")
-      // ProseMirror uses .ProseMirror, legacy editors use .docx-editor-pages or .docx-ai-editor
+      // Search only within the BODY content area (not toolbar which contains icon text like "format_bold",
+      // and not the header/footer hidden PMs). Falls back to legacy editor markup.
       const contentArea =
+        document.querySelector('.paged-editor__hidden-pm .ProseMirror') ||
         document.querySelector('.ProseMirror') ||
         document.querySelector('.docx-editor-pages') ||
         document.querySelector('.docx-ai-editor');
@@ -321,14 +343,15 @@ export class EditorPage {
 
     if (!textInfo) return false;
 
-    // Focus the editor by clicking, then re-select
+    // Focus the BODY editor, then re-select
     // This ensures ProseMirror is focused and will sync selections
-    const pm = this.page.locator('.ProseMirror');
+    const pm = this.page.locator(BODY_PM_SELECTOR);
     await pm.focus();
 
     // Re-apply the selection after focus
     await this.page.evaluate((text) => {
       const contentArea =
+        document.querySelector('.paged-editor__hidden-pm .ProseMirror') ||
         document.querySelector('.ProseMirror') ||
         document.querySelector('.docx-editor-pages') ||
         document.querySelector('.docx-ai-editor');
@@ -363,8 +386,9 @@ export class EditorPage {
   async selectRange(paragraphIndex: number, startOffset: number, endOffset: number): Promise<void> {
     await this.page.evaluate(
       ({ pIndex, start, end }) => {
-        // Try ProseMirror structure first, then fall back to legacy
+        // Try BODY ProseMirror structure first, then fall back to legacy
         const contentArea =
+          document.querySelector('.paged-editor__hidden-pm .ProseMirror') ||
           document.querySelector('.ProseMirror') ||
           document.querySelector('.docx-editor-pages') ||
           document.querySelector('.docx-ai-editor');
@@ -884,14 +908,43 @@ export class EditorPage {
   // ============================================================================
 
   /**
-   * Set paragraph style
+   * Set paragraph style.
+   * The picker is a custom Select combobox (not a native <select>), so open
+   * it and pick the matching option — mirrors setFontFamily. Option text is
+   * the display name (e.g. styleId 'Normal' renders as "Normal text"), so
+   * prefer an exact text match and fall back to a unique substring match.
    */
   async setParagraphStyle(style: string): Promise<void> {
-    // Native <select> — use selectOption for reliable interaction
-    const stylePicker = this.toolbar.locator('select[aria-label="Select paragraph style"]');
-    await stylePicker.selectOption({ label: style });
+    const trigger = this.toolbar.locator('[aria-label="Select paragraph style"]');
+    await trigger.click();
+    await this.page.getByRole('option').first().waitFor({ state: 'visible', timeout: 5000 });
+
+    const matched = await this.page.evaluate((want) => {
+      const norm = (s: string) => s.trim().toLowerCase();
+      const opts = [...document.querySelectorAll('[role="option"]')];
+      const exact = opts.find((o) => norm(o.textContent ?? '') === norm(want));
+      if (exact) {
+        (exact as HTMLElement).click();
+        return (exact.textContent ?? '').trim();
+      }
+      const partial = opts.filter((o) => norm(o.textContent ?? '').includes(norm(want)));
+      if (partial.length === 1) {
+        (partial[0] as HTMLElement).click();
+        return (partial[0].textContent ?? '').trim();
+      }
+      return null;
+    }, style);
+
+    if (!matched) {
+      const available = await this.page.getByRole('option').allTextContents();
+      throw new Error(
+        `setParagraphStyle: no option for "${style}" (available: ${available.join(' | ')})`
+      );
+    }
+
     // Refocus editor after selecting style
     await this.focus();
+    await this.page.waitForTimeout(50);
   }
 
   /**
@@ -1021,7 +1074,10 @@ export class EditorPage {
 
     // Wait for table to be inserted (use generic table selector since prosemirror-tables
     // column resizing plugin may override the table DOM and not include our docx-table class)
-    await this.page.waitForSelector('.ProseMirror table', { state: 'visible', timeout: 5000 });
+    await this.page.waitForSelector('.paged-editor__hidden-pm .ProseMirror table', {
+      state: 'visible',
+      timeout: 5000,
+    });
   }
 
   /**
@@ -1051,7 +1107,7 @@ export class EditorPage {
    * Get table cell content
    */
   async getTableCellContent(tableIndex: number, row: number, col: number): Promise<string> {
-    const table = this.page.locator('.ProseMirror table').nth(tableIndex);
+    const table = this.page.locator('.paged-editor__hidden-pm .ProseMirror table').nth(tableIndex);
     const cell = table.locator('tr').nth(row).locator('td, th').nth(col);
     return (await cell.textContent()) ?? '';
   }
@@ -1060,14 +1116,14 @@ export class EditorPage {
    * Count tables in the document
    */
   async getTableCount(): Promise<number> {
-    return await this.page.locator('.ProseMirror table').count();
+    return await this.page.locator('.paged-editor__hidden-pm .ProseMirror table').count();
   }
 
   /**
    * Get table dimensions (rows x cols)
    */
   async getTableDimensions(tableIndex: number): Promise<{ rows: number; cols: number }> {
-    const table = this.page.locator('.ProseMirror table').nth(tableIndex);
+    const table = this.page.locator('.paged-editor__hidden-pm .ProseMirror table').nth(tableIndex);
     const rows = await table.locator('tr').count();
     const cols = await table.locator('tr').first().locator('td, th').count();
     return { rows, cols };
@@ -1177,7 +1233,7 @@ export class EditorPage {
    * Get cell background color
    */
   async getCellBackgroundColor(tableIndex: number, row: number, col: number): Promise<string> {
-    const table = this.page.locator('.ProseMirror table').nth(tableIndex);
+    const table = this.page.locator('.paged-editor__hidden-pm .ProseMirror table').nth(tableIndex);
     const cell = table.locator('tr').nth(row).locator('td, th').nth(col);
     const style = await cell.getAttribute('style');
     // Extract background-color from style
@@ -1189,7 +1245,7 @@ export class EditorPage {
    * Check if cell has visible borders (not all set to 'none')
    */
   async cellHasBorders(tableIndex: number, row: number, col: number): Promise<boolean> {
-    const table = this.page.locator('.ProseMirror table').nth(tableIndex);
+    const table = this.page.locator('.paged-editor__hidden-pm .ProseMirror table').nth(tableIndex);
     const cell = table.locator('tr').nth(row).locator('td, th').nth(col);
     const style = await cell.getAttribute('style');
 
