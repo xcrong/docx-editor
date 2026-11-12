@@ -460,7 +460,7 @@ export function pixelsToEmu(px: number): number;
 export type ProgressCallback = (stage: string, percent: number) => void;
 
 // @public
-export function renderListMarker(lvlText: string, counters: number[], formats: NumberFormat[]): string;
+export function renderListMarker(lvlText: string | null | undefined, counters: number[], formats: NumberFormat[]): string;
 
 // @public
 export function repackDocx(doc: Document_2, options?: RepackOptions): Promise<ArrayBuffer>;
