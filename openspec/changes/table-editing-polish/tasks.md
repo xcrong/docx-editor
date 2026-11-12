@@ -26,9 +26,9 @@
 
 ## Testing
 
-- [ ] E2E test: resize middle column in 4-column table
-- [ ] E2E test: resize and resize back to original position
-- [ ] E2E test: add row inherits center alignment from reference row
-- [ ] E2E test: add row inherits font family from reference row
-- [ ] E2E test: add row inherits cell shading from reference row
+- [x] E2E test: resize middle column in 4-column table (evidence: `e2e/tests/table-editing-polish.spec.ts:175` — drags border col 1 in a 2×4 table; widths[1] grows, widths[2] shrinks, pair sum + untouched columns preserved)
+- [x] E2E test: resize and resize back to original position (evidence: `table-editing-polish.spec.ts:202` — +60px then −60px drags restore all 4 widths within 30 twips)
+- [x] E2E test: add row inherits center alignment from reference row (evidence: `table-editing-polish.spec.ts:238` — toolbar alignCenter on row 0, insert row below via context menu, new row para alignment `center`, cell empty)
+- [x] E2E test: add row inherits font family from reference row (evidence: `table-editing-polish.spec.ts:254` — Georgia set on empty para → `defaultTextFormatting` contains Georgia in the new row, cell empty)
+- [x] E2E test: add row inherits cell shading from reference row (evidence: `table-editing-polish.spec.ts:272` — `#ffff00` fill on row 0, new row `backgroundColor` equals reference, cell empty; also fixed stale `setCellFillColor` helper in `e2e/helpers/editor-page.ts` to drive the real "Cell Fill Color" ColorPicker)
 - [x] Run `bun run typecheck` (evidence: `bun run typecheck` green @ b9a30c9c — all 5 packages exit 0)

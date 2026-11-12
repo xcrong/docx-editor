@@ -1167,9 +1167,10 @@ export class EditorPage {
    * Set cell fill color
    */
   async setCellFillColor(color: string): Promise<void> {
-    await this.page.locator('[data-testid="toolbar-table-cell-fill"]').click();
-    await this.page.waitForTimeout(100);
-    await this.page.locator(`button[title="${color}"]`).click();
+    // The cell fill control is a ColorPicker split button titled
+    // "Cell Fill Color" (no data-testid) — reuse the shared dropdown path.
+    const hexColor = color.replace(/^#/, '').toUpperCase();
+    await this.pickColorFromDropdown('Cell Fill Color', hexColor);
   }
 
   /**
