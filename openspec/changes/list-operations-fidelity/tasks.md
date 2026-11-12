@@ -33,7 +33,7 @@
 
 - [x] Check numbering definition's run properties for `w:vanish` (evidence: `packages/core/src/docx/numberingParser.ts:602-605` + `numbering-vanish.test.ts:47-61`)
 - [x] Skip indicator rendering when vanish is true (evidence: `listMarkerHidden` plumbed end-to-end — `layout-engine/types.ts:349` → `ParagraphExtension.ts:303` → `toProseDoc/paragraph.ts:310` → skipped at `layout-painter/renderParagraph.ts:536`)
-- [ ] Test with DOCX that has hidden indicators
+- [x] Test with DOCX that has hidden indicators (evidence: `packages/core/src/docx/__tests__/numbering-vanish.test.ts` — in-memory DOCX via `parseDocx` asserts `listRendering.markerHidden=true` on vanish-level items, `undefined` + marker `•` on the visible level)
 
 ## Contextual spacing
 
@@ -44,9 +44,9 @@
 
 ## Testing
 
-- [ ] E2E test: multi-select indent changes all items
-- [ ] E2E test: multi-select toggle removes all list styling
-- [ ] E2E test: list indicator aligned in table cell
-- [ ] E2E test: hidden indicators not rendered
-- [ ] E2E test: contextual spacing collapses between same-style paragraphs
+- [x] E2E test: multi-select indent changes all items (evidence: `e2e/tests/list-operations-fidelity.spec.ts` — selectAll + Increase Indent asserts ilvl [1,1,1] on all three items via PM doc JSON)
+- [x] E2E test: multi-select toggle removes all list styling (evidence: `e2e/tests/list-operations-fidelity.spec.ts` — selectAll + toggle asserts numPr [null,null,null] and zero `.layout-list-marker`)
+- [x] E2E test: list indicator aligned in table cell (evidence: `e2e/tests/list-rendering-fidelity.spec.ts` + `e2e/fixtures/list-operations-fidelity.docx` — cell marker inline at 24px from content edge, body after marker end)
+- [x] E2E test: hidden indicators not rendered (evidence: `e2e/tests/list-rendering-fidelity.spec.ts` — vanish-level blocks paint 0 markers, doc total is 1, PM attrs carry `listMarkerHidden=true`)
+- [x] E2E test: contextual spacing collapses between same-style paragraphs (evidence: `e2e/tests/list-rendering-fidelity.spec.ts` — context pair gap <3px vs plain pair gap >10px)
 - [x] Run `bun run typecheck` (evidence: `bun run typecheck` green @ b9a30c9c — all 5 packages exit 0)
