@@ -176,6 +176,51 @@
               class="docx-editor-vue__pages paged-editor__pages"
               :style="pagesContainerStyle"
             />
+
+            <!-- Sidebar rail lives inside the content-width wrapper (NOT the
+              viewport) so `left: calc(50% + …)` resolves against the same
+              content center the page centers in — mirrors React, where the
+              sidebar overlay spans the content-width container. When the
+              wrapper overflows the viewport (sidebar open reserves 352px),
+              a viewport-anchored 50% drifts left of the page and the rail
+              overlaps the document. -->
+            <CommentMarginMarkers
+              :comments="comments"
+              :pages-container="pagesRef"
+              :zoom="zoom"
+              :page-width-px="pageWidthPx"
+              :sidebar-open="showSidebar"
+              :resolved-comment-ids="resolvedCommentIds"
+              :engine-anchor-positions="engineAnchorPositions"
+              @marker-click="handleMarkerClick"
+            />
+
+            <UnifiedSidebar
+              :is-open="showSidebar"
+              :comments="comments"
+              :tracked-changes="trackedChanges"
+              :engine-anchor-positions="engineAnchorPositions"
+              :add-comment-y-position="addCommentYPosition"
+              :show-resolved="true"
+              :pages-container="pagesRef"
+              :page-width-px="pageWidthPx"
+              :zoom="zoom"
+              :active-item-id="activeSidebarItem"
+              @close="showSidebar = false"
+              @add-comment="handleAddComment"
+              @cancel-add-comment="handleCancelAddComment"
+              @comment-reply="handleCommentReply"
+              @comment-resolve="handleCommentResolve"
+              @comment-unresolve="handleCommentUnresolve"
+              @comment-delete="handleCommentDelete"
+              @accept-change="handleAcceptChange"
+              @reject-change="handleRejectChange"
+              @accept-change-by-id="handleAcceptChangeById"
+              @reject-change-by-id="handleRejectChangeById"
+              @tracked-change-reply="handleTrackedChangeReply"
+              @update:active-item-id="(id: string | null) => (activeSidebarItem = id)"
+              @navigate="handleSidebarNavigate"
+            />
           </div>
 
           <ContentControlWidgets v-if="!readOnly" :container="pagesRef" :view="editorView" />
@@ -289,16 +334,6 @@
             </svg>
           </button>
 
-          <CommentMarginMarkers
-            :comments="comments"
-            :pages-container="pagesRef"
-            :zoom="zoom"
-            :page-width-px="pageWidthPx"
-            :sidebar-open="showSidebar"
-            :resolved-comment-ids="resolvedCommentIds"
-            @marker-click="handleMarkerClick"
-          />
-
           <SidebarChromeOverlay
             :overlay-mode="sidebarOverlayMode"
             :is-open="showSidebar"
@@ -306,33 +341,6 @@
             :active-item-id="activeSidebarItem"
             :pages-container="pagesRef"
             @close="showSidebar = false"
-          />
-
-          <UnifiedSidebar
-            :is-open="showSidebar"
-            :comments="comments"
-            :tracked-changes="trackedChanges"
-            :engine-anchor-positions="engineAnchorPositions"
-            :add-comment-y-position="addCommentYPosition"
-            :show-resolved="true"
-            :pages-container="pagesRef"
-            :page-width-px="pageWidthPx"
-            :zoom="zoom"
-            :active-item-id="activeSidebarItem"
-            @close="showSidebar = false"
-            @add-comment="handleAddComment"
-            @cancel-add-comment="handleCancelAddComment"
-            @comment-reply="handleCommentReply"
-            @comment-resolve="handleCommentResolve"
-            @comment-unresolve="handleCommentUnresolve"
-            @comment-delete="handleCommentDelete"
-            @accept-change="handleAcceptChange"
-            @reject-change="handleRejectChange"
-            @accept-change-by-id="handleAcceptChangeById"
-            @reject-change-by-id="handleRejectChangeById"
-            @tracked-change-reply="handleTrackedChangeReply"
-            @update:active-item-id="(id: string | null) => (activeSidebarItem = id)"
-            @navigate="handleSidebarNavigate"
           />
 
           <!-- Hyperlink popup — lives inside the scroll container so it
