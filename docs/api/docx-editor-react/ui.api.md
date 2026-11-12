@@ -381,9 +381,6 @@ export { getDefaultPrintOptions }
 export function getDefaultShortcuts(): DialogKeyboardShortcut[];
 
 // @public
-export function getDefaultTextContextMenuItems(): TextContextMenuItem[];
-
-// @public
 export function getImageAcceptString(): string;
 
 // @public
@@ -442,12 +439,6 @@ export function getTablePresets(): {
 
 // @public (undocumented)
 export function getTableSplitCellDialogConfig(table: Table, rowIndex: number, columnIndex: number): TableSplitConfig | null;
-
-// @public
-export function getTextActionLabel(action: TextContextAction): string;
-
-// @public
-export function getTextActionShortcut(action: TextContextAction): string;
 
 // @public
 export function getVariantLabel(variant: IndicatorVariant): string;
@@ -592,9 +583,6 @@ export { isEmptySearch }
 export function isPasteSpecialShortcut(event: KeyboardEvent): boolean;
 
 export { isPrintSupported }
-
-// @public
-export function isTextActionAvailable(action: TextContextAction, hasSelection: boolean, isEditable: boolean): boolean;
 
 // @public
 export function isValidImageFile(file: File): boolean;
@@ -1449,31 +1437,6 @@ export interface UseResponsiveToolbarReturn {
     overflowItems: ToolbarItem[];
     recalculate: () => void;
     visibleItems: ToolbarItem[];
-}
-
-// @public
-export function useTextContextMenu(options?: UseTextContextMenuOptions): UseTextContextMenuReturn;
-
-// @public
-export interface UseTextContextMenuOptions {
-    containerRef?: React__default.RefObject<HTMLElement>;
-    enabled?: boolean;
-    isEditable?: boolean;
-    onAction?: (action: TextContextAction) => void;
-}
-
-// @public
-export interface UseTextContextMenuReturn {
-    closeMenu: () => void;
-    handleAction: (action: TextContextAction) => void;
-    hasSelection: boolean;
-    isOpen: boolean;
-    onContextMenu: (event: React__default.MouseEvent) => void;
-    openMenu: (event: React__default.MouseEvent | MouseEvent) => void;
-    position: {
-        x: number;
-        y: number;
-    };
 }
 
 // @public

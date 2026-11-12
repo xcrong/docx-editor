@@ -57,13 +57,6 @@ export {
   type TextContextMenuProps,
   type TextContextAction,
   type TextContextMenuItem,
-  type UseTextContextMenuOptions,
-  type UseTextContextMenuReturn,
-  useTextContextMenu,
-  getTextActionLabel,
-  getTextActionShortcut,
-  getDefaultTextContextMenuItems,
-  isTextActionAvailable,
 } from './components/TextContextMenu';
 
 // ============================================================================

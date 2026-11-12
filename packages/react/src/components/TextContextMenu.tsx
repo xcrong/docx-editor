@@ -8,10 +8,7 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { MaterialSymbol } from './ui/Icons';
 import { useTranslation } from '../i18n';
-import { en as defaultLocale } from '@xcrong/docx-editor-i18n';
-import type { TranslationKey } from '@xcrong/docx-editor-i18n';
 import { Z_INDEX } from '../styles/zIndex';
-import { formatKeys } from './dialogs/KeyboardShortcutsDialog/ShortcutItem';
 
 // ============================================================================
 // TYPES
@@ -86,77 +83,6 @@ export interface TextContextMenuProps {
   /** Additional className */
   className?: string;
 }
-
-/**
- * Hook options for text context menu
- */
-export interface UseTextContextMenuOptions {
-  /** Whether the context menu is enabled */
-  enabled?: boolean;
-  /** Whether the editor is editable */
-  isEditable?: boolean;
-  /** Container element ref */
-  containerRef?: React.RefObject<HTMLElement>;
-  /** Callback when an action is triggered */
-  onAction?: (action: TextContextAction) => void;
-}
-
-/**
- * Hook return value
- */
-export interface UseTextContextMenuReturn {
-  /** Whether the menu is open */
-  isOpen: boolean;
-  /** Menu position */
-  position: { x: number; y: number };
-  /** Whether there's a text selection */
-  hasSelection: boolean;
-  /** Open the context menu */
-  openMenu: (event: React.MouseEvent | MouseEvent) => void;
-  /** Close the context menu */
-  closeMenu: () => void;
-  /** Handle action selection */
-  handleAction: (action: TextContextAction) => void;
-  /** Context menu event handler for onContextMenu prop */
-  onContextMenu: (event: React.MouseEvent) => void;
-}
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-/**
- * Default menu item definitions (use translation keys for label/shortcut)
- */
-interface DefaultMenuItemDef {
-  action: TextContextAction;
-  labelKey: TranslationKey;
-  shortcutKey?: TranslationKey;
-  dividerAfter?: boolean;
-}
-
-const DEFAULT_MENU_ITEM_DEFS: DefaultMenuItemDef[] = [
-  { action: 'cut', labelKey: 'contextMenu.cut', shortcutKey: 'contextMenu.cutShortcut' },
-  { action: 'copy', labelKey: 'contextMenu.copy', shortcutKey: 'contextMenu.copyShortcut' },
-  { action: 'paste', labelKey: 'contextMenu.paste', shortcutKey: 'contextMenu.pasteShortcut' },
-  {
-    action: 'pasteAsPlainText',
-    labelKey: 'contextMenu.pastePlainText',
-    shortcutKey: 'contextMenu.pastePlainTextShortcut',
-    dividerAfter: true,
-  },
-  {
-    action: 'delete',
-    labelKey: 'contextMenu.delete',
-    shortcutKey: 'contextMenu.deleteShortcut',
-    dividerAfter: true,
-  },
-  {
-    action: 'selectAll',
-    labelKey: 'contextMenu.selectAll',
-    shortcutKey: 'contextMenu.selectAllShortcut',
-  },
-];
 
 // ============================================================================
 // ICONS
@@ -493,15 +419,43 @@ export const TextContextMenu: React.FC<TextContextMenuProps> = ({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const { t } = useTranslation();
 
-  // Translate default menu items from definitions
+  // Fallback items when the host passes no `items` (the live
+  // `useContextMenus` hook always supplies composed provider items).
   const translatedDefaults: TextContextMenuItem[] = useMemo(
-    () =>
-      DEFAULT_MENU_ITEM_DEFS.map((def) => ({
-        action: def.action,
-        label: t(def.labelKey),
-        shortcut: def.shortcutKey ? t(def.shortcutKey) : undefined,
-        dividerAfter: def.dividerAfter,
-      })),
+    () => [
+      {
+        action: 'cut' as const,
+        label: t('contextMenu.cut'),
+        shortcut: t('contextMenu.cutShortcut'),
+      },
+      {
+        action: 'copy' as const,
+        label: t('contextMenu.copy'),
+        shortcut: t('contextMenu.copyShortcut'),
+      },
+      {
+        action: 'paste' as const,
+        label: t('contextMenu.paste'),
+        shortcut: t('contextMenu.pasteShortcut'),
+      },
+      {
+        action: 'pasteAsPlainText' as const,
+        label: t('contextMenu.pastePlainText'),
+        shortcut: t('contextMenu.pastePlainTextShortcut'),
+        dividerAfter: true,
+      },
+      {
+        action: 'delete' as const,
+        label: t('contextMenu.delete'),
+        shortcut: t('contextMenu.deleteShortcut'),
+        dividerAfter: true,
+      },
+      {
+        action: 'selectAll' as const,
+        label: t('contextMenu.selectAll'),
+        shortcut: t('contextMenu.selectAllShortcut'),
+      },
+    ],
     [t]
   );
 
@@ -553,7 +507,14 @@ export const TextContextMenu: React.FC<TextContextMenuProps> = ({
     };
   }, [isOpen, onClose]);
 
-  // Handle keyboard navigation
+  // Handle keyboard navigation.
+  //
+  // Capture phase + stopPropagation: focus stays in the hidden ProseMirror
+  // while the menu is open, so without capture PM's own keymap would run
+  // first (e.g. Enter would delete the current selection before the menu
+  // activates its item). Intercepting on the way down keeps menu keys from
+  // ever reaching the editor. The Vue twin avoids this by moving focus
+  // into the menu; same observable contract.
   useEffect(() => {
     if (!isOpen) return;
 
@@ -561,10 +522,12 @@ export const TextContextMenu: React.FC<TextContextMenuProps> = ({
       switch (e.key) {
         case 'Escape':
           e.preventDefault();
+          e.stopPropagation();
           onClose();
           break;
         case 'ArrowDown':
           e.preventDefault();
+          e.stopPropagation();
           setHighlightedIndex((prev) => {
             let next = (prev + 1) % navigableItems.length;
             // Skip disabled items
@@ -576,6 +539,7 @@ export const TextContextMenu: React.FC<TextContextMenuProps> = ({
           break;
         case 'ArrowUp':
           e.preventDefault();
+          e.stopPropagation();
           setHighlightedIndex((prev) => {
             let next = (prev - 1 + navigableItems.length) % navigableItems.length;
             // Skip disabled items
@@ -587,6 +551,7 @@ export const TextContextMenu: React.FC<TextContextMenuProps> = ({
           break;
         case 'Enter':
           e.preventDefault();
+          e.stopPropagation();
           const item = navigableItems[highlightedIndex];
           if (item && !item.disabled) {
             onAction(item.action);
@@ -596,8 +561,8 @@ export const TextContextMenu: React.FC<TextContextMenuProps> = ({
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, highlightedIndex, navigableItems, onAction, onClose]);
 
   // Reset highlighted index when menu opens
@@ -683,248 +648,6 @@ export const TextContextMenu: React.FC<TextContextMenuProps> = ({
     </div>
   );
 };
-
-// ============================================================================
-// USE TEXT CONTEXT MENU HOOK
-// ============================================================================
-
-/**
- * Hook to manage text context menu state
- */
-export function useTextContextMenu(
-  options: UseTextContextMenuOptions = {}
-): UseTextContextMenuReturn {
-  const {
-    enabled = true,
-    isEditable: _isEditable = true,
-    containerRef: _containerRef,
-    onAction,
-  } = options;
-
-  const [isOpen, setIsOpen] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [hasSelection, setHasSelection] = useState(false);
-
-  /**
-   * Check if there's a text selection
-   */
-  const checkSelection = useCallback(() => {
-    const selection = window.getSelection();
-    const hasText = selection && !selection.isCollapsed && selection.toString().length > 0;
-    setHasSelection(!!hasText);
-    return !!hasText;
-  }, []);
-
-  /**
-   * Open the context menu
-   */
-  const openMenu = useCallback(
-    (event: React.MouseEvent | MouseEvent) => {
-      if (!enabled) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      // Update selection state
-      checkSelection();
-
-      setPosition({ x: event.clientX, y: event.clientY });
-      setIsOpen(true);
-    },
-    [enabled, checkSelection]
-  );
-
-  /**
-   * Close the context menu
-   */
-  const closeMenu = useCallback(() => {
-    setIsOpen(false);
-  }, []);
-
-  /**
-   * Handle action selection
-   */
-  const handleAction = useCallback(
-    (action: TextContextAction) => {
-      closeMenu();
-
-      // Execute the action
-      switch (action) {
-        case 'cut':
-          document.execCommand('cut');
-          break;
-        case 'copy':
-          document.execCommand('copy');
-          break;
-        case 'paste':
-          document.execCommand('paste');
-          break;
-        case 'pasteAsPlainText':
-          // Trigger paste event with shift key simulation
-          // Note: This may not work in all browsers due to security restrictions
-          navigator.clipboard
-            .readText?.()
-            .then((text) => {
-              document.execCommand('insertText', false, text);
-            })
-            .catch(() => {
-              // Fallback - just try regular paste
-              document.execCommand('paste');
-            });
-          break;
-        case 'delete':
-          document.execCommand('delete');
-          break;
-        case 'selectAll':
-          document.execCommand('selectAll');
-          break;
-      }
-
-      onAction?.(action);
-    },
-    [closeMenu, onAction]
-  );
-
-  /**
-   * Context menu event handler
-   */
-  const onContextMenu = useCallback(
-    (event: React.MouseEvent) => {
-      openMenu(event);
-    },
-    [openMenu]
-  );
-
-  // Close menu when clicking elsewhere or pressing Escape
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeMenu();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, closeMenu]);
-
-  return {
-    isOpen,
-    position,
-    hasSelection,
-    openMenu,
-    closeMenu,
-    handleAction,
-    onContextMenu,
-  };
-}
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Get action label (English source-locale fallback for headless callers —
- * the rendered menu uses `t()` providers instead).
- */
-export function getTextActionLabel(action: TextContextAction): string {
-  const labels: Record<TextContextAction, string> = {
-    cut: 'Cut',
-    copy: 'Copy',
-    paste: 'Paste',
-    pasteAsPlainText: 'Paste as Plain Text',
-    selectAll: 'Select All',
-    delete: 'Delete',
-    separator: '',
-    addRowAbove: 'Insert row above',
-    addRowBelow: 'Insert row below',
-    deleteRow: 'Delete row',
-    addColumnLeft: 'Insert column left',
-    addColumnRight: 'Insert column right',
-    deleteColumn: 'Delete column',
-    mergeCells: defaultLocale.table.mergeCells,
-    splitCell: defaultLocale.table.splitCell,
-    selectTable: defaultLocale.table.selectTable,
-    deleteTable: defaultLocale.table.deleteTable,
-    addComment: 'Comment',
-    insertLink: 'Insert link',
-    clearFormatting: 'Clear formatting',
-    editLink: 'Edit link',
-    removeLink: 'Remove link',
-    openLink: 'Open link',
-  };
-  return labels[action];
-}
-
-/**
- * Get action shortcut, platform-mapped (`Ctrl` -> `⌘` on Mac).
- */
-export function getTextActionShortcut(action: TextContextAction): string {
-  const shortcuts: Record<TextContextAction, string> = {
-    cut: formatKeys('Ctrl+X'),
-    copy: formatKeys('Ctrl+C'),
-    paste: formatKeys('Ctrl+V'),
-    pasteAsPlainText: formatKeys('Ctrl+Shift+V'),
-    selectAll: formatKeys('Ctrl+A'),
-    delete: formatKeys('Del'),
-    separator: '',
-    addRowAbove: '',
-    addRowBelow: '',
-    deleteRow: '',
-    addColumnLeft: '',
-    addColumnRight: '',
-    deleteColumn: '',
-    mergeCells: '',
-    splitCell: '',
-    selectTable: '',
-    deleteTable: '',
-    addComment: '',
-    insertLink: '',
-    clearFormatting: '',
-    editLink: '',
-    removeLink: '',
-    openLink: '',
-  };
-  return shortcuts[action];
-}
-
-/**
- * Get default menu item definitions (untranslated, use translation keys)
- */
-export function getDefaultTextContextMenuItems(): TextContextMenuItem[] {
-  return DEFAULT_MENU_ITEM_DEFS.map((def) => ({
-    action: def.action,
-    label: def.labelKey,
-    shortcut: def.shortcutKey,
-    dividerAfter: def.dividerAfter,
-  }));
-}
-
-/**
- * Check if action is available
- */
-export function isTextActionAvailable(
-  action: TextContextAction,
-  hasSelection: boolean,
-  isEditable: boolean
-): boolean {
-  switch (action) {
-    case 'cut':
-    case 'copy':
-    case 'delete':
-      return hasSelection;
-    case 'paste':
-    case 'pasteAsPlainText':
-      return isEditable;
-    case 'addComment':
-      return hasSelection;
-    case 'selectAll':
-      return true;
-    default:
-      return true;
-  }
-}
 
 // ============================================================================
 // EXPORTS
