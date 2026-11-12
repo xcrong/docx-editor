@@ -1,5 +1,73 @@
 # @xcrong/docx-editor-vue
 
+## 2.0.0
+
+### Minor Changes
+
+- 2c91b11: T28-02 (#85): converge Vue parity gaps core-first. The header/footer selection and caret overlay now resolves against the engaged (double-clicked) painted instance instead of guessing by viewport proximity, so editing a footer on a later page highlights that page's copy (previously painted page 1's, off-screen). `DocxEditorEngine.save()` no longer dispatches post-save tracker cleanup onto a view destroyed or superseded by a document load that landed mid-save (previously threw `null.matchesNode` inside prosemirror-view).
+- b574dec: Port the built-in template plugin to the Vue adapter using only core's plugin contract: new `templatePlugin` / `createPlugin` in `@xcrong/docx-editor-vue/plugin-api` (same PM state, sidebar items, and overlay semantics as React, rendered via `h()`), `VueSidebarItem` + `getSidebarItems` on the plugin type, and pixel-identical chip/highlight CSS. Adds a `?template=1` parity smoke spec covering tag detection on both adapters.
+
+### Patch Changes
+
+- 0464a1c: Move the Clear Formatting (format_clear) button to the end of the text formatting group in both adapters.
+- 15afb74: fix: render endnote bodies in a document-end sheet with reference/body cross-navigation (fixes #89)
+
+  `word/endnotes.xml` parsed fine but the layout chain never consumed endnotes, so note bodies appeared nowhere. Endnote references are now collected alongside footnote references and the referenced bodies render in a trailing sheet after the last page (mirroring the footnote body pipeline, not a new stack). Clicking a body marker scrolls to its note; clicking a note number jumps back to the reference. Fixes #89.
+
+- 52bbc3c: Internal hyperlinks (`w:hyperlink w:anchor`) now navigate to their bookmark in both adapters: clicking a `#bookmark` link scrolls the viewport to the bookmarked paragraph, and the HyperlinkPopup "go" action plus the context-menu "open link" item do the same instead of opening a blank tab. Unknown bookmarks are a silent no-op; external links are unchanged. Also fixes Vue clicks on painted links being swallowed by a selection-triggered relayout, which broke external-link popups there too. Fixes #88.
+- e9abd61: The tracked-changes review group (accept/reject/prev/next) now follows the comments sidebar: closing the sidebar hides it, reopening restores it. Viewing mode still hides it, and an explicit `showReviewControls` still wins.
+- 86201f1: Hide the tracked-changes review toolbar group in viewing mode. The read-only mode no longer shows disabled accept/reject buttons; editing and suggesting modes are unchanged. Explicit showReviewControls still overrides. Fixes #104.
+- 0310c20: Dual-adapter Playwright architecture + snapshot/bundle gates (T28-01, refs #84, refs #71). No runtime change. New gates, all red-capable and running in CI: the full `e2e/tests/parity/` suite (parametrized over `/react/` + `/vue/` with per-adapter failure screenshots) on every PR, a cross-adapter first-page pixel-diff, normalized Document round-trip digests (`bun run check:snapshot-parity`), gzip bundle-size parity for both adapter entries (`bun run check:parity-bundle-size`), and a matrix-freshness check for component changes. On-demand smoke usage is documented in CONTRIBUTING and the Vue README.
+- f3a586f: T28-03 (refs #86, refs #71): Vue agent UI readiness is unchanged — the Vue chat surface (`AgentPanel`, chat log, composer, timeline, `useAgentBridge`) stays partial while six behavioral agent flows (tracked-change, comment threading, tool error, multi-step, streaming, byte-equal output) have no Vue parity specs yet, tracked by #368. Tooling-only release otherwise: pair-edit watch mode (`bun run dev:parity:watch`), a weekly a11y-parity cron, and an "AI assistant in 30 lines" snippet in the Vue README.
+- 43d24db: fix: cursor navigation auto-scroll and cross-page split-paragraph selection (fixes #73)
+
+  ArrowUp/Down now steps one painted visual line in Vue too (it previously fell back to document-offset stepping with no painted-line scrolling); drag-selecting to the viewport edge auto-scrolls without corrupting the selection when the pointer slides over a header, footer, or the native scrollbar; and the auto-scroll loop parks when the pointer leaves the edge zone. Fixes #73.
+
+- a627ace: Fix Vue sidebar comment cards stacking at the rail top with no anchor. The first layout read a still-null editor view so engine anchors came back empty, and the sidebar didn't re-resolve once anchors arrived. Fixes #109.
+- 1e60aa2: Fix Vue comments sidebar overlapping the document. The rail was anchored to the scrolling viewport (`left: 50%` of the visible width) instead of the content-width wrapper the page centers in, so whenever the layout overflowed the viewport the rail drifted left over the text (React anchors to the content box, which is why only Vue overlapped). The rail and margin markers now live inside the content-width wrapper, use the shared `SIDEBAR_PAGE_GAP`, and sit above the narrow-overlay backdrop. Margin markers also anchor from engine positions, so resolved comments show markers like React.
+- 32c8642: Route the Vue toolbar through the suggesting-tracked `commands/*` wrappers (fixes #127): `getCommands()` now overlays the extension manager's bare commands with the same wrapped factories React calls directly, so toolbar run/paragraph/table property edits in suggesting mode mint tracked revisions instead of editing properties in place. Closed-mode behavior is unchanged.
+- Updated dependencies [da78957]
+- Updated dependencies [fe7f2ed]
+- Updated dependencies [d35cda4]
+- Updated dependencies [15afb74]
+- Updated dependencies [bd325ed]
+- Updated dependencies [81b7241]
+- Updated dependencies [ac78b76]
+- Updated dependencies [6ce42a9]
+- Updated dependencies [52bbc3c]
+- Updated dependencies [f2740e7]
+- Updated dependencies [af9910f]
+- Updated dependencies [efbe24b]
+- Updated dependencies [ea943d8]
+- Updated dependencies [2c91422]
+- Updated dependencies [7ed722d]
+- Updated dependencies [e8f00e6]
+- Updated dependencies [b0e03d2]
+- Updated dependencies [ac0988c]
+- Updated dependencies [5a0dbeb]
+- Updated dependencies [2ba6d79]
+- Updated dependencies [76a6bca]
+- Updated dependencies [e1d2499]
+- Updated dependencies [6318fd0]
+- Updated dependencies [c682b3f]
+- Updated dependencies [a22eae8]
+- Updated dependencies [2f585e8]
+- Updated dependencies [0282ec9]
+- Updated dependencies [e61f2d7]
+- Updated dependencies [793b48a]
+- Updated dependencies [2c91b11]
+- Updated dependencies [070be5b]
+- Updated dependencies [43d24db]
+- Updated dependencies [6406222]
+- Updated dependencies [8ad9fdd]
+- Updated dependencies [869d622]
+- Updated dependencies [321c4bf]
+- Updated dependencies [1e7c2b5]
+- Updated dependencies [7758983]
+  - @xcrong/docx-editor-agents@2.0.0
+  - @xcrong/docx-editor-core@2.0.0
+  - @xcrong/docx-editor-i18n@2.0.0
+
 ## 1.10.3
 
 ### Patch Changes
