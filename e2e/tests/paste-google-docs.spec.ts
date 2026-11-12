@@ -11,18 +11,21 @@ import { test, expect } from '@playwright/test';
 import { EditorPage } from '../helpers/editor-page';
 
 async function pasteHtml(page: import('@playwright/test').Page, html: string): Promise<void> {
-  await page.evaluate((payload) => {
-    const dataTransfer = new DataTransfer();
-    dataTransfer.setData('text/html', payload.html);
-    dataTransfer.setData('text/plain', payload.html.replace(/<[^>]+>/g, ' '));
-    const target =
-      document.querySelector('.ProseMirror') ||
-      document.querySelector('[contenteditable="true"]');
-    if (!target) throw new Error('Editable target not found');
-    const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
-    Object.defineProperty(event, 'clipboardData', { value: dataTransfer });
-    target.dispatchEvent(event);
-  }, { html });
+  await page.evaluate(
+    (payload) => {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData('text/html', payload.html);
+      dataTransfer.setData('text/plain', payload.html.replace(/<[^>]+>/g, ' '));
+      const target =
+        document.querySelector('.ProseMirror') ||
+        document.querySelector('[contenteditable="true"]');
+      if (!target) throw new Error('Editable target not found');
+      const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: dataTransfer });
+      target.dispatchEvent(event);
+    },
+    { html }
+  );
 }
 
 interface PMDocJSON {
@@ -189,5 +192,35 @@ test.describe('Google Docs paste fidelity', () => {
     };
     walkMarks(cells[0]);
     expect(marks).not.toContain('highlight');
+  });
+
+  test('text with 1.5x line spacing keeps 360-twips spacing', async ({ page }) => {
+    await pasteHtml(
+      page,
+      `<p><span>Top</span></p>` +
+        `<p style="line-height:1.8;margin-top:0pt;margin-bottom:8pt;">` +
+        `<span style="font-size:11pt;font-family:Arial;">Spaced</span></p>`
+    );
+
+    const doc = await getDocJSON(page);
+    const paras = paragraphsOf(doc).filter((p) => textOf(p).includes('Spaced'));
+    expect(paras.length).toBe(1);
+    expect(paras[0].attrs?.lineSpacing).toBe(360);
+    expect(paras[0].attrs?.lineSpacingRule).toBe('auto');
+    expect(paras[0].attrs?.spaceAfter).toBe(160);
+  });
+
+  test('indented paragraph keeps its left indent', async ({ page }) => {
+    await pasteHtml(
+      page,
+      `<p><span>Top</span></p>` +
+        `<p style="margin-left:36pt;">` +
+        `<span style="font-size:11pt;font-family:Arial;">Indented</span></p>`
+    );
+
+    const doc = await getDocJSON(page);
+    const paras = paragraphsOf(doc).filter((p) => textOf(p).includes('Indented'));
+    expect(paras.length).toBe(1);
+    expect(paras[0].attrs?.indentLeft).toBe(720);
   });
 });

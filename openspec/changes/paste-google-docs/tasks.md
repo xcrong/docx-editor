@@ -15,19 +15,19 @@
 
 ## Line spacing
 
-- [ ] Extract `lineHeight` from pasted `<p>` elements
-- [ ] Convert to spacing values: 1.2→single, 1.8→1.5x, 2.4→double
-- [ ] Extract `marginTop`/`marginBottom` for spacing before/after
-- [ ] Test with different spacing values
-- [ ] E2E test: paste text with 1.5x line spacing
+- [x] Extract `lineHeight` from pasted `<p>` elements (evidence: `extractParagraphAttrsFromStyle`/`cssLineHeightToSpacing` in `ParagraphExtension.ts:169-193,257-263`; unit tests `paste-google-docs.test.ts` 'Google Docs line-height presets' + 'other line-height values')
+- [x] Convert to spacing values: 1.2→single, 1.8→1.5x, 2.4→double (evidence: `googleDocsLineHeightToTwips` in `ParagraphExtension.ts:194-200` snaps 1.2→240, 1.8→360, 2.4→480, others proportional)
+- [x] Extract `marginTop`/`marginBottom` for spacing before/after (evidence: `extractParagraphAttrsFromStyle` in `ParagraphExtension.ts:265-273`; unit test 'margin-top/margin-bottom become spaceBefore/spaceAfter' — 12pt→240, 8pt→160)
+- [x] Test with different spacing values (evidence: unit tests `paste-google-docs.test.ts` — presets 1.2/1.8/2.4, proportional 1.38→331, 130%→312, absolute 18pt→360 exact)
+- [x] E2E test: paste text with 1.5x line spacing (evidence: `e2e/tests/paste-google-docs.spec.ts` 'text with 1.5x line spacing keeps 360-twips spacing' — line-height:1.8→360 auto, spaceAfter 160; 7/7 paste specs green)
 
 ## Indentation
 
-- [ ] Extract `marginLeft` from pasted `<p>` elements
-- [ ] Convert pt to twips for `indent.left`
-- [ ] Handle nested indentation levels
-- [ ] Test with indented paragraphs
-- [ ] E2E test: paste indented paragraph
+- [x] Extract `marginLeft` from pasted `<p>` elements (evidence: `extractParagraphAttrsFromStyle` in `ParagraphExtension.ts:228-233`; unit test 'margin-left converts pt to indentLeft twips' — 36pt→720)
+- [x] Convert pt to twips for `indent.left` (evidence: `cssLengthToTwips` in `ParagraphExtension.ts:125-139` — 1pt=20 twips; covered by margin-left unit tests)
+- [x] Handle nested indentation levels (evidence: unit test 'nested indentation levels scale with margin-left' — 36pt→720, 72pt→1440; list nesting via aria-level already covered by 'three-deep nesting maps to levels 0-2')
+- [x] Test with indented paragraphs (evidence: unit tests `paste-google-docs.test.ts` 'margin-left converts pt to indentLeft twips' + 'nested indentation levels scale with margin-left')
+- [x] E2E test: paste indented paragraph (evidence: unit-level indent tests in `paste-google-docs.test.ts`; E2E in `e2e/tests/paste-google-docs.spec.ts` 'indented paragraph keeps its left indent' — margin-left:36pt→720)
 
 ## Heading detection
 
@@ -39,16 +39,16 @@
 ## Table cell styles
 
 - [x] Extract `backgroundColor` from `<td>` → cell fill (evidence: 7ed722d1, `td` background moved to `data-bgcolor` at `PasteStyleInlinerExtension.ts:212-226`)
-- [ ] Extract `verticalAlign` from `<td>` → cell vertical alignment
-- [ ] Extract `padding` from `<td>` → cell margins
-- [ ] Extract `border` from `<td>` → cell borders (parse width, style, color)
-- [ ] Test with colored and bordered table cells
+- [x] Extract `verticalAlign` from `<td>` → cell vertical alignment (evidence: `parseCellAttrsFromDOM`/`mapCssVerticalAlign` in `TableExtension/paste.ts:115-155`; unit test 'td vertical-align maps to cell verticalAlign' — top/middle/bottom)
+- [x] Extract `padding` from `<td>` → cell margins (evidence: `extractCellMarginsFromCSS` in `TableExtension/paste.ts:97-113`; unit test 'td padding becomes cell margins in twips' — 5pt→100 each side)
+- [x] Extract `border` from `<td>` → cell borders (parse width, style, color) (evidence: `extractCellBordersFromCSS` in `TableExtension/paste.ts:71-95`; unit test 'td borders parse width, style, and color' — 1pt solid rgb(0,0,0)→single/8/000000)
+- [x] Test with colored and bordered table cells (evidence: unit test 'colored and bordered table cells keep fills on the cell' — FFFF00→FF0000 fill + borders + margins + bottom valign, no highlight leak)
 
 ## Testing
 
 - [x] E2E test: paste centered text from Google Docs (evidence: 7ed722d1, `e2e/tests/paste-google-docs.spec.ts:74`)
-- [ ] E2E test: paste text with 1.5x line spacing
-- [ ] E2E test: paste indented paragraph
+- [x] E2E test: paste text with 1.5x line spacing (evidence: `e2e/tests/paste-google-docs.spec.ts:194`; 7/7 paste specs green)
+- [x] E2E test: paste indented paragraph (evidence: `e2e/tests/paste-google-docs.spec.ts:210`; 7/7 paste specs green)
 - [x] E2E test: paste H1/H3 headings (evidence: 7ed722d1, `e2e/tests/paste-google-docs.spec.ts:151` + unit tests `paste-google-docs.test.ts:117,217`)
 - [x] E2E test: paste table with colored cells (evidence: 7ed722d1, `e2e/tests/paste-google-docs.spec.ts:165`)
-- [x] Run `bun run typecheck` (evidence: `bun run typecheck` green @ b9a30c9c — all 5 packages exit 0)
+- [x] Run `bun run typecheck` (evidence: `bun run typecheck` green @ b9a30c9c — all 5 packages exit 0; re-verified green after line-height snap + new tests, all 6 packages exit 0)

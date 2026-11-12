@@ -240,6 +240,134 @@ describe('paste-google-docs', () => {
     expect(transformPastedHTML(broken)).toContain('unclosed');
   });
 
+  test('Google Docs line-height presets snap to Word spacing', () => {
+    const cases: Array<[string, number]> = [
+      ['1.2', 240],
+      ['1.8', 360],
+      ['2.4', 480],
+    ];
+    for (const [lineHeight, expected] of cases) {
+      const { slice } = parseTransformed(`<p style="line-height:${lineHeight};">t</p>`);
+      const paras: ProseMirrorNode[] = [];
+      slice.content.forEach((n) => paras.push(n));
+      expect(paras[0].attrs.lineSpacing).toBe(expected);
+      expect(paras[0].attrs.lineSpacingRule).toBe('auto');
+    }
+  });
+
+  test('other line-height values scale proportionally', () => {
+    const { slice: sliceMultiplier } = parseTransformed(`<p style="line-height:1.38;">t</p>`);
+    const parasM: ProseMirrorNode[] = [];
+    sliceMultiplier.content.forEach((n) => parasM.push(n));
+    expect(parasM[0].attrs.lineSpacing).toBe(Math.round(240 * 1.38));
+    expect(parasM[0].attrs.lineSpacingRule).toBe('auto');
+
+    const { slice: slicePct } = parseTransformed(`<p style="line-height:130%;">t</p>`);
+    const parasP: ProseMirrorNode[] = [];
+    slicePct.content.forEach((n) => parasP.push(n));
+    expect(parasP[0].attrs.lineSpacing).toBe(Math.round(240 * 1.3));
+
+    const { slice: sliceAbs } = parseTransformed(`<p style="line-height:18pt;">t</p>`);
+    const parasA: ProseMirrorNode[] = [];
+    sliceAbs.content.forEach((n) => parasA.push(n));
+    expect(parasA[0].attrs.lineSpacing).toBe(360);
+    expect(parasA[0].attrs.lineSpacingRule).toBe('exact');
+  });
+
+  test('margin-top/margin-bottom become spaceBefore/spaceAfter', () => {
+    const { slice } = parseTransformed(`<p style="margin-top:12pt;margin-bottom:8pt;">spaced</p>`);
+    const paras: ProseMirrorNode[] = [];
+    slice.content.forEach((n) => paras.push(n));
+    expect(paras[0].attrs.spaceBefore).toBe(240);
+    expect(paras[0].attrs.spaceAfter).toBe(160);
+  });
+
+  test('margin-left converts pt to indentLeft twips', () => {
+    const { slice } = parseTransformed(`<p style="margin-left:36pt;">indented</p>`);
+    const paras: ProseMirrorNode[] = [];
+    slice.content.forEach((n) => paras.push(n));
+    expect(paras[0].attrs.indentLeft).toBe(720);
+  });
+
+  test('nested indentation levels scale with margin-left', () => {
+    const { slice } = parseTransformed(
+      `<p style="margin-left:36pt;">level one</p><p style="margin-left:72pt;">level two</p>`
+    );
+    const paras: ProseMirrorNode[] = [];
+    slice.content.forEach((n) => paras.push(n));
+    expect(paras.map((p) => p.attrs.indentLeft)).toEqual([720, 1440]);
+  });
+
+  test('td vertical-align maps to cell verticalAlign', () => {
+    for (const [css, expected] of [
+      ['top', 'top'],
+      ['middle', 'center'],
+      ['bottom', 'bottom'],
+    ] as const) {
+      const { slice } = parseTransformed(
+        `<table><tr><td style="vertical-align:${css};"><p><span>c</span></p></td></tr></table>`
+      );
+      let cell: any = null;
+      slice.content.forEach((node) => {
+        node.descendants((n) => {
+          if (n.type.name === 'tableCell') cell = n;
+        });
+      });
+      expect(cell?.attrs.verticalAlign).toBe(expected);
+    }
+  });
+
+  test('td padding becomes cell margins in twips', () => {
+    const { slice } = parseTransformed(
+      `<table><tr><td style="padding:5pt;"><p><span>c</span></p></td></tr></table>`
+    );
+    let cell: any = null;
+    slice.content.forEach((node) => {
+      node.descendants((n) => {
+        if (n.type.name === 'tableCell') cell = n;
+      });
+    });
+    expect(cell?.attrs.margins).toMatchObject({ top: 100, right: 100, bottom: 100, left: 100 });
+  });
+
+  test('td borders parse width, style, and color', () => {
+    const { slice } = parseTransformed(
+      `<table><tr><td style="border:1pt solid rgb(0, 0, 0);"><p><span>c</span></p></td></tr></table>`
+    );
+    let cell: any = null;
+    slice.content.forEach((node) => {
+      node.descendants((n) => {
+        if (n.type.name === 'tableCell') cell = n;
+      });
+    });
+    expect(cell?.attrs.borders?.top).toMatchObject({
+      style: 'single',
+      size: 8,
+      color: { rgb: '000000' },
+    });
+    expect(cell?.attrs.borders?.bottom).toMatchObject({ style: 'single', size: 8 });
+  });
+
+  test('colored and bordered table cells keep fills on the cell', () => {
+    const { slice } = parseTransformed(
+      `<table><tr><td style="border:1pt solid rgb(0, 0, 0);padding:5pt;` +
+        `vertical-align:bottom;background-color:rgb(255, 0, 0);"><p><span>c</span></p></td></tr></table>`
+    );
+    let cell: any = null;
+    const cellTextMarks: string[] = [];
+    slice.content.forEach((node) => {
+      node.descendants((n) => {
+        if (n.type.name === 'tableCell') cell = n;
+        if (n.isText && n.text === 'c') for (const m of n.marks) cellTextMarks.push(m.type.name);
+      });
+    });
+    expect(cell?.attrs.backgroundColor).toBe('FF0000');
+    expect(cell?.attrs.verticalAlign).toBe('bottom');
+    expect(cell?.attrs.margins).toMatchObject({ top: 100, left: 100 });
+    expect(cell?.attrs.borders?.top?.style).toBe('single');
+    expect(cellTextMarks).not.toContain('highlight');
+  });
+
   test('unknown highlight names are dropped, known names kept', () => {
     const dropped = parseTransformed(`<p><span style="background-color: expression;">x</span></p>`);
     const kept = parseTransformed(`<p><span style="background-color: yellow;">y</span></p>`);
