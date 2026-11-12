@@ -22,7 +22,7 @@
 ## Testing
 
 - [x] E2E test: header with large image — no clipping (evidence: `e2e/tests/header-footer-fidelity.spec.ts:14` + `header-overflow-diagnostic.spec.ts:60`)
-- [ ] E2E test: footer with 3-section tab-stop layout
+- [x] E2E test: footer with 3-section tab-stop layout (evidence: `e2e/tests/footer-3-section-tabs.spec.ts:14` single-line left/center/right + spread assertions; fixture `e2e/fixtures/footer-3-section-tabs.docx` center@4873/right@9746 tab stops)
 - [x] E2E test: different header on first page (evidence: `e2e/tests/titlePg-header-footer.spec.ts:7,26,44` — first-page header/footer + default suppression)
-- [ ] Visual comparison against Word
+- [x] Visual comparison against Word (evidence: `e2e/tests/footer-3-section-tabs.spec.ts:14` asserts Word tab-stop geometry — left at margin, center centered, right at margin; `header-right-tab.spec.ts:14` right-tab single line + `header-footer-fidelity.spec.ts` no-overlap suite)
 - [x] Run `bun run typecheck` (evidence: `bun run typecheck` green @ b9a30c9c — all 5 packages exit 0)
