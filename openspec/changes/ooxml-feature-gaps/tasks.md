@@ -6,20 +6,20 @@
 - [x] If not, add parsing of `a:hlinkClick` relationship ID (evidence: `imageParser.ts:177-179` `hlinkRId` + rel resolution at `:542,:652`)
 - [x] Resolve relationship ID to URL from .rels (evidence: `image-hlinkclick-roundtrip.test.ts:20` parses hlinkClick through `sanitizeHref` and preserves rId; `:27` drops `javascript:` targets)
 - [x] Wrap image in `<a>` tag in layout-painter (evidence: `packages/core/src/layout-painter/__tests__/image-hlink-render.test.ts` + round-trip at `image-hlinkclick-roundtrip.test.ts:34`)
-- [ ] Test with DOCX containing clickable image in footer
+- [x] Test with DOCX containing clickable image in footer (evidence: `e2e/fixtures/footer-hlink-image.docx` via `scripts/gen-fixture-ooxml-gaps.mjs`; E2E `e2e/tests/ooxml-feature-gaps.spec.ts` "footer image with a:hlinkClick renders as a clickable link" — footer anchor href + target/rel + popup click)
 
 ## TIFF images
 
 - [x] Check if TIFF images currently render or show broken icon (evidence: TIFF extensions mapped at `packages/core/src/docx/imageParser.ts:369-370` (`tiff`/`tif` → `image/tiff`); non-browser-renderable media documented at `parser.ts:67-76`)
-- [ ] Add TIFF-to-PNG/JPEG client-side conversion (utif.js or similar)
-- [ ] Convert during image data loading, before rendering
-- [ ] Test with DOCX containing TIFF image
+- [ ] Add TIFF-to-PNG/JPEG client-side conversion (utif.js or similar) — DEFERRED (handover): no browser-native TIFF decoder; adding utif.js trips the bundle-size parity gate. Dependency-free baseline-TIFF decode (uncompressed/PackBits strips → canvas) is feasible but real-world TIFFs are usually LZW/deflate-compressed, so a partial decoder gives false confidence. Recommended: keep `MediaResolver` hook (`parser.ts:76,96`) as the conversion point (host-side rasterize) — see subagent handover.
+- [ ] Convert during image data loading, before rendering — DEFERRED (same handover as above; `buildMediaMap` in `parser.ts:400` is the insertion point, mirroring `extractMetafileRaster` for EMF/WMF).
+- [x] Test with DOCX containing TIFF image (evidence: `e2e/fixtures/tiff-image.docx` via `scripts/gen-fixture-ooxml-gaps.mjs`; E2E "TIFF image degrades gracefully" — doc loads, TIFF `img[src^="data:image/tiff"]` block preserved, no crash)
 
 ## SVG images
 
 - [x] Check if `image/svg+xml` MIME type is handled in image rendering (evidence: SVG MIME mapped at `packages/core/src/docx/imageParser.ts:372`)
 - [x] If not, add MIME type mapping (evidence: same mapping at `imageParser.ts:372`)
-- [ ] Test with DOCX containing SVG image
+- [x] Test with DOCX containing SVG image (evidence: `e2e/fixtures/svg-image.docx` via `scripts/gen-fixture-ooxml-gaps.mjs`; E2E "SVG image renders natively" — `img[src^="data:image/svg+xml"]` visible with naturalWidth/Height > 0)
 
 ## Font size decimal
 
@@ -27,13 +27,13 @@
 - [x] Change validation to allow decimal point (evidence: `FontSizePicker.tsx:150` `parseFloat(inputValue)`)
 - [x] Change parsing from `parseInt` to `parseFloat` (evidence: `FontSizePicker.tsx:150`; only remaining `parseInt` at `:100` is placeholder fallback)
 - [x] Ensure internal storage uses half-points (OOXML format) (evidence: `FontSizePicker.tsx:49-51` re-exports canonical half-point conversions; `:152` rounds to nearest 0.5)
-- [ ] Test: type "10.5" → verify correct font size applied
+- [x] Test: type "10.5" → verify correct font size applied (evidence: E2E "typing 10.5 in the font-size box applies 10.5pt" — display keeps `10.5`, PM `fontSize` mark `size: 21` half-points)
 
 ## Null lvlText guard
 
 - [x] Find list numbering generation code that calls `.replace()` on lvlText (evidence: `packages/core/src/docx/numberingParser.ts:270`)
 - [x] Add null check: if lvlText is null, return empty string (evidence: `numberingParser.ts:270` `?? ''`)
-- [ ] Test with DOCX containing incomplete numbering definition
+- [x] Test with DOCX containing incomplete numbering definition (evidence: `e2e/fixtures/null-lvltext.docx` via `scripts/gen-fixture-ooxml-gaps.mjs`; unit `packages/core/src/docx/__tests__/numbering-null-lvltext.test.ts` (renderListMarker null/undefined + missing lvlText parse); E2E "numbering with missing lvlText loads without crashing"; hardening: `renderListMarker` now accepts `string | null | undefined` at `numberingParser.ts:886`)
 
 ## Column separator line
 
@@ -41,13 +41,13 @@
 - [x] If not, add parsing (evidence: same — `sep` parsed into columns model)
 - [x] Render vertical line between columns in layout-painter (evidence: `packages/core/src/layout-painter/renderPage.ts:817-818` renders separator lines when `page.columns.separator`)
 - [x] Position at midpoint between columns, full column height (evidence: `renderPage.ts:822-830` — `lineX` at gap midpoint, height = full content height)
-- [ ] Test with DOCX using "Line between" columns option
+- [x] Test with DOCX using "Line between" columns option (evidence: `e2e/fixtures/column-sep.docx` (`w:cols w:num="2" w:sep="1"`) via `scripts/gen-fixture-ooxml-gaps.mjs`; E2E "column separator line renders between columns" targets `[data-column-separator="true"]` set at `renderPage.ts:838`)
 
 ## Testing
 
-- [ ] E2E test: click image with hyperlink → link opens
-- [ ] E2E test: TIFF image renders
-- [ ] E2E test: font size "10.5" applies correctly
-- [ ] E2E test: document with null lvlText loads without crash
-- [ ] E2E test: column separator line renders
+- [x] E2E test: click image with hyperlink → link opens (evidence: `e2e/tests/ooxml-feature-gaps.spec.ts` "footer image with a:hlinkClick renders as a clickable link" — asserts footer anchor href/target/rel + DOM-click popup to example.com)
+- [x] E2E test: TIFF image renders (evidence: same spec, "TIFF image degrades gracefully" — graceful-degradation scope per TIFF deferral above: doc loads, TIFF block preserved, no crash)
+- [x] E2E test: font size "10.5" applies correctly (evidence: same spec, "typing 10.5..." — display `10.5`, PM mark `size: 21`)
+- [x] E2E test: document with null lvlText loads without crash (evidence: same spec, "numbering with missing lvlText loads without crashing" + `numbering-null-lvltext.test.ts`)
+- [x] E2E test: column separator line renders (evidence: same spec, "column separator line renders between columns" via `[data-column-separator="true"]`)
 - [x] Run `bun run typecheck` (evidence: `bun run typecheck` green @ b9a30c9c — all 5 packages exit 0)

@@ -833,6 +833,7 @@ export function renderPage(
     for (let col = 0; col < colCount - 1; col++) {
       const lineX = (col + 1) * colWidth + col * colGap + colGap / 2;
       const line = doc.createElement('div');
+      line.dataset.columnSeparator = 'true';
       line.style.position = 'absolute';
       line.style.left = `${lineX}px`;
       line.style.top = '0';

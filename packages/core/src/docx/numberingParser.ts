@@ -884,11 +884,11 @@ function toOrdinal(num: number): string {
  * @returns Rendered marker text
  */
 export function renderListMarker(
-  lvlText: string,
+  lvlText: string | null | undefined,
   counters: number[],
   formats: NumberFormat[]
 ): string {
-  let result = lvlText;
+  let result = lvlText ?? '';
 
   // Replace %1 through %9 with formatted counter values
   for (let i = 1; i <= 9; i++) {
