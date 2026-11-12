@@ -144,9 +144,9 @@ function serializeWrap(wrap: ImageWrap): string {
     case 'square':
       return `<wp:wrapSquare${wrapText}/>`;
     case 'tight':
-      return `<wp:wrapTight${wrapText}><wp:wrapPolygon edited="0"><wp:start x="0" y="0"/><wp:lineTo x="0" y="21600"/><wp:lineTo x="21600" y="21600"/><wp:lineTo x="21600" y="0"/><wp:lineTo x="0" y="0"/></wp:wrapPolygon></wp:wrapTight>`;
+      return `<wp:wrapTight${wrapText}>${serializeWrapPolygon(wrap.wrapPolygon)}</wp:wrapTight>`;
     case 'through':
-      return `<wp:wrapThrough${wrapText}><wp:wrapPolygon edited="0"><wp:start x="0" y="0"/><wp:lineTo x="0" y="21600"/><wp:lineTo x="21600" y="21600"/><wp:lineTo x="21600" y="0"/><wp:lineTo x="0" y="0"/></wp:wrapPolygon></wp:wrapThrough>`;
+      return `<wp:wrapThrough${wrapText}>${serializeWrapPolygon(wrap.wrapPolygon)}</wp:wrapThrough>`;
     case 'topAndBottom':
       return '<wp:wrapTopAndBottom/>';
     case 'behind':
@@ -155,6 +155,31 @@ function serializeWrap(wrap: ImageWrap): string {
     default:
       return '<wp:wrapNone/>';
   }
+}
+
+/**
+ * Serialize a stored wrap contour to `wp:wrapPolygon` (0..21600 units).
+ * Falls back to the rectangular polygon when no usable contour is stored —
+ * the parser treats a rectangle as equivalent to square, so the round-trip
+ * is layout-neutral.
+ */
+function serializeWrapPolygon(polygon: ImageWrap['wrapPolygon']): string {
+  const points = (polygon ?? []).filter((p) => Number.isFinite(p?.x) && Number.isFinite(p?.y));
+  const vertices =
+    points.length >= 3
+      ? points
+      : [
+          { x: 0, y: 0 },
+          { x: 0, y: 1 },
+          { x: 1, y: 1 },
+          { x: 1, y: 0 },
+          { x: 0, y: 0 },
+        ];
+  const [start, ...lineTos] = vertices;
+  const fmt = (v: number): number => Math.min(21600, Math.max(0, Math.round(v * 21600)));
+  const startEl = `<wp:start x="${fmt(start?.x ?? 0)}" y="${fmt(start?.y ?? 0)}"/>`;
+  const lineToEls = lineTos.map((p) => `<wp:lineTo x="${fmt(p.x)}" y="${fmt(p.y)}"/>`).join('');
+  return `<wp:wrapPolygon edited="0">${startEl}${lineToEls}</wp:wrapPolygon>`;
 }
 
 /** Build the common a:graphic > pic:pic element for images */

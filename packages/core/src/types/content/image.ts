@@ -17,6 +17,17 @@ export interface ImageSize {
 }
 
 /**
+ * A single wrap-polygon vertex (`wp:wrapPolygon wp:start/wp:lineTo`), stored
+ * as fractions of the image extent in [0, 1]. OOXML serializes these in
+ * 0..21600 units; the parser normalizes on read and the serializer scales
+ * back on write.
+ */
+export interface WrapPolygonPoint {
+  x: number;
+  y: number;
+}
+
+/**
  * Image wrap type for floating images
  */
 export interface ImageWrap {
@@ -28,6 +39,13 @@ export interface ImageWrap {
   distB?: number;
   distL?: number;
   distR?: number;
+  /**
+   * Tight/through wrap contour (`wp:wrapTight` / `wp:wrapThrough`
+   * `wp:wrapPolygon`), normalized to [0, 1] fractions of the image extent.
+   * Absent for square/topAndBottom/behind/inFront wraps. A rectangular
+   * polygon (the common serializer output) is equivalent to square.
+   */
+  wrapPolygon?: WrapPolygonPoint[];
 }
 
 /**

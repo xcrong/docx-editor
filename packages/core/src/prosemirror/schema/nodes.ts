@@ -290,6 +290,11 @@ export interface ImageAttrs {
   borderStyle?: string;
   /** Wrap text setting from DOCX (left, right, bothSides, largest) for round-trip */
   wrapText?: string;
+  /**
+   * Tight/through wrap contour (`wp:wrapPolygon`), normalized to [0, 1]
+   * fractions of the image extent. Round-tripped through save.
+   */
+  wrapPolygon?: { x: number; y: number }[] | null;
   /** Hyperlink URL for clickable image */
   hlinkHref?: string;
   /** Original `a:hlinkClick` relationship ID, preserved for round-trip save. */

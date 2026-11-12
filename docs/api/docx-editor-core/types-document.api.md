@@ -498,6 +498,7 @@ export interface ImageWrap {
     distT?: number;
     // (undocumented)
     type: WrapType;
+    wrapPolygon?: WrapPolygonPoint[];
     wrapText?: 'bothSides' | 'left' | 'right' | 'largest';
 }
 

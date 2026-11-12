@@ -193,6 +193,10 @@ export type ImageRun = {
     position?: ImageRunPosition;
     wrapType?: string;
     wrapText?: WrapTextDirection;
+    wrapPolygon?: {
+        x: number;
+        y: number;
+    }[];
     displayMode?: 'inline' | 'block' | 'float';
     cssFloat?: 'left' | 'right' | 'none';
     distTop?: number;

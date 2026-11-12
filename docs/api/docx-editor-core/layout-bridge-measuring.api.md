@@ -43,6 +43,7 @@ export interface FloatingExclusionRect {
     side: 'left' | 'right';
     // (undocumented)
     width: number;
+    wrapPolygon?: WrapPolygonPoint[];
     // (undocumented)
     wrapText?: WrapTextDirection;
     // (undocumented)
@@ -55,6 +56,7 @@ export interface FloatingExclusionRect {
 export interface FloatingImageZone {
     // (undocumented)
     bottomY: number;
+    contour?: WrapContour;
     fullWidthBlock?: boolean;
     // (undocumented)
     leftMargin: number;

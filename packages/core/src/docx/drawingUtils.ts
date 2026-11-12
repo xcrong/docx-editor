@@ -377,6 +377,16 @@ export function parseWrapElement(
   if (distL !== undefined) wrap.distL = distL;
   if (distR !== undefined) wrap.distR = distR;
 
+  // Tight/through wrap contour: wp:wrapPolygon start + lineTo vertices in
+  // 0..21600 units (fractions of the image extent). Stored normalized to
+  // [0, 1] so layout can scale it to pixels without EMU knowledge. Values
+  // are attacker-controlled file data: validate finite, clamp to range, cap
+  // the vertex count.
+  if (type === 'tight' || type === 'through') {
+    const polygon = parseWrapPolygon(wrapEl);
+    if (polygon) wrap.wrapPolygon = polygon;
+  }
+
   return wrap;
 }
 
@@ -398,6 +408,43 @@ export function parseAnchorWrap(anchor: XmlElement): ImageWrap | undefined {
   };
 
   return parseWrapElement(wrapEl ?? null, behindDoc, anchorDistances);
+}
+
+/**
+ * OOXML wrap-polygon coordinate space: vertices are fractions of the image
+ * extent expressed in 0..21600 units.
+ */
+const WRAP_POLYGON_SCALE = 21600;
+
+/** Maximum wrap-polygon vertices kept (DoS guard on hostile files). */
+const MAX_WRAP_POLYGON_POINTS = 64;
+
+/**
+ * Parse a `wp:wrapPolygon` contour (start + lineTo vertices) into normalized
+ * [0, 1] points. Returns undefined when the wrap element has no polygon or
+ * no usable vertices. Non-finite values are dropped; the rest are clamped
+ * to the valid range.
+ */
+export function parseWrapPolygon(wrapEl: XmlElement): ImageWrap['wrapPolygon'] {
+  const polygonEl = getChildElements(wrapEl).find((el) => el.name === 'wp:wrapPolygon');
+  if (!polygonEl) return undefined;
+
+  const points: { x: number; y: number }[] = [];
+  for (const child of getChildElements(polygonEl)) {
+    if (child.name !== 'wp:start' && child.name !== 'wp:lineTo') continue;
+    const x = parseNumericAttribute(child, null, 'x');
+    const y = parseNumericAttribute(child, null, 'y');
+    if (x === undefined || y === undefined || !Number.isFinite(x) || !Number.isFinite(y)) {
+      continue;
+    }
+    points.push({
+      x: Math.min(1, Math.max(0, x / WRAP_POLYGON_SCALE)),
+      y: Math.min(1, Math.max(0, y / WRAP_POLYGON_SCALE)),
+    });
+    if (points.length >= MAX_WRAP_POLYGON_POINTS) break;
+  }
+
+  return points.length >= 3 ? points : undefined;
 }
 
 // ============================================================================

@@ -198,6 +198,12 @@ export type ImageRun = {
   wrapType?: string;
   /** OOXML wrapText direction (which side(s) text flows on) */
   wrapText?: WrapTextDirection;
+  /**
+   * Tight/through wrap contour (`wp:wrapPolygon`), normalized to [0, 1]
+   * fractions of the image extent. Rectangular polygons are equivalent to
+   * square; non-rectangular ones narrow the exclusion zone per line.
+   */
+  wrapPolygon?: { x: number; y: number }[];
   /** Display mode for CSS rendering */
   displayMode?: 'inline' | 'block' | 'float';
   /** CSS float direction */

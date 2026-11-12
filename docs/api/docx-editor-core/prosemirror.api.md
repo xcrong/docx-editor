@@ -342,6 +342,10 @@ export interface ImageAttrs {
     title?: string;
     transform?: string;
     width?: number;
+    wrapPolygon?: {
+        x: number;
+        y: number;
+    }[] | null;
     wrapText?: string;
     wrapType?: WrapType;
 }

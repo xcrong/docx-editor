@@ -199,3 +199,112 @@ describe('getFloatingMargins fullWidthBlock', () => {
     expect(margins).toEqual({ leftMargin: 0, rightMargin: 0 });
   });
 });
+
+describe('wrap polygon exclusion zones', () => {
+  const rect = {
+    side: 'left' as const,
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
+    distTop: 0,
+    distBottom: 0,
+    distLeft: 0,
+    distRight: 0,
+    wrapText: 'right' as const,
+  };
+
+  test('full-bleed rectangular polygon behaves like square (no contour)', () => {
+    const [zone] = rectsToFloatingZones(
+      [
+        {
+          ...rect,
+          wrapType: 'tight',
+          wrapPolygon: [
+            { x: 0, y: 0 },
+            { x: 0, y: 1 },
+            { x: 1, y: 1 },
+            { x: 1, y: 0 },
+            { x: 0, y: 0 },
+          ],
+        },
+      ],
+      500
+    );
+    expect(zone?.contour).toBeUndefined();
+    expect(zone?.leftMargin).toBe(100);
+    expect(zone?.rightMargin).toBe(0);
+  });
+
+  test('inset rectangular polygon shrinks the exclusion to the polygon bbox', () => {
+    const [zone] = rectsToFloatingZones(
+      [
+        {
+          ...rect,
+          wrapType: 'through',
+          wrapPolygon: [
+            { x: 0.2, y: 0.1 },
+            { x: 0.2, y: 0.9 },
+            { x: 0.8, y: 0.9 },
+            { x: 0.8, y: 0.1 },
+          ],
+        },
+      ],
+      500
+    );
+    expect(zone?.contour).toBeUndefined();
+    // Bbox covers x in [20, 80], y in [10, 90].
+    expect(zone?.leftMargin).toBe(80);
+    expect(zone?.topY).toBe(10);
+    expect(zone?.bottomY).toBe(90);
+  });
+
+  test('triangle polygon narrows the exclusion per line via the contour', () => {
+    // Wide at the top (full width), point at the bottom center.
+    const [zone] = rectsToFloatingZones(
+      [
+        {
+          ...rect,
+          wrapType: 'tight',
+          wrapPolygon: [
+            { x: 0, y: 0 },
+            { x: 1, y: 0 },
+            { x: 0.5, y: 1 },
+          ],
+        },
+      ],
+      500
+    );
+    expect(zone?.contour).toBeDefined();
+    // Bounding-box fallback stays conservative.
+    expect(zone?.leftMargin).toBe(100);
+
+    const zones = [zone!];
+    const topLine = getFloatingMargins(2, 16, zones, 0);
+    const bottomLine = getFloatingMargins(82, 16, zones, 0);
+    // Top line sees the full-width span; near the tip the span collapses
+    // toward the center, so the single-side margin shrinks with it.
+    expect(topLine.leftMargin).toBeGreaterThan(80);
+    expect(bottomLine.leftMargin).toBeLessThan(topLine.leftMargin);
+    expect(bottomLine.leftMargin).toBeLessThan(60);
+  });
+
+  test('non-tight wrap types ignore the polygon', () => {
+    const [zone] = rectsToFloatingZones(
+      [
+        {
+          ...rect,
+          wrapType: 'square',
+          wrapPolygon: [
+            { x: 0, y: 0 },
+            { x: 1, y: 0 },
+            { x: 0.5, y: 1 },
+          ],
+        },
+      ],
+      500
+    );
+    expect(zone?.contour).toBeUndefined();
+    expect(zone?.leftMargin).toBe(100);
+  });
+});

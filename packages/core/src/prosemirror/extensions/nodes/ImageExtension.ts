@@ -208,6 +208,7 @@ export const ImageExtension = createNodeExtension({
       borderColor: { default: null },
       borderStyle: { default: null },
       wrapText: { default: null },
+      wrapPolygon: { default: null },
       hlinkHref: { default: null },
       hlinkRId: { default: null },
       cropTop: { default: null },

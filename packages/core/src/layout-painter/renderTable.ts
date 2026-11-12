@@ -85,7 +85,8 @@ function renderCellContent(
   // rectsToFloatingZones with the page-level path so side/segments/clamp
   // stay identical (largest, centered both-sides split, near-full-width
   // clamp). Tight/through with a rectangular wrapPolygon (the common
-  // serializer output) are equivalent to square here.
+  // serializer output) are equivalent to square; a non-rectangular polygon
+  // narrows the exclusion per line via the zone contour.
   let floatingZones: FloatingImageZone[] | undefined;
   if (cellFloatingImages.length > 0) {
     floatingZones = rectsToFloatingZones(
@@ -101,6 +102,7 @@ function renderCellContent(
         distRight: img.distRight,
         wrapText: img.wrapText,
         wrapType: img.wrapType,
+        wrapPolygon: img.wrapPolygon,
       })),
       contentWidth
     );

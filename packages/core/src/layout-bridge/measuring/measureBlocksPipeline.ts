@@ -267,7 +267,8 @@ function resolveAnchoredX(
  * top-level textbox extraction since both use the same
  * `ImageRunPosition` shape and `cssFloat` fallback. Tight/through with a
  * rectangular wrapPolygon (the common serializer output) are equivalent to
- * square here.
+ * square; a non-rectangular polygon narrows the exclusion per line via the
+ * zone contour.
  */
 function computeAnchoredMargins(
   position: ImageRunPosition | undefined,
@@ -281,7 +282,8 @@ function computeAnchoredMargins(
   topY: number,
   wrapText: ImageRun['wrapText'],
   wrapType: string | undefined,
-  contentWidth: number
+  contentWidth: number,
+  wrapPolygon?: ImageRun['wrapPolygon']
 ): FloatingImageZone {
   const { x, side } = resolveAnchoredX(position, cssFloat, width, contentWidth);
   const [zone] = rectsToFloatingZones(
@@ -298,6 +300,7 @@ function computeAnchoredMargins(
         distRight,
         wrapText: wrapText ?? imageWrapTextFromCssFloat(cssFloat),
         wrapType,
+        wrapPolygon,
       },
     ],
     contentWidth
@@ -352,7 +355,8 @@ function extractImageZonesFromParagraph(
       topY,
       imgRun.wrapText,
       imgRun.wrapType,
-      contentWidth
+      contentWidth,
+      imgRun.wrapPolygon
     );
 
     // Centered both-sides floats emit split segments with zero side margins —

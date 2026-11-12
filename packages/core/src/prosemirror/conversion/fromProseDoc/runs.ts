@@ -294,6 +294,28 @@ export function createImageRun(node: PMNode): Run {
     wrap.wrapText = attrs.wrapText as import('../../../types/content').ImageWrap['wrapText'];
   }
 
+  // Restore tight/through wrap contour. PM attrs are in-memory only (never
+  // parsed from HTML), but validate anyway: keep finite [0, 1] points, cap
+  // the count, require a real polygon.
+  if (Array.isArray(attrs.wrapPolygon)) {
+    const points: { x: number; y: number }[] = [];
+    for (const p of attrs.wrapPolygon) {
+      if (points.length >= 64) break;
+      const x = (p as { x?: unknown })?.x;
+      const y = (p as { x?: unknown; y?: unknown })?.y;
+      if (
+        typeof x !== 'number' ||
+        typeof y !== 'number' ||
+        !Number.isFinite(x) ||
+        !Number.isFinite(y)
+      ) {
+        continue;
+      }
+      points.push({ x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) });
+    }
+    if (points.length >= 3) wrap.wrapPolygon = points;
+  }
+
   const image: Image = {
     type: 'image',
     rId: attrs.rId || '',

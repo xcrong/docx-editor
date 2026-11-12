@@ -80,9 +80,7 @@ test.describe('Floating image layout (T14)', () => {
     // presence and in-flow placement since this dense fixture stacks many
     // floats whose side margins legitimately appear near block images.
     const block = await page.evaluate(() => {
-      const blocks = Array.from(
-        document.querySelectorAll<HTMLElement>('.layout-block-image')
-      );
+      const blocks = Array.from(document.querySelectorAll<HTMLElement>('.layout-block-image'));
       let inFloatingLayer = 0;
       let withSize = 0;
       for (const blockImg of blocks) {
@@ -101,7 +99,9 @@ test.describe('Floating image layout (T14)', () => {
     await loadFixture(page);
     const behind = await page.evaluate(() => {
       const floats = Array.from(
-        document.querySelectorAll<HTMLElement>('.layout-page-floating-image[data-wrap-type="behind"]')
+        document.querySelectorAll<HTMLElement>(
+          '.layout-page-floating-image[data-wrap-type="behind"]'
+        )
       );
       let layersWithoutFrontZ = 0;
       let overlappingOffsetLines = 0;
@@ -126,7 +126,12 @@ test.describe('Floating image layout (T14)', () => {
           }
         }
       }
-      return { floats: floats.length, overlappingTotal, overlappingOffsetLines, layersWithoutFrontZ };
+      return {
+        floats: floats.length,
+        overlappingTotal,
+        overlappingOffsetLines,
+        layersWithoutFrontZ,
+      };
     });
     expect(behind.floats).toBeGreaterThan(0);
     // Behind images must not create wrap margins on overlapping lines.
@@ -139,7 +144,9 @@ test.describe('Floating image layout (T14)', () => {
     await loadFixture(page);
     const front = await page.evaluate(() => {
       const floats = Array.from(
-        document.querySelectorAll<HTMLElement>('.layout-page-floating-image[data-wrap-type="inFront"]')
+        document.querySelectorAll<HTMLElement>(
+          '.layout-page-floating-image[data-wrap-type="inFront"]'
+        )
       );
       let withOffset = 0;
       for (const float of floats) {
@@ -157,7 +164,9 @@ test.describe('Floating image layout (T14)', () => {
         }
       }
       const frontLayers = Array.from(
-        document.querySelectorAll<HTMLElement>('.layout-page-content > .layout-floating-images-layer')
+        document.querySelectorAll<HTMLElement>(
+          '.layout-page-content > .layout-floating-images-layer'
+        )
       );
       const zIndexes = frontLayers.map((l) => window.getComputedStyle(l).zIndex);
       return { floats: floats.length, withOffset, zIndexes };
@@ -176,7 +185,9 @@ test.describe('Floating image layout (T14)', () => {
       for (const img of imgs) {
         const cellContent = img.closest('.layout-table-cell-content') as HTMLElement | null;
         if (!cellContent) continue;
-        const imgRect = (img.firstElementChild as HTMLElement | null)?.getBoundingClientRect() ?? img.getBoundingClientRect();
+        const imgRect =
+          (img.firstElementChild as HTMLElement | null)?.getBoundingClientRect() ??
+          img.getBoundingClientRect();
         const cellRect = cellContent.getBoundingClientRect();
         if (
           imgRect.left >= cellRect.left - 2 &&
@@ -203,5 +214,127 @@ test.describe('Floating image layout (T14)', () => {
     expect(cell.imgs).toBeGreaterThan(0);
     expect(cell.inside).toBe(cell.imgs);
     expect(cell.cellsWithOffset).toBeGreaterThan(0);
+  });
+});
+
+test.describe('Floating image layout (polygon + grid)', () => {
+  const POLYGON_GRID_FIXTURE = 'fixtures/float-wrap-polygon-grid-test.docx';
+
+  async function loadPolygonGridFixture(page: Page) {
+    const editor = new EditorPage(page);
+    await editor.goto();
+    await editor.waitForReady();
+    await page
+      .locator('input[type="file"][accept=".docx"]')
+      .setInputFiles(`e2e/${POLYGON_GRID_FIXTURE}`);
+    await page.waitForSelector('.paged-editor__pages');
+    await page.waitForSelector('[data-page-number]');
+    await page.waitForTimeout(2000);
+  }
+
+  test('tight triangle polygon narrows the exclusion down the image', async ({ page }) => {
+    await loadPolygonGridFixture(page);
+    const result = await page.evaluate(() => {
+      const floats = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '.layout-page-floating-image[data-wrap-type="tight"]'
+        )
+      );
+      const perFloat: { lines: number; minMl: number; maxMl: number; unwrapped: number }[] = [];
+      for (const float of floats) {
+        const imgRect = float.getBoundingClientRect();
+        const pageEl = float.closest('[data-page-number]');
+        if (!pageEl) continue;
+        let minMl = Infinity;
+        let maxMl = -Infinity;
+        let lines = 0;
+        let unwrapped = 0;
+        for (const line of pageEl.querySelectorAll<HTMLElement>('.layout-paragraph .layout-line')) {
+          const lineRect = line.getBoundingClientRect();
+          if (lineRect.bottom > imgRect.top + 2 && lineRect.top < imgRect.bottom - 2) {
+            lines++;
+            const ml = parseFloat(line.style.marginLeft) || 0;
+            if (ml < 5) unwrapped++;
+            if (ml < minMl) minMl = ml;
+            if (ml > maxMl) maxMl = ml;
+          }
+        }
+        perFloat.push({ lines, minMl, maxMl, unwrapped });
+      }
+      return perFloat;
+    });
+    expect(result.length).toBeGreaterThan(0);
+    // The triangle float wraps every overlapping line and its single-side
+    // margin varies from full-width (top) to narrow (tip).
+    const triangle = result.find((f) => f.lines >= 4 && f.maxMl - f.minMl > 20);
+    expect(triangle).toBeDefined();
+    expect(triangle!.unwrapped).toBe(0);
+  });
+
+  test('multiple images in table grid do not overlap', async ({ page }) => {
+    await loadPolygonGridFixture(page);
+    const grid = await page.evaluate(() => {
+      const imgs = Array.from(
+        document.querySelectorAll<HTMLElement>('.layout-cell-floating-image')
+      );
+      const byCell = new Map<Element, DOMRect[]>();
+      let inside = 0;
+      for (const img of imgs) {
+        const cellContent = img.closest('.layout-table-cell-content');
+        if (!cellContent) continue;
+        const imgRect =
+          (img.firstElementChild as HTMLElement | null)?.getBoundingClientRect() ??
+          img.getBoundingClientRect();
+        const cellRect = cellContent.getBoundingClientRect();
+        if (
+          imgRect.left >= cellRect.left - 2 &&
+          imgRect.right <= cellRect.right + 2 &&
+          imgRect.top >= cellRect.top - 2 &&
+          imgRect.bottom <= cellRect.bottom + 2
+        ) {
+          inside++;
+        }
+        const list = byCell.get(cellContent) ?? [];
+        list.push(imgRect);
+        byCell.set(cellContent, list);
+      }
+      let overlappingPairs = 0;
+      let maxInCell = 0;
+      for (const rects of byCell.values()) {
+        maxInCell = Math.max(maxInCell, rects.length);
+        for (let i = 0; i < rects.length; i++) {
+          for (let j = i + 1; j < rects.length; j++) {
+            const a = rects[i]!;
+            const b = rects[j]!;
+            if (
+              a.left < b.right - 1 &&
+              b.left < a.right - 1 &&
+              a.top < b.bottom - 1 &&
+              b.top < a.bottom - 1
+            ) {
+              overlappingPairs++;
+            }
+          }
+        }
+      }
+      let cellsWithOffset = 0;
+      for (const cellEl of document.querySelectorAll('.layout-table-cell-content')) {
+        if (!cellEl.querySelector('.layout-cell-floating-images-layer')) continue;
+        for (const line of cellEl.querySelectorAll<HTMLElement>('.layout-line')) {
+          const ml = parseFloat((line as HTMLElement).style.marginLeft) || 0;
+          if (ml > 5) {
+            cellsWithOffset++;
+            break;
+          }
+        }
+      }
+      return { imgs: imgs.length, inside, overlappingPairs, maxInCell, cellsWithOffset };
+    });
+    // 2x2 grid: twin cell holds 2 floats, the other three hold 1 each.
+    expect(grid.imgs).toBe(5);
+    expect(grid.maxInCell).toBe(2);
+    expect(grid.inside).toBe(grid.imgs);
+    expect(grid.overlappingPairs).toBe(0);
+    expect(grid.cellsWithOffset).toBeGreaterThan(0);
   });
 });

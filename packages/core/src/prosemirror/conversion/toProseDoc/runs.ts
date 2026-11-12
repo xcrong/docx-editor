@@ -445,6 +445,7 @@ function convertImage(image: Image): PMNode {
     effectExtentRight,
     layoutInCell: image.layoutInCell,
     allowOverlap: image.allowOverlap,
+    wrapPolygon: image.wrap.wrapPolygon,
   });
 }
 

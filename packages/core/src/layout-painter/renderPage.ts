@@ -131,6 +131,11 @@ interface PageFloatingImage {
   wrapText?: 'bothSides' | 'left' | 'right' | 'largest';
   /** Wrap type (square, tight, through, topAndBottom) */
   wrapType?: string;
+  /**
+   * Tight/through wrap contour (`wp:wrapPolygon`), normalized to [0, 1]
+   * fractions of the image extent.
+   */
+  wrapPolygon?: { x: number; y: number }[];
   /** wp:srcRect crop fractions [0..1]. */
   cropTop?: number;
   cropRight?: number;
@@ -446,9 +451,12 @@ function extractFloatingImagesFromParagraph(
       // Prefer the OOXML wrapText carried on the run (bothSides/left/right/
       // largest); fall back to the cssFloat-derived direction for runs that
       // predate the plumbing. Tight/through with a rectangular wrapPolygon
-      // (the common serializer output) are equivalent to square here.
+      // (the common serializer output) are equivalent to square; a
+      // non-rectangular polygon narrows the exclusion per line via the
+      // zone contour.
       wrapText: imgRun.wrapText ?? imageWrapTextFromCssFloat(imgRun.cssFloat),
       wrapType: imgRun.wrapType,
+      wrapPolygon: imgRun.wrapPolygon,
       cropTop: imgRun.cropTop,
       cropRight: imgRun.cropRight,
       cropBottom: imgRun.cropBottom,
@@ -547,6 +555,7 @@ export function renderPage(
       distRight: img.distRight,
       wrapText: img.wrapText,
       wrapType: img.wrapType,
+      wrapPolygon: img.wrapPolygon,
     });
   }
 
