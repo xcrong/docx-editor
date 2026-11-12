@@ -32,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from 'vue';
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import MaterialSymbol from './ui/MaterialSymbol.vue';
 
@@ -43,6 +43,15 @@ const props = defineProps<{
   pageWidthPx: number;
   sidebarOpen: boolean;
   resolvedCommentIds: Set<number>;
+  /**
+   * Engine-computed anchors in pages-container coords (PM+layout, no DOM
+   * dependency). Primary source — the DOM query below only fills keys
+   * missing here (e.g. anchors whose engine entry hasn't arrived yet).
+   * Required for resolved comments: the painter strips their highlight
+   * spans, so DOM lookup can never anchor them (React anchors markers
+   * from the same engine map, which is why its markers always showed).
+   */
+  engineAnchorPositions?: Map<string, number> | null;
 }>();
 
 defineEmits<{
@@ -55,7 +64,64 @@ interface Marker {
   y: number;
 }
 
+// Bumped after every painter repaint (and a short settle on mount /
+// sidebar-close) so the DOM anchor query below re-runs against fresh
+// page DOM. Without this the computed resolves once against a stale (or
+// not-yet-painted) tree and markers stay missing until an unrelated
+// reactive tick — React avoids this via engine-computed anchorPositions.
+const paintTick = ref(0);
+function bump() {
+  paintTick.value++;
+}
+let paintEl: HTMLElement | null = null;
+function bindPaintListener() {
+  paintEl?.removeEventListener('painter:painted', bump);
+  paintEl = props.pagesContainer;
+  paintEl?.addEventListener('painter:painted', bump);
+}
+
+onMounted(() => {
+  bindPaintListener();
+  // Cold start: the last paint may predate this mount, so no
+  // `painter:painted` will arrive — settle over a few frames instead.
+  let frames = 0;
+  const tick = () => {
+    bump();
+    if (++frames < 5) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+});
+
+watch(
+  () => props.pagesContainer,
+  () => bindPaintListener()
+);
+
+// Closing the sidebar repaints (highlight/restyle pass); re-resolve
+// once that paint lands (via the listener) plus one next-frame bump
+// in case this close issues no paint at all. Engine anchors arrive as
+// a fresh Map identity per engine run, so watch it too — this is what
+// anchors resolved comments, whose highlight spans the painter strips
+// (DOM lookup alone can never find them).
+watch(
+  () => props.sidebarOpen,
+  (open) => {
+    if (!open) requestAnimationFrame(() => bump());
+  }
+);
+
+watch(
+  () => props.engineAnchorPositions,
+  () => bump()
+);
+
+onBeforeUnmount(() => {
+  paintEl?.removeEventListener('painter:painted', bump);
+});
+
 const markers = computed<Marker[]>(() => {
+  // Dependency: re-resolve anchors after every repaint/settle tick.
+  void paintTick.value;
   // Hide all markers when the sidebar is open — cards are visible
   // there instead. Matches React's CommentMarginMarkers semantics.
   if (props.sidebarOpen) return [];
@@ -74,26 +140,46 @@ const markers = computed<Marker[]>(() => {
   const out: Marker[] = [];
   for (const c of props.comments) {
     if (c.parentId != null) continue;
-    const anchor = els.get(String(c.id));
-    if (!anchor) continue;
-    const r = anchor.getBoundingClientRect();
+    // Engine anchors first (PM+layout, always available — including
+    // resolved comments whose spans the painter strips), DOM fallback
+    // second. Both are post-zoom pages-container coords; `y` is stored
+    // unscaled to match the template's `top: y * zoom`.
+    const key = `comment-${c.id}`;
+    const top =
+      props.engineAnchorPositions?.get(key) ?? domAnchorTop(els, containerRect, container, String(c.id));
+    if (top == null) continue;
     out.push({
       comment: c,
       isResolved: props.resolvedCommentIds.has(c.id),
-      y: (r.top - containerRect.top + container.scrollTop) / props.zoom,
+      y: top / props.zoom,
     });
   }
   return out;
 });
 
-// pageWidthPx is post-zoom; the marker container lives inside the
-// scaled pages-viewport, so layout coords are unscaled. Divide
-// zoom back out so the markers stay glued to the page right edge
-// across zoom levels (mirrors UnifiedSidebar.vue's asideStyle).
+/** Visual (post-zoom) Y of a comment anchor span relative to the pages container. */
+function domAnchorTop(
+  els: Map<string, HTMLElement>,
+  containerRect: DOMRect,
+  container: HTMLElement,
+  id: string
+): number | null {
+  const anchor = els.get(id);
+  if (!anchor) return null;
+  const r = anchor.getBoundingClientRect();
+  return r.top - containerRect.top + container.scrollTop;
+}
+
+// pageWidthPx is post-zoom (scaled), and the marker container now lives
+// inside the content-width wrapper next to the scaled `__pages` element —
+// so the page right edge in these coords is the SCALED half width.
+// (Previously divided zoom back out, which glued markers to the unscaled
+// edge and misplaced them at any zoom ≠ 1; mirrors React's
+// `(pageWidth * zoom) / 2`.)
 const containerStyle = computed<CSSProperties>(() => ({
   position: 'absolute',
   top: 0,
-  left: `calc(50% + ${(props.pageWidthPx / props.zoom) / 2 + 6}px)`,
+  left: `calc(50% + ${props.pageWidthPx / 2 + 6}px)`,
   zIndex: 30,
   pointerEvents: 'none',
 }));

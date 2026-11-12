@@ -90,6 +90,7 @@ import { resolveItemPositions } from './sidebar/resolveItemPositions';
 
 import {
   SIDEBAR_DOCUMENT_SHIFT,
+  SIDEBAR_PAGE_GAP,
   SIDEBAR_WIDTH,
 } from '@xcrong/docx-editor-core/utils/sidebarConstants';
 
@@ -344,16 +345,18 @@ const minHeightPx = computed(() => {
   return max + 200; // headroom for the bottom card
 });
 
-// Sidebar lives inside the pages-viewport but is a SIBLING of the
-// scaled `__pages` container — so it is NOT itself scaled. The page
-// renders at its visible (post-zoom) width, AND the page is shifted
-// left by SIDEBAR_DOCUMENT_SHIFT whenever the sidebar is open
-// (DocxEditor applies translateX on `__pages`). The sidebar must
-// sit at `50% - SIDEBAR_DOCUMENT_SHIFT + visibleHalfPage + gap` so
-// it tracks the shifted page right-edge — using `50% + halfPage` (the
-// stale calc) put the rail ~352px past the page edge whenever the
-// shift was active.
-const SIDEBAR_GAP = 16;
+// Sidebar lives inside the content-width wrapper (sibling of the shifted
+// `__pages` container — sibling of the transform, like React's overlay
+// layer) — so it is NOT itself scaled. The page renders at its visible
+// (post-zoom) width, AND the page is shifted left by
+// SIDEBAR_DOCUMENT_SHIFT whenever the sidebar is open (DocxEditor applies
+// translateX on `__pages`). The sidebar must sit at
+// `contentCenter - SHIFT + visibleHalfPage + gap` so it tracks the shifted
+// page right-edge. `50%` here is the wrapper (content) center — the same
+// box the page centers in — NOT the viewport, which is narrower whenever
+// the wrapper's min-width reserve overflows it; anchoring to the viewport
+// drifted the rail left over the document.
+const SIDEBAR_GAP = SIDEBAR_PAGE_GAP;
 // SIDEBAR_WIDTH is imported from core (340) so React and Vue rails match and
 // stay consistent with SIDEBAR_DOCUMENT_SHIFT (also derived from it).
 // Dynamic CSS boost for the expanded item. Mirrors React
@@ -523,7 +526,9 @@ onBeforeUnmount(() => {
   background: transparent;
   font-family: 'Google Sans', Roboto, Arial, sans-serif;
   pointer-events: auto;
-  z-index: 5;
+  /* Above the narrow-overlay backdrop (z 30) so cards stay clickable
+     when the rail floats over the doc — mirrors React's zIndex 40. */
+  z-index: 40;
   transition: opacity 0.15s ease;
 }
 .unified-sidebar__inner {
