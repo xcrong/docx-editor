@@ -58,6 +58,25 @@
 
 ## 6. Wrap-up
 
-- [ ] 6.1 Confirm React `PagedEditor`/hooks and Vue `useDocxEditor` are thin engine wrappers (line-count drop); no duplicated orchestration remains.
-- [ ] 6.2 Update CLAUDE.md architecture section to point at `core/editor/DocxEditorEngine` as the orchestration owner.
-- [ ] 6.3 Update issue #696 with Tier 2 completion; note #89 (vanilla pkg) is now a thin-wrapper follow-up.
+- [x] 6.1 Confirm React `PagedEditor`/hooks and Vue `useDocxEditor` are thin engine wrappers (line-count drop); no duplicated orchestration remains. — done 2026-11-12: 7 orchestration files `ea5b6cf1^`→HEAD total 3867→3278 (−589): `HiddenProseMirror` 551→318, `HiddenHeaderFooterPMs` 391→140, `useFileIO` 280→223, `useDocxEditor` 953→860, `PagedEditor` 999→990, `useDocumentLoader` 171→165; `useLayoutPipeline` 522→582 (+60 — growth is the `EngineHost` construction + documented thin delegations at `:219-500`, not orchestration). Duplication grep over both adapters: zero hits for `computePerBlockWidths`/`toFlowBlocks`/`layoutDocument(`/`incrementStateSeq`/`decideSelectiveSave`/`clearTrackedChanges` (only test-file + comment hits). Remaining `requestAnimationFrame` hits are UI chrome (toolbar refocus, overlays, dropdowns) + the post-commit scroll-restore effect (`useLayoutPipeline.ts:514`) + autofocus (`useDocxEditor.ts:535`) — the layout coalescer itself is engine-owned (`scheduleLayout` via `createLayoutScheduler`, adapters supply only `scheduleFrame`). Remaining `parseDocx` refs are the engine-absent fallback (`useDocumentLoader.ts:92`) + a font comment; `stateToDocument` (`HiddenProseMirror.tsx:116`) is a one-liner read helper for the imperative `getDocument()` ref API, not orchestration. Adapter-side triggers stay by design: `syncHfViews` triggers (React `useEffect([slots])`, Vue load path), resolved-comment repaint effect, explicit sync `reLayout`. No removal needed.
+- [x] 6.2 Update CLAUDE.md architecture section to point at `core/editor/DocxEditorEngine` as the orchestration owner. — done 2026-11-12, minimal (2 inserts, no code touched): the section already named the engine 4× (hidden-PM ownership `:46`, click flow `:51`, Vue delegation `:55`, key-map `engine.run` row `:113`), so added only what was missing — a bold **Orchestration owner: `DocxEditorEngine`** line after the dual-rendering bullets enumerating the 5 owned areas + the no-copies rule, and 2 key-file-map rows (scheduler+transaction loop; view lifecycle + load/save seam). Left untouched: FlowBlock invariant item 1 (`runLayoutPipeline` in `layout-engine/index.ts`) — matches the code's own switch label (`index.ts:345`) and `types.ts:697` doc wording, not stale.
+- [x] 6.3 Update issue #696 with Tier 2 completion; note #89 (vanilla pkg) is now a thin-wrapper follow-up. — DISCREPANCY, human action required (no post made): **#696 does not exist** in `xcrong/docx-editor` (REST `GET /issues/696` → 404 + GraphQL resolve failure, verified 2026-11-12); **#89 is the CLOSED endnotes issue** ("viewer：尾注（endnotes）正文不在编辑器渲染"), not a vanilla-pkg follow-up; `gh search issues "vanilla"` returns nothing and the Tier 2 tracker #33 is already CLOSED. Draft comment below is ready to paste once the human confirms the target issue number. Changeset check (part of 6.3): `.changeset/engine-spine-tier2.md` exists, frontmatter `@xcrong/docx-editor-core` patch correct, and content is accurate — names `run`/`scheduleLayout`/`handleTransaction` (line 5), step 4 view lifecycle (line 7), step 5 load/save + manual-check-pending note (line 9), and the HF-coalescing behavior note (line 11); no edit needed.
+
+  DRAFT (paste to the confirmed Tier 2 issue; do NOT reference #696/#89 as written until numbers are confirmed):
+
+  > Tier 2 (engine spine, #33) complete — orchestration converged into `core/editor/DocxEditorEngine`.
+  >
+  > Done (steps 1–5, one PR of ordered commits, each gated on typecheck + engine unit tests + full Playwright in both adapters):
+  >
+  > - `engine.run` — layout compute→paint→scroll-restore; both adapters delegate (React keeps post-commit scroll-restore timing; Vue gains columns/scroll-restore/`painter:painted`).
+  > - `engine.scheduleLayout` — shared rAF coalescer; closes the Vue per-keystroke perf gap.
+  > - `engine.handleTransaction`/`handleHfTransaction` — transaction→repaint loop + scroll-flag strip; React/Vue dispatches route through it.
+  > - View lifecycle — body + per-rId HF map (`mountBodyView`/`syncHfViews`) engine-owned; adapters are thin hosts (`HiddenProseMirror` 551→318, `HiddenHeaderFooterPMs` 391→140 lines).
+  > - Load/save seam — `engine.load` (parse race guard) / `engine.save` (selective-via-agent + tracker clear); Vue gains `DocumentAgent` + selective save.
+  >   Net −589 lines across the 7 orchestration files; grep-verified no orchestration copies remain in adapters (remaining rAF/`parseDocx` hits are UI chrome, engine-absent fallback, and explicit sync paths — all by design).
+  >
+  > Deviations: cell-drag→CellSelection promotion excluded (already shared in core, nothing for the engine to own); `onLayout` required rather than optional; `onTotalPages` reserved/undefined.
+  >
+  > Remaining manual step (§5.5, human): Word/LibreOffice round-trip open check of a selective-save file from both demos (body + header edits, comment + reply) — code is in, box stays open until reported here.
+  >
+  > Changeset: `.changeset/engine-spine-tier2.md` (patch).
