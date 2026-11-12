@@ -22,10 +22,21 @@ const MODIFIER = process.platform === 'darwin' ? 'Meta' : 'Control';
  * Load the large doc fixture and wait for pages to render.
  */
 async function loadLargeDoc(page: Page): Promise<void> {
+  await loadLargeDocWithTimings(page);
+}
+
+/**
+ * Load the large doc fixture, measuring first-meaningful-paint (first
+ * `[data-page-number]` in the DOM) and full-load (paint settled) times.
+ */
+async function loadLargeDocWithTimings(page: Page): Promise<{ fmpMs: number; fullMs: number }> {
+  const loadStart = Date.now();
   const fileInput = page.locator('input[type="file"][accept=".docx"]');
   await fileInput.setInputFiles(LARGE_DOC_PATH);
   await page.waitForSelector('[data-page-number]', { timeout: 90_000 });
+  const fmpMs = Date.now() - loadStart;
   await page.waitForTimeout(2000); // let layout settle
+  return { fmpMs, fullMs: Date.now() - loadStart };
 }
 
 /**
@@ -100,16 +111,17 @@ test.describe('Large Document Performance (#68)', () => {
   });
 
   test('loads 127K word document without crashing', async ({ page }) => {
-    const loadStart = Date.now();
-
-    await loadLargeDoc(page);
-    const loadTime = Date.now() - loadStart;
+    const { fmpMs, fullMs } = await loadLargeDocWithTimings(page);
 
     const pageCount = await page.locator('[data-page-number]').count();
-    expect(pageCount).toBeGreaterThan(50);
+    expect(pageCount).toBeGreaterThan(200);
     await expect(page.locator('.ProseMirror')).toContainText('Chapter 1');
 
-    console.log(`Load time: ${loadTime}ms, Pages: ${pageCount}`);
+    console.log(`FMP: ${fmpMs}ms, full load: ${fullMs}ms, Pages: ${pageCount}`);
+    // Benchmark budgets (editor-performance): first meaningful paint < 5s,
+    // full 300-page document < 15s.
+    expect(fmpMs).toBeLessThan(5000);
+    expect(fullMs).toBeLessThan(15000);
   });
 
   test('typing at document start stays responsive', async ({ page }) => {
@@ -245,5 +257,43 @@ test.describe('Large Document Performance (#68)', () => {
 
     expect(undoStats.avg).toBeLessThan(500);
     expect(redoStats.avg).toBeLessThan(500);
+  });
+
+  test('tab switch after load does not blank rendered pages', async ({ page, context }) => {
+    await loadLargeDoc(page);
+    const before = await page.locator('[data-page-number]').count();
+    expect(before).toBeGreaterThan(200);
+
+    // Background the tab: rAF-driven layout and the page-virtualization
+    // IntersectionObserver both stall while hidden. Foregrounding must
+    // restore the painted pages, not shells or a white screen.
+    const bg = await context.newPage();
+    await bg.bringToFront();
+    await bg.waitForTimeout(1500);
+    await page.bringToFront();
+    await page.waitForTimeout(500);
+
+    const after = await page.locator('[data-page-number]').count();
+    expect(after).toBe(before);
+    await expect(page.locator('[data-page-number="1"]').first()).toContainText('Chapter 1');
+    await bg.close();
+  });
+
+  test('tab switch during loading does not cause white screen', async ({ page, context }) => {
+    const loadStart = Date.now();
+    const fileInput = page.locator('input[type="file"][accept=".docx"]');
+    await fileInput.setInputFiles(LARGE_DOC_PATH);
+
+    // Background the tab mid-load, then return and wait for completion.
+    const bg = await context.newPage();
+    await bg.bringToFront();
+    await page.waitForSelector('[data-page-number]', { timeout: 90_000 });
+    await page.bringToFront();
+    await page.waitForTimeout(2000);
+
+    const pageCount = await page.locator('[data-page-number]').count();
+    expect(pageCount).toBeGreaterThan(200);
+    console.log(`Load-with-tab-switch time: ${Date.now() - loadStart}ms, Pages: ${pageCount}`);
+    await bg.close();
   });
 });

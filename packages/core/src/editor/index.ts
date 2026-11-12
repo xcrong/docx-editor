@@ -27,6 +27,7 @@ export type {
   EngineHost,
   EnginePaintedInfo,
   HfPartKind,
+  PipelineTimings,
 } from './DocxEditorEngine';
 export {
   createBodyEditorState,

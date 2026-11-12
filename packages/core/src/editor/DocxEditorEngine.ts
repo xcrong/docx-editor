@@ -90,6 +90,32 @@ export interface EnginePaintedInfo {
 }
 
 /**
+ * Per-phase timings for the load → layout pipeline (editor-performance
+ * profiling). All values are milliseconds from `performance.now()`; a
+ * phase that did not run stays `undefined`. Read via
+ * {@link DocxEditorEngine.getTimings}.
+ *
+ * - `parseMs` — DOCX unzip + XML parse (`engine.load`).
+ * - `toProseMs` — `Document` model → ProseMirror doc (`createBodyEditorState`).
+ * - `computeMs` — full `computeLayout` (flow blocks + measure + paginate).
+ * - `measureMs` — block-measurement portion of `computeMs` (adapter measurer).
+ * - `paintMs` — DOM paint (`renderPages`); 0/unset in headless (no container).
+ * - `totalMs` — end-to-end `run()` wall time.
+ */
+export interface PipelineTimings {
+  parseMs?: number;
+  toProseMs?: number;
+  computeMs?: number;
+  measureMs?: number;
+  paintMs?: number;
+  totalMs?: number;
+  /** Flow-block count for the last `run()` (context for the timings). */
+  blocks?: number;
+  /** Page count for the last `run()`. */
+  pages?: number;
+}
+
+/**
  * Framework seam for {@link DocxEditorEngine}. Only the layout subset is
  * consumed in step 1; the contract grows per step (view factories in step 4,
  * session hooks in step 5) rather than locking a speculative shape up front.
@@ -247,6 +273,8 @@ export class DocxEditorEngine {
   private pendingScrollRestore: PendingScrollRestore | null = null;
   private pendingIncrementalScrollSnapshotWrittenAt = 0;
   private layoutScheduler: LayoutScheduler | null = null;
+  /** Last pipeline phase timings (see {@link PipelineTimings}). */
+  private timings: PipelineTimings = {};
   // -- view lifecycle (step 4): the persistent body view + per-rId HF map.
   private bodyView: EditorView | null = null;
   private bodyDocumentId: string | null = null;
@@ -335,12 +363,14 @@ export class DocxEditorEngine {
    * Stores + returns the view.
    */
   mountBodyView(hostEl: HTMLElement, document: Document | null): EditorView {
+    const toProseStart = performance.now();
     const state = createBodyEditorState({
       document,
       styles: this.host.getStyles(),
       manager: this.host.getBodyExtensionManager?.(),
       prefixPlugins: this.host.getBodyPrefixPlugins?.() ?? [],
     });
+    this.timings.toProseMs = performance.now() - toProseStart;
     const view = this.host.mountView(
       hostEl,
       state,
@@ -375,12 +405,14 @@ export class DocxEditorEngine {
     if (this.bodyViewInitialized && id === this.bodyDocumentId) return;
     this.bodyViewInitialized = true;
     this.bodyDocumentId = id;
+    const toProseStart = performance.now();
     const newState = createBodyEditorState({
       document,
       styles: this.host.getStyles(),
       manager: this.host.getBodyExtensionManager?.(),
       prefixPlugins: this.host.getBodyPrefixPlugins?.() ?? [],
     });
+    this.timings.toProseMs = performance.now() - toProseStart;
     this.bodyView.updateState(newState);
     this.host.onBodyState?.(newState, null);
   }
@@ -399,6 +431,16 @@ export class DocxEditorEngine {
 
   getBodyView(): EditorView | null {
     return this.bodyView;
+  }
+
+  /**
+   * Snapshot of the last load → layout pipeline phase timings (see
+   * {@link PipelineTimings}). `load()` records parsing, the body-view
+   * builders record `toProseDoc`, and `run()` records compute / measure /
+   * paint. Both adapters share this, so React and Vue report identically.
+   */
+  getTimings(): PipelineTimings {
+    return { ...this.timings };
   }
 
   /**
@@ -507,8 +549,11 @@ export class DocxEditorEngine {
    */
   async load(buffer: DocxInput): Promise<Document | null> {
     const generation = this.loadGeneration.begin();
+    const parseStart = performance.now();
     const document = await parseDocx(buffer);
     if (!this.loadGeneration.isCurrent(generation)) return null;
+    // Fresh load resets the pipeline timings; run() fills in compute/paint.
+    this.timings = { parseMs: performance.now() - parseStart };
     return document;
   }
 
@@ -616,6 +661,8 @@ export class DocxEditorEngine {
       const styles = host.getStyles() ?? null;
       const hf = host.getHeaderFooter();
 
+      this.timings.measureMs = 0;
+      const computeStart = performance.now();
       computation = computeLayout({
         state,
         document,
@@ -635,9 +682,20 @@ export class DocxEditorEngine {
         footerContent: hf.footer,
         firstPageHeaderContent: hf.firstHeader,
         firstPageFooterContent: hf.firstFooter,
-        measureBlocks: (blocks, widths, geometry) => host.measureBlocks(blocks, widths, geometry),
+        measureBlocks: (blocks, widths, geometry) => {
+          // Time the adapter measurer separately: it dominates compute on
+          // large docs (per-block DOM measure + cache lookup).
+          const measureStart = performance.now();
+          try {
+            return host.measureBlocks(blocks, widths, geometry);
+          } finally {
+            this.timings.measureMs =
+              (this.timings.measureMs ?? 0) + (performance.now() - measureStart);
+          }
+        },
         getHfPmDoc: (h) => host.getHfPmDoc(h) ?? null,
       });
+      this.timings.computeMs = performance.now() - computeStart;
 
       const {
         blocks: newBlocks,
@@ -703,7 +761,11 @@ export class DocxEditorEngine {
           endnoteRefPmPos,
           resolvedCommentIds,
         };
+        const paintStart = performance.now();
         const renderPagesKind = renderPages(newLayout.pages, pagesEl, pageOptions);
+        this.timings.paintMs = performance.now() - paintStart;
+        this.timings.blocks = newBlocks.length;
+        this.timings.pages = newLayout.pages.length;
 
         host.onPaintContainer?.(newLayout);
 
@@ -736,15 +798,26 @@ export class DocxEditorEngine {
         this.applyPendingIncrementalScrollSnapshot(false, pagesEl);
 
         const totalTime = performance.now() - pipelineStart;
+        this.timings.totalMs = totalTime;
         if (totalTime > 2000) {
+          const t = this.timings;
           console.warn(
             `[DocxEditorEngine] Layout pipeline took ${Math.round(totalTime)}ms total ` +
-              `(${newBlocks.length} blocks, ${newMeasures.length} measures)`
+              `(${newBlocks.length} blocks, ${newMeasures.length} measures) ` +
+              `compute=${Math.round(t.computeMs ?? 0)}ms ` +
+              `measure=${Math.round(t.measureMs ?? 0)}ms ` +
+              `paint=${Math.round(t.paintMs ?? 0)}ms`
           );
         }
       } else {
         this.pendingScrollRestore = null;
         this.pendingIncrementalScrollSnapshotWrittenAt = 0;
+        // Headless (compute-only): no paint ran, but compute/measure still
+        // apply — record counts so getTimings() stays meaningful in tests.
+        this.timings.paintMs = 0;
+        this.timings.blocks = computation.blocks.length;
+        this.timings.pages = computation.layout.pages.length;
+        this.timings.totalMs = performance.now() - pipelineStart;
       }
     } catch (error) {
       // A failed pass leaves no usable layout; adapters keep their

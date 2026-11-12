@@ -110,6 +110,7 @@ export class DocxEditorEngine {
     getHfView(rId: string): EditorView | null;
     // (undocumented)
     getHfViews(): Map<string, EditorView>;
+    getTimings(): PipelineTimings;
     handleHfTransaction(rId: string, view: EditorView, docChanged: boolean): void;
     handleTransaction(tr: Transaction, newState: EditorState): void;
     load(buffer: DocxInput): Promise<Document_2 | null>;
@@ -345,6 +346,24 @@ export interface PendingScrollRestore {
     renderKind: RenderPagesUpdateKind;
     // (undocumented)
     scrollTopSnapshot: number | null;
+}
+
+// @public
+export interface PipelineTimings {
+    blocks?: number;
+    // (undocumented)
+    computeMs?: number;
+    // (undocumented)
+    measureMs?: number;
+    pages?: number;
+    // (undocumented)
+    paintMs?: number;
+    // (undocumented)
+    parseMs?: number;
+    // (undocumented)
+    toProseMs?: number;
+    // (undocumented)
+    totalMs?: number;
 }
 
 // @public
