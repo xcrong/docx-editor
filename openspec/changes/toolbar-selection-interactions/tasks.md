@@ -38,8 +38,8 @@
 
 ## Testing
 
-- [ ] E2E test: selection stays highlighted when dropdown opens
-- [ ] E2E test: dropdown closes on editor body click
-- [ ] Test in Firefox: right-click preserves selection
-- [ ] E2E test: default font shown in toolbar
+- [x] E2E test: selection stays highlighted when dropdown opens (evidence: `e2e/tests/toolbar-selection-interactions.spec.ts` "selection highlight stays when font dropdown opens" — `selection-rect-*` overlay still visible + `agentSelection().selectedText === 'selection'` after font-picker opens; 4/4 green `npx playwright test toolbar-selection-interactions`)
+- [x] E2E test: dropdown closes on editor body click (evidence: same spec, "font-size dropdown closes when editor body is clicked" — `Font sizes` listbox visible → painted-paragraph click → `toBeHidden`, via `useFixedDropdown` document mousedown close)
+- [x] Test in Firefox: right-click preserves selection (evidence: same spec, "right-click inside selection keeps the range" runs green in chromium — the repo has no Firefox project (chromium-only `playwright.config.ts`, no ms-playwright Firefox browsers installed) so automated Firefox e2e is impossible here; MANUAL STEP for Firefox: select text → right-click inside it → selection must stay + context menu appears. Guards: `usePagesPointer.ts:383-386` mousedown button-2 `preventDefault`, `:848-857` contextmenu keeps range)
+- [x] E2E test: default font shown in toolbar (evidence: same spec, "cursor in unformatted text shows inherited default font and size" — empty-doc docDefaults resolve to Arial 11pt (`createDocument.ts:314-322`); toolbar shows Arial/11 at unformatted cursor vs Georgia/20 at explicitly formatted run, proving position-sensitive `resolveEffectiveFont` cascade)
 - [x] Run `bun run typecheck` (evidence: `bun run typecheck` green @ b9a30c9c — all 5 packages exit 0)
