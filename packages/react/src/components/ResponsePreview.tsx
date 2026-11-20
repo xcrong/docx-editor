@@ -291,6 +291,11 @@ export const ResponsePreview: React.FC<ResponsePreviewProps> = ({
     }
   }, [isEditing]);
 
+  const handleAccept = useCallback(() => {
+    const textToAccept = isEditing ? editedText : newText;
+    onAccept(textToAccept);
+  }, [isEditing, editedText, newText, onAccept]);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -309,12 +314,7 @@ export const ResponsePreview: React.FC<ResponsePreviewProps> = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isEditing, newText, onReject]);
-
-  const handleAccept = useCallback(() => {
-    const textToAccept = isEditing ? editedText : newText;
-    onAccept(textToAccept);
-  }, [isEditing, editedText, newText, onAccept]);
+  }, [isEditing, newText, onReject, handleAccept]);
 
   const handleStartEdit = useCallback(() => {
     setIsEditing(true);
