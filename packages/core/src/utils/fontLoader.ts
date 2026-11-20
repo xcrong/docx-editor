@@ -94,6 +94,15 @@ function faceKey(
   return `${family.trim()}|${weight}|${style}`;
 }
 
+// Buffer faces hash bytes into the key (#143): same-named subsetted fonts
+// from different documents register separately; identical bytes share a key.
+function hashFontBuffer(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < bytes.length; i++) hash = Math.imul(hash ^ bytes[i], 0x01000193);
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
 // "A genuine system font satisfies this family" — the decision behind every
 // fetch skip. Self-excludes families registered through our face loaders
 // (subsetted/partial faces — see registeredFamilies); system fonts that
@@ -583,7 +592,8 @@ export async function loadFontFromBuffer(
 
   const normalizedFamily = fontFamily.trim();
   const style = options?.style ?? 'normal';
-  const key = faceKey(normalizedFamily, options?.weight, style);
+  // Content-aware key (#143): keeps the `family|` prefix for in-flight matching.
+  const key = `${faceKey(normalizedFamily, options?.weight, style)}|buf:${hashFontBuffer(buffer)}`;
 
   // Provenance: mark before the async work so an in-flight registration
   // already counts as registered (see loadFontWithMapping). Marking a family
@@ -591,9 +601,7 @@ export async function loadFontFromBuffer(
   // equivalent — the safe direction.
   registeredFamilies.add(normalizedFamily);
 
-  // Face-keyed dedupe so multiple weights of the same family register
-  // independently and a prior URL/Google load of the family does not skip
-  // this face.
+  // Face-keyed dedupe; the content hash scopes entries per bytes (#143).
   if (loadedFaces.has(key)) return true;
   const existing = loadingFaces.get(key);
   if (existing) return existing;
