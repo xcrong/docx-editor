@@ -68,6 +68,12 @@ export function useDocumentLoader({
     (doc: Document) => {
       resetForNewDocument();
       history.reset(doc);
+      // Explicit loads always rebuild the body view. The engine's
+      // same-identity guard can't tell two `parseDocx` results apart
+      // (they share the `"--"` metadata identity), so without `force`
+      // the second `loadDocument()` is a silent no-op (#138). The later
+      // prop-change effect then sees the fresh identity and skips.
+      pagedEditorRef.current?.getEngine()?.updateBodyViewForDocument(doc, { force: true });
       setLoadingState({ isLoading: false, parseError: null });
       loadDocumentFonts(doc).catch((err) => {
         console.warn('Failed to load document fonts:', err);
@@ -80,7 +86,7 @@ export function useDocumentLoader({
         })
       );
     },
-    [resetForNewDocument, history, setLoadingState, setDocumentFonts]
+    [resetForNewDocument, history, setLoadingState, setDocumentFonts, pagedEditorRef]
   );
 
   const loadBuffer = useCallback(

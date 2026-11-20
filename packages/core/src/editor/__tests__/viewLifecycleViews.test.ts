@@ -229,6 +229,33 @@ describe('engine body view lifecycle', () => {
     }
   });
 
+  test('same-metadata collision stays stale without force; force rebuilds (#138)', () => {
+    const { engine, hfHost } = freshEngine();
+    try {
+      const host = window.document.createElement('div');
+      window.document.body.appendChild(host);
+      // `parseDocx` never fills `package.properties`, so every parsed file
+      // shares the `"--"` identity — the second load must still swap.
+      const docA: Document = { package: { document: { content: [para('aaa')] } } };
+      const docB: Document = { package: { document: { content: [para('bbb')] } } };
+      const view = engine.mountBodyView(host, docA);
+      expect(view.state.doc.textContent).toContain('aaa');
+
+      const before = view.state;
+      engine.updateBodyViewForDocument(docB);
+      expect(view.state).toBe(before);
+
+      engine.updateBodyViewForDocument(docB, { force: true });
+      expect(view.state).not.toBe(before);
+      expect(view.state.doc.textContent).toContain('bbb');
+
+      engine.destroyBodyView();
+      host.remove();
+    } finally {
+      hfHost.remove();
+    }
+  });
+
   test('body dispatch strips scroll flag and runs the transaction loop', () => {
     const { engine, hfHost } = freshEngine();
     try {
