@@ -556,6 +556,24 @@ const CSS_HEX_ESCAPES: Record<string, string> = {
 const cssStringEscape = (s: string) =>
   s.replace(/["\\]/g, '\\$&').replace(/[<>\n\r\f]/g, (c) => CSS_HEX_ESCAPES[c]);
 
+// Buffer-registered faces (DOCX-embedded fonts) dedupe on more than
+// family|weight|style: two documents can embed different binaries under the
+// same family name, and the second must re-register instead of silently
+// reusing the first document's glyphs. Fingerprint the content (length +
+// head/tail bytes — cheap, and de-obfuscated ODTTF payloads differ where it
+// matters) into the face key so a same-document re-parse stays deduped while
+// differing content re-registers.
+function bufferFingerprint(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const head = bytes.subarray(0, Math.min(16, bytes.length));
+  const tail = bytes.subarray(Math.max(0, bytes.length - 8));
+  let hex = '';
+  for (const b of head) hex += b.toString(16).padStart(2, '0');
+  hex += '-';
+  for (const b of tail) hex += b.toString(16).padStart(2, '0');
+  return `${bytes.length}:${hex}`;
+}
+
 /**
  * Load a font from a raw buffer (e.g., embedded in DOCX)
  *
@@ -583,7 +601,10 @@ export async function loadFontFromBuffer(
 
   const normalizedFamily = fontFamily.trim();
   const style = options?.style ?? 'normal';
-  const key = faceKey(normalizedFamily, options?.weight, style);
+  // Content-fingerprinted face key (see bufferFingerprint): the family stays
+  // the first segment so inFlightFacePromises' `${family}|` prefix still
+  // matches in-flight buffer registrations.
+  const key = `${faceKey(normalizedFamily, options?.weight, style)}|${bufferFingerprint(buffer)}`;
 
   // Provenance: mark before the async work so an in-flight registration
   // already counts as registered (see loadFontWithMapping). Marking a family
