@@ -821,25 +821,29 @@ function runToHtml(run: Run, theme?: Theme | null): string {
 
   if (formatting.fontSize) {
     const sizePt = formatting.fontSize / 2;
-    styles.push(`font-size: ${sizePt}pt`);
+    if (Number.isFinite(sizePt)) {
+      styles.push(`font-size: ${sizePt}pt`);
+    }
   }
 
   if (formatting.fontFamily?.ascii) {
-    styles.push(`font-family: "${formatting.fontFamily.ascii}"`);
+    styles.push(`font-family: "${escapeCssFontFamily(formatting.fontFamily.ascii)}"`);
   }
 
   const colorHex = resolveColorToHex(formatting.color, theme);
-  if (colorHex) {
+  if (colorHex && isSafeHexColor(colorHex)) {
     styles.push(`color: #${colorHex}`);
   }
 
   const bgHex = resolveColorToHex(formatting.shading?.fill, theme);
-  if (bgHex) {
+  if (bgHex && isSafeHexColor(bgHex)) {
     styles.push(`background-color: #${bgHex}`);
   }
 
   if (styles.length > 0) {
-    html = `<span style="${styles.join('; ')}">${html}</span>`;
+    // Single-quoted attribute so the double-quoted font-family value cannot
+    // terminate it (a `"` inside would otherwise close a `"`-quoted attr).
+    html = `<span style='${styles.join('; ')}'>${html}</span>`;
   }
 
   return html;
@@ -855,6 +859,35 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/**
+ * Escape a font name for a double-quoted `font-family` value inside the
+ * single-quoted clipboard `style` attribute. CSS layer follows the repo
+ * standard (`cssStringEscape` in fontLoader.ts / `escapeQuotedFontName` in
+ * fontResolver.ts): `"` and `\` are backslash-escaped in a single pass, so a
+ * crafted name cannot break out of the quoted value and `\"` is not
+ * double-escaped. Newlines collapse to spaces; `&`, `<`, `>`, `'` are
+ * HTML-entity-encoded so the value also stays inside the `'`-quoted
+ * `style` attribute.
+ */
+function escapeCssFontFamily(fontName: string): string {
+  return fontName
+    .replace(/["\\]/g, '\\$&')
+    .replace(/&/g, '&amp;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/[\n\r\f]/g, ' ');
+}
+
+/**
+ * Accept only 6-digit hex (OOXML ST_HexColor shape) so a crafted `w:color`
+ * `w:val` cannot break out of the clipboard `style` attribute. Non-hex
+ * values previously produced invalid CSS that browsers dropped anyway.
+ */
+function isSafeHexColor(hex: string): boolean {
+  return /^[0-9A-Fa-f]{6}$/.test(hex);
 }
 
 /**
