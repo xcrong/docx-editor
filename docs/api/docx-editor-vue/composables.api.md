@@ -135,8 +135,8 @@ export { TrackedChangeEntry }
 
 export { TrackedChangesResult }
 
-// @public (undocumented)
-export function useAutoSave(document: MaybeRef<Document_2 | null | undefined>, options?: UseAutoSaveOptions): UseAutoSaveReturn;
+// @public
+export function useAutoSave(document: MaybeRef<Document_2 | null | undefined>, options?: MaybeRef<UseAutoSaveOptions>): UseAutoSaveReturn;
 
 // @public (undocumented)
 export interface UseAutoSaveOptions {

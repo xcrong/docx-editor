@@ -29,11 +29,11 @@ export {
 };
 
 export interface UseAutoSaveOptions {
-  /** localStorage key (default: 'docx-editor-autosave') */
+  /** localStorage key (default: 'docx-editor-autosave'). Init-only, 变化走重建. */
   storageKey?: string;
   /** Auto-save interval in ms (default: 30000) */
   interval?: number;
-  /** Whether auto-save starts enabled (default: true). */
+  /** Whether auto-save starts enabled (default: true). 运行期翻转会启停（React/Vue 均跟随）. */
   enabled?: boolean;
   /** Maximum age of auto-save before it is considered stale. */
   maxAge?: number;
@@ -63,25 +63,21 @@ export interface UseAutoSaveReturn {
   disable: () => void;
 }
 
+/**
+ * Persist the document to localStorage via AutoSaveManager.
+ *
+ * 运行时 options 跟随 MaybeRef 热更新；storageKey 变化重建；enabled 翻转启停.
+ *
+ * @public
+ */
 export function useAutoSave(
   document: MaybeRef<Document | null | undefined>,
-  options: UseAutoSaveOptions = {}
+  options: MaybeRef<UseAutoSaveOptions> = {}
 ): UseAutoSaveReturn {
   const status = ref<AutoSaveStatus>('idle');
   const lastSaveTime = ref<Date | null>(null);
   const hasRecoveryData = ref(false);
   const isEnabled = ref(true);
-  const {
-    storageKey,
-    interval,
-    enabled: initialEnabled = true,
-    maxAge,
-    onSave,
-    onError,
-    onRecoveryAvailable,
-    saveOnChange,
-    debounceDelay,
-  } = options;
 
   if (!isAutoSaveSupported()) {
     return {
@@ -99,16 +95,18 @@ export function useAutoSave(
     };
   }
 
-  const manager = new AutoSaveManager({
-    storageKey,
-    interval,
-    maxAge,
-    saveOnChange,
-    debounceDelay,
-    onSave,
-    onError,
-    onRecoveryAvailable,
+  const managerOptions = unref(options) ?? {};
+  let manager = new AutoSaveManager({
+    storageKey: managerOptions.storageKey,
+    interval: managerOptions.interval,
+    maxAge: managerOptions.maxAge,
+    saveOnChange: managerOptions.saveOnChange,
+    debounceDelay: managerOptions.debounceDelay,
+    onSave: managerOptions.onSave,
+    onError: managerOptions.onError,
+    onRecoveryAvailable: managerOptions.onRecoveryAvailable,
   });
+  const initialEnabled = managerOptions.enabled ?? true;
 
   const sync = () => {
     const snapshot = manager.getSnapshot();
@@ -118,10 +116,65 @@ export function useAutoSave(
     isEnabled.value = snapshot.isEnabled;
   };
 
-  const unsubscribe = manager.subscribe(sync);
+  let unsubscribe = manager.subscribe(sync);
   if (initialEnabled) manager.enable();
   else manager.disable();
   sync();
+
+  // Recreate the manager when storageKey changes (mirrors React useMemo [storageKey]).
+  watch(
+    () => (unref(options) ?? {}).storageKey,
+    (newKey, oldKey) => {
+      if (newKey === oldKey) return;
+      const current = unref(options) ?? {};
+      const currentDoc = unref(document) ?? null;
+      const currentEnabled = current.enabled ?? true;
+      unsubscribe();
+      manager.destroy();
+      manager = new AutoSaveManager({
+        storageKey: current.storageKey,
+        interval: current.interval,
+        maxAge: current.maxAge,
+        saveOnChange: current.saveOnChange,
+        debounceDelay: current.debounceDelay,
+        onSave: current.onSave,
+        onError: current.onError,
+        onRecoveryAvailable: current.onRecoveryAvailable,
+      });
+      unsubscribe = manager.subscribe(sync);
+      if (currentEnabled) manager.enable();
+      else manager.disable();
+      manager.onDocumentChanged(currentDoc);
+      sync();
+    }
+  );
+
+  // Start/stop interval based on enabled prop (mirrors React effect).
+  // No immediate: initialization above already ran once.
+  watch(
+    () => (unref(options) ?? {}).enabled ?? true,
+    (enabled) => {
+      if (enabled) manager.enable();
+      else manager.disable();
+    }
+  );
+
+  // Keep runtime options in sync when the caller passes a reactive object.
+  watch(
+    () => {
+      const o = unref(options) ?? {};
+      return {
+        interval: o.interval,
+        maxAge: o.maxAge,
+        saveOnChange: o.saveOnChange,
+        debounceDelay: o.debounceDelay,
+        onSave: o.onSave,
+        onError: o.onError,
+        onRecoveryAvailable: o.onRecoveryAvailable,
+      };
+    },
+    (o) => manager.updateOptions(o)
+  );
 
   watch(
     () => unref(document),
