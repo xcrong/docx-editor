@@ -17,6 +17,7 @@ export class AutoSaveManager extends Subscribable<AutoSaveSnapshot> {
     onDocumentChanged(document: Document_2 | null): void;
     save(): Promise<boolean>;
     startInterval(): void;
+    updateOptions(options: Omit<AutoSaveManagerOptions, 'storageKey'>): void;
 }
 
 // @public

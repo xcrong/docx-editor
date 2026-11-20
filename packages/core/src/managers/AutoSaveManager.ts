@@ -121,6 +121,42 @@ export class AutoSaveManager extends Subscribable<AutoSaveSnapshot> {
   // PUBLIC API
   // --------------------------------------------------------------------------
 
+  /**
+   * Refresh runtime options (call when adapter props change).
+   * Scalar fields ignore `undefined` (retain current value); callbacks use a
+   * presence check so an explicit `undefined` clears a removed handler.
+   */
+  updateOptions(options: Omit<AutoSaveManagerOptions, 'storageKey'>): void {
+    let intervalChanged = false;
+    if (options.interval !== undefined && options.interval !== this.interval) {
+      this.interval = options.interval;
+      intervalChanged = true;
+    }
+    if (options.maxAge !== undefined) {
+      this.maxAge = options.maxAge;
+    }
+    if (options.saveOnChange !== undefined && options.saveOnChange !== this.saveOnChange) {
+      this.saveOnChange = options.saveOnChange;
+      if (!this.saveOnChange && this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = null;
+      }
+    }
+    if (options.debounceDelay !== undefined) {
+      this.debounceDelay = options.debounceDelay;
+    }
+    // Callbacks use `in` so partial updates keep existing handlers while an
+    // explicit `undefined` still clears a removed callback.
+    if ('onSave' in options) this.onSaveCallback = options.onSave;
+    if ('onError' in options) this.onErrorCallback = options.onError;
+    if ('onRecoveryAvailable' in options) {
+      this.onRecoveryAvailableCallback = options.onRecoveryAvailable;
+    }
+    if (intervalChanged && this.intervalTimer) {
+      this.startInterval();
+    }
+  }
+
   /** Update the current document. Triggers debounced save if enabled. */
   onDocumentChanged(document: Document | null): void {
     this.currentDocument = document;

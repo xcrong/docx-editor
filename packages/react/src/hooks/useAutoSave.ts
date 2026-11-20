@@ -104,9 +104,31 @@ export function useAutoSave(
         onError,
         onRecoveryAvailable,
       }),
-    // Only recreate if storageKey changes — callbacks are captured in the manager
+    // Only recreate if storageKey changes — options below stay live via updateOptions.
     [storageKey]
   );
+
+  // Keep runtime options in sync (callbacks, interval, maxAge, saveOnChange, debounceDelay).
+  useEffect(() => {
+    manager.updateOptions({
+      interval,
+      maxAge,
+      saveOnChange,
+      debounceDelay,
+      onSave,
+      onError,
+      onRecoveryAvailable,
+    });
+  }, [
+    manager,
+    interval,
+    maxAge,
+    saveOnChange,
+    debounceDelay,
+    onSave,
+    onError,
+    onRecoveryAvailable,
+  ]);
 
   // Start/stop interval based on enabled prop
   useEffect(() => {
