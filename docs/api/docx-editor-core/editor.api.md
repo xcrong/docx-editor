@@ -122,7 +122,9 @@ export class DocxEditorEngine {
     }): Promise<ArrayBuffer | null>;
     scheduleLayout(state: EditorState): void;
     syncHfViews(document: Document_2 | null): void;
-    updateBodyViewForDocument(document: Document_2 | null): void;
+    updateBodyViewForDocument(document: Document_2 | null, options?: {
+        force?: boolean;
+    }): void;
 }
 
 // @public

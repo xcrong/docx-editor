@@ -398,11 +398,16 @@ export class DocxEditorEngine {
    * External-document swap path (file load; lifted from React's
    * document-change effect). Skips same-identity updates so internal
    * edits passed back through props never reset IME/selection.
+   *
+   * `parseDocx` never fills `package.properties`, so every parsed file
+   * shares the same metadata identity (`getDocumentId` returns `"--"`).
+   * Explicit loads (`loadDocument`) bypass the guard with `force: true`;
+   * without it the second load is a silent no-op (#138).
    */
-  updateBodyViewForDocument(document: Document | null): void {
+  updateBodyViewForDocument(document: Document | null, options?: { force?: boolean }): void {
     if (!this.bodyView) return;
     const id = getDocumentId(document);
-    if (this.bodyViewInitialized && id === this.bodyDocumentId) return;
+    if (!options?.force && this.bodyViewInitialized && id === this.bodyDocumentId) return;
     this.bodyViewInitialized = true;
     this.bodyDocumentId = id;
     const toProseStart = performance.now();
@@ -415,6 +420,10 @@ export class DocxEditorEngine {
     this.timings.toProseMs = performance.now() - toProseStart;
     this.bodyView.updateState(newState);
     this.host.onBodyState?.(newState, null);
+    // `updateState` alone never schedules a pass (unlike dispatched
+    // transactions), so repaint explicitly — otherwise the swapped body
+    // never reaches the painter.
+    this.scheduleLayout(newState);
   }
 
   /** Tear down the body view (drops any pending coalesced frame too). */
