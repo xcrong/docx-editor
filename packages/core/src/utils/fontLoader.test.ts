@@ -286,3 +286,46 @@ describe('loadFontFromBuffer — family-name escaping', () => {
     expect(css.match(/@font-face/g)).toHaveLength(1);
   });
 });
+
+describe('loadFontFromBuffer — cross-document face dedupe', () => {
+  // Two 12-byte "font files" that differ only in the final byte, plus a fresh
+  // instance with identical content (simulates re-parsing the same document).
+  const makeBuf = (lastByte: number): ArrayBuffer => {
+    const u8 = new Uint8Array(12);
+    for (let i = 0; i < 12; i++) u8[i] = i + 1;
+    u8[11] = lastByte;
+    return u8.buffer as ArrayBuffer;
+  };
+  const bufA = makeBuf(0xaa);
+  const bufB = makeBuf(0xbb);
+  const bufA2 = bufA.slice(0);
+
+  const fontFaceCount = (family: string) =>
+    appendedEls.filter(
+      (el) => el.tagName === 'style' && el.textContent?.includes(`"${family}"`)
+    ).length;
+
+  test('re-registers a same-named face whose bytes differ (second document)', async () => {
+    await loadFontFromBuffer('XDocFam', bufA);
+    expect(fontFaceCount('XDocFam')).toBe(1);
+
+    // A second document embeds a font under the same family name but with
+    // different content: it must be registered fresh, not silently reuse the
+    // first document's binary.
+    await loadFontFromBuffer('XDocFam', bufB);
+    expect(fontFaceCount('XDocFam')).toBe(2);
+  });
+
+  test('does not re-register the identical face (same document re-parse)', async () => {
+    await loadFontFromBuffer('XSameFam', bufA);
+    await loadFontFromBuffer('XSameFam', bufA2);
+    expect(fontFaceCount('XSameFam')).toBe(1);
+  });
+
+  test('registers each weight and the italic face of one family separately', async () => {
+    await loadFontFromBuffer('XWtFam', bufA, { weight: 400 });
+    await loadFontFromBuffer('XWtFam', bufA, { weight: 700 });
+    await loadFontFromBuffer('XWtFam', bufA, { weight: 400, style: 'italic' });
+    expect(fontFaceCount('XWtFam')).toBe(3);
+  });
+});
