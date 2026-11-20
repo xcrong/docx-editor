@@ -296,6 +296,20 @@ export const PasteSpecialDialog: React.FC<PasteSpecialDialogProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onClose]);
 
+  const handlePaste = useCallback(
+    (option: PasteOption) => {
+      if (!clipboardContent) {
+        setError(t('dialogs.pasteSpecial.noContent'));
+        return;
+      }
+
+      const asPlainText = option === 'plainText';
+      onPaste(clipboardContent, asPlainText);
+      onClose();
+    },
+    [clipboardContent, onPaste, onClose]
+  );
+
   // Handle keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
@@ -325,21 +339,7 @@ export const PasteSpecialDialog: React.FC<PasteSpecialDialogProps> = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, selectedIndex, onClose]);
-
-  const handlePaste = useCallback(
-    (option: PasteOption) => {
-      if (!clipboardContent) {
-        setError(t('dialogs.pasteSpecial.noContent'));
-        return;
-      }
-
-      const asPlainText = option === 'plainText';
-      onPaste(clipboardContent, asPlainText);
-      onClose();
-    },
-    [clipboardContent, onPaste, onClose]
-  );
+  }, [isOpen, selectedIndex, handlePaste]);
 
   // Calculate dialog position
   const getDialogStyle = useCallback((): React.CSSProperties => {
