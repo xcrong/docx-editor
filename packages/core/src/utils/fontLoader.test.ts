@@ -286,3 +286,35 @@ describe('loadFontFromBuffer — family-name escaping', () => {
     expect(css.match(/@font-face/g)).toHaveLength(1);
   });
 });
+
+describe('loadFontFromBuffer — cross-document content awareness (#143)', () => {
+  const styleCount = () => appendedEls.filter((el) => el.tagName === 'style').length;
+
+  test('same family/weight/style with different bytes registers a second face', async () => {
+    // Two documents embedding a same-named (subsetted) font with different
+    // glyph coverage: the second load must not hit the first one's cache.
+    const first = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]).buffer as ArrayBuffer;
+    const second = new Uint8Array([7, 6, 5, 4, 3, 2, 1, 0]).buffer as ArrayBuffer;
+
+    expect(await loadFontFromBuffer('EpTestCrossDoc', first)).toBe(true);
+    expect(styleCount()).toBe(1);
+
+    expect(await loadFontFromBuffer('EpTestCrossDoc', second)).toBe(true);
+    const styles = appendedEls.filter((el) => el.tagName === 'style');
+    expect(styles).toHaveLength(2);
+    // Distinct registrations point at distinct font blobs.
+    expect(styles[0].textContent).not.toBe(styles[1].textContent);
+  });
+
+  test('identical bytes do not re-register the same face', async () => {
+    // Same document loaded twice: equal bytes share a cache key, so the face
+    // registers once.
+    const bytes = [10, 20, 30, 40, 50, 60, 70, 80];
+    const first = new Uint8Array(bytes).buffer as ArrayBuffer;
+    const second = new Uint8Array(bytes).buffer as ArrayBuffer;
+
+    expect(await loadFontFromBuffer('EpTestSameDoc', first)).toBe(true);
+    expect(await loadFontFromBuffer('EpTestSameDoc', second)).toBe(true);
+    expect(styleCount()).toBe(1);
+  });
+});
