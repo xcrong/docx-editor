@@ -13,7 +13,11 @@
 
 import { parseRelationships } from '../docx/relsParser';
 import { deobfuscateFont, isValidFontKey } from './fontDeobfuscation';
-import { loadFontFromBuffer } from './fontLoader';
+import {
+  beginDocumentFontGeneration,
+  loadFontFromBuffer,
+  pruneOldDocumentFaces,
+} from './fontLoader';
 import type { FontTable, FontInfo, FontEmbed } from '../types/styles';
 
 /**
@@ -159,9 +163,16 @@ export async function loadEmbeddedFonts(
   rawFonts: ReadonlyMap<string, ArrayBuffer>,
   fontTableRelsXml: string | null | undefined
 ): Promise<Set<string>> {
+  // New document scope first (#144): the prune after the loads below spares
+  // faces touched in this generation, so new faces register before old ones
+  // are removed (no flash) and same-bytes reuse (#143) survives via touch.
+  const generation = beginDocumentFontGeneration();
   const faces = getEmbeddedFontFaces(fontTable, rawFonts, fontTableRelsXml);
   const families = new Set<string>();
-  if (faces.length === 0) return families;
+  if (faces.length === 0) {
+    pruneOldDocumentFaces(generation);
+    return families;
+  }
 
   await Promise.all(
     faces.map(async (face) => {
@@ -183,5 +194,6 @@ export async function loadEmbeddedFonts(
       }
     })
   );
+  pruneOldDocumentFaces(generation);
   return families;
 }

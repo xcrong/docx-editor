@@ -154,6 +154,7 @@ export {
   preloadCommonFonts,
   setGoogleFontsEnabled,
   isGoogleFontsEnabled,
+  resetDocumentFonts,
 } from './utils/fontLoader';
 
 export {

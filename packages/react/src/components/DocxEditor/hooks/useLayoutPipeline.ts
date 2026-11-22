@@ -28,6 +28,7 @@ import {
   type EngineHost,
 } from '@xcrong/docx-editor-core/editor';
 import { findVerticalScrollParentOrRoot } from '@xcrong/docx-editor-core/utils/findVerticalScrollParent';
+import { resetDocumentFonts } from '@xcrong/docx-editor-core/utils';
 import type {
   Document,
   HeaderFooter,
@@ -557,12 +558,13 @@ export function useLayoutPipeline(opts: UseLayoutPipelineOptions): UseLayoutPipe
     if (view && engineRef.current) engineRef.current.scheduleLayout(view.state);
   }, [resolvedKey, hiddenPMRef]);
 
-  // Clean up pending rAF + in-flight loads on unmount
+  // Clean up pending rAF + in-flight loads + injected font faces on unmount
   useEffect(() => {
     const engine = engineRef.current;
     return () => {
       engine?.cancelScheduledLayout();
       engine?.cancelLoads();
+      resetDocumentFonts();
     };
   }, []);
 
