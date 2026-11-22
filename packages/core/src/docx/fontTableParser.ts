@@ -102,7 +102,7 @@ export function parseFontTable(fontTableXml: string | null | undefined): FontTab
     return { fonts: [] };
   }
 
-  const root = parseXmlDocument(fontTableXml);
+  const root = parseXmlDocument(fontTableXml, 'word/fontTable.xml');
   if (!root) {
     console.warn('Failed to parse fontTable.xml');
     return { fonts: [] };

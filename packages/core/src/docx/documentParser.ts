@@ -211,7 +211,7 @@ export function parseDocumentBody(
   }
 
   // Parse XML
-  const doc = parseXml(xml);
+  const doc = parseXml(xml, 'word/document.xml');
   if (!doc) {
     return result;
   }

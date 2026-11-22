@@ -160,7 +160,9 @@ export async function parseDocx(input: DocxInput, options: ParseOptions = {}): P
     // ========================================================================
     onProgress('Parsing relationships...', 10);
     const rels = timeStage('relationships', () =>
-      raw.documentRels ? parseRelationships(raw.documentRels) : new Map()
+      raw.documentRels
+        ? parseRelationships(raw.documentRels, 'word/_rels/document.xml.rels')
+        : new Map()
     );
     onProgress('Parsed relationships', 15);
 
@@ -501,7 +503,7 @@ function parseHeadersAndFooters(
         // Get header-specific relationships (e.g., word/_rels/header1.xml.rels)
         const headerRelsPath = `word/_rels/${filename}.rels`;
         const headerRelsXml = getMapCaseInsensitive(raw.allXml, headerRelsPath);
-        const headerRels = headerRelsXml ? parseRelationships(headerRelsXml) : rels;
+        const headerRels = headerRelsXml ? parseRelationships(headerRelsXml, headerRelsPath) : rels;
 
         const header = parseHeader(
           headerXml,
@@ -510,7 +512,8 @@ function parseHeadersAndFooters(
           theme,
           numbering,
           headerRels,
-          media
+          media,
+          `word/${filename}`
         );
         headers.set(rId, header);
       }
@@ -523,7 +526,7 @@ function parseHeadersAndFooters(
         // Get footer-specific relationships (e.g., word/_rels/footer1.xml.rels)
         const footerRelsPath = `word/_rels/${filename}.rels`;
         const footerRelsXml = getMapCaseInsensitive(raw.allXml, footerRelsPath);
-        const footerRels = footerRelsXml ? parseRelationships(footerRelsXml) : rels;
+        const footerRels = footerRelsXml ? parseRelationships(footerRelsXml, footerRelsPath) : rels;
 
         const footer = parseFooter(
           footerXml,
@@ -532,7 +535,8 @@ function parseHeadersAndFooters(
           theme,
           numbering,
           footerRels,
-          media
+          media,
+          `word/${filename}`
         );
         footers.set(rId, footer);
       }

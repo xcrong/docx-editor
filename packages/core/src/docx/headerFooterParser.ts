@@ -175,7 +175,8 @@ export function parseHeader(
   theme: Theme | null = null,
   numbering: NumberingMap | null = null,
   rels: RelationshipMap | null = null,
-  media: Map<string, MediaFile> | null = null
+  media: Map<string, MediaFile> | null = null,
+  partPath?: string
 ): HeaderFooter {
   const result: HeaderFooter = {
     type: 'header',
@@ -189,7 +190,7 @@ export function parseHeader(
 
   result.verbatimXml = headerXml;
 
-  const doc = parseXml(headerXml);
+  const doc = parseXml(headerXml, partPath ?? 'word/header.xml');
   if (!doc) {
     return result;
   }
@@ -239,7 +240,8 @@ export function parseFooter(
   theme: Theme | null = null,
   numbering: NumberingMap | null = null,
   rels: RelationshipMap | null = null,
-  media: Map<string, MediaFile> | null = null
+  media: Map<string, MediaFile> | null = null,
+  partPath?: string
 ): HeaderFooter {
   const result: HeaderFooter = {
     type: 'footer',
@@ -253,7 +255,7 @@ export function parseFooter(
 
   result.verbatimXml = footerXml;
 
-  const doc = parseXml(footerXml);
+  const doc = parseXml(footerXml, partPath ?? 'word/footer.xml');
   if (!doc) {
     return result;
   }
@@ -297,12 +299,13 @@ export function parseHeaderFooter(
   theme: Theme | null = null,
   numbering: NumberingMap | null = null,
   rels: RelationshipMap | null = null,
-  media: Map<string, MediaFile> | null = null
+  media: Map<string, MediaFile> | null = null,
+  partPath?: string
 ): HeaderFooter {
   if (isHeader) {
-    return parseHeader(xml, hdrFtrType, styles, theme, numbering, rels, media);
+    return parseHeader(xml, hdrFtrType, styles, theme, numbering, rels, media, partPath);
   } else {
-    return parseFooter(xml, hdrFtrType, styles, theme, numbering, rels, media);
+    return parseFooter(xml, hdrFtrType, styles, theme, numbering, rels, media, partPath);
   }
 }
 

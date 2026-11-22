@@ -265,7 +265,7 @@ export function parseTheme(themeXml: string | null): Theme {
   }
 
   try {
-    const doc = parseXmlDocument(themeXml);
+    const doc = parseXmlDocument(themeXml, 'word/theme/theme1.xml');
     if (!doc) {
       return { ...DEFAULT_THEME };
     }

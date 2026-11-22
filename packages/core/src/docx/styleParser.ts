@@ -307,7 +307,7 @@ export function parseStyles(stylesXml: string, theme: Theme | null): StyleMap {
   const styleMap: StyleMap = new Map();
 
   try {
-    const doc = parseXmlDocument(stylesXml);
+    const doc = parseXmlDocument(stylesXml, 'word/styles.xml');
     if (!doc) {
       return styleMap;
     }
@@ -346,7 +346,7 @@ export function parseStyleDefinitions(stylesXml: string, theme: Theme | null): S
   };
 
   try {
-    const doc = parseXmlDocument(stylesXml);
+    const doc = parseXmlDocument(stylesXml, 'word/styles.xml');
     if (!doc) {
       return result;
     }

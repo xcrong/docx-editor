@@ -247,7 +247,7 @@ export function parseFootnotes(
     return createFootnoteMap(byId, footnotes);
   }
 
-  const doc = parseXml(footnotesXml);
+  const doc = parseXml(footnotesXml, 'word/footnotes.xml');
   if (!doc) {
     return createFootnoteMap(byId, footnotes);
   }
@@ -368,7 +368,7 @@ export function parseEndnotes(
     return createEndnoteMap(byId, endnotes);
   }
 
-  const doc = parseXml(endnotesXml);
+  const doc = parseXml(endnotesXml, 'word/endnotes.xml');
   if (!doc) {
     return createEndnoteMap(byId, endnotes);
   }

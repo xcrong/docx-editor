@@ -25,6 +25,19 @@
  */
 
 import JSZip from 'jszip';
+import { assertXmlPartBudget } from './xmlParser';
+
+/**
+ * True for XML parts (`.xml`/`.rels`). These get an independent, tighter cap
+ * (see `MAX_XML_PART_BYTES` in `xmlParser.ts`, issue #145) on top of the
+ * generic zip caps below: a near-150MB `word/document.xml` would otherwise
+ * reach the XML tree builder and OOM before table/SDT caps run. Media/fonts
+ * keep the generous generic caps.
+ */
+function isXmlPart(path: string): boolean {
+  const lower = path.toLowerCase();
+  return lower.endsWith('.xml') || lower.endsWith('.rels');
+}
 
 /**
  * Decompression limits — guard against zip bombs.
@@ -35,6 +48,8 @@ import JSZip from 'jszip';
  * total uncompressed bytes, bailing as soon as a limit is crossed. Limits are
  * generous enough for real documents (large embedded media, long XML) while
  * stopping bombs well before they exhaust memory.
+ * XML parts additionally enforce `assertXmlPartBudget` (tighter, pre-parse);
+ * the two layers coexist without conflict (XML must pass both).
  */
 export const MAX_ENTRIES = 5000;
 export const MAX_ENTRY_UNCOMPRESSED_BYTES = 150 * 1024 * 1024; // 150 MB
@@ -179,19 +194,24 @@ export async function unzipDocx(buffer: ArrayBuffer): Promise<RawDocxContent> {
   // Read an entry as text/binary while enforcing decompression limits. The
   // declared size (when available) lets us reject a bomb before inflating it;
   // the post-inflation accumulation is the fallback when it is not.
+  // XML parts additionally enforce the tighter XML cap pre/post inflate.
   const readEntry = async <T extends 'text' | 'arraybuffer'>(
     path: string,
     file: JSZip.JSZipObject,
     kind: T
   ): Promise<T extends 'text' ? string : ArrayBuffer> => {
     const declared = declaredUncompressedSize(file);
-    if (declared !== undefined) assertDecompressionBudget(path, declared, totalUncompressed);
+    if (declared !== undefined) {
+      assertDecompressionBudget(path, declared, totalUncompressed);
+      if (isXmlPart(path)) assertXmlPartBudget(path, declared);
+    }
 
     const data = kind === 'text' ? await file.async('text') : await file.async('arraybuffer');
     const size = typeof data === 'string' ? data.length : (data as ArrayBuffer).byteLength;
 
     // Re-check against the actual size in case the declared size was absent or lied.
     assertDecompressionBudget(path, size, totalUncompressed);
+    if (isXmlPart(path)) assertXmlPartBudget(path, size);
     totalUncompressed += size;
 
     return data as T extends 'text' ? string : ArrayBuffer;

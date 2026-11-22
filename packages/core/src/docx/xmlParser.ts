@@ -75,24 +75,127 @@ function escapeStrayAmpersands(xml: string): string {
 }
 
 /**
+ * Independent XML-part limits (issue #145) — defense in depth alongside the
+ * generic zip decompression caps in `unzip.ts`.
+ *
+ * The zip caps (150MB/entry, 300MB total) still allow a single ~150MB
+ * `word/document.xml` to reach `xml-js`, which builds a full in-memory tree
+ * and can OOM or block the main thread during expansion. These tighter,
+ * XML-specific budgets reject absurd parts *before* the tree is built
+ * (byte length + tag pre-scan) and right after (exact element/depth walk),
+ * so downstream caps (table/SDT/block) are never the first line of defense.
+ * 20MB comfortably covers real documents (fixtures are KBs; 20MB of XML is
+ * millions of paragraphs) while stopping bombs early.
+ */
+export const MAX_XML_PART_BYTES = 20 * 1024 * 1024; // 20 MB
+export const MAX_XML_ELEMENTS = 500_000;
+export const MAX_XML_DEPTH = 128;
+// Pre-parse tag budget: each element costs 1 (`<a/>`) or 2 (`<a></a>`) `<`.
+export const MAX_XML_TAGS = MAX_XML_ELEMENTS * 2;
+
+/**
+ * Throw if an XML part of `sizeBytes` breaches the independent XML size cap.
+ * Pure (no I/O) so `unzip.ts` can call it both before inflating (declared
+ * size) and after (actual size). Message carries the part path and the limit.
+ */
+export function assertXmlPartBudget(path: string, sizeBytes: number): void {
+  if (sizeBytes > MAX_XML_PART_BYTES) {
+    throw new Error(
+      `DOCX rejected: XML part "${path}" exceeds XML size limit ` +
+        `(${sizeBytes} > ${MAX_XML_PART_BYTES} bytes)`
+    );
+  }
+}
+
+/**
+ * Count `<` bytes without allocating (pre-parse element-budget estimate).
+ * Overcounts by design: comments/PIs/DOCTYPES each contribute a `<` but are
+ * not elements. That errs fail-closed (a comment-heavy file may trip the
+ * pre-scan; a bomb never slips through) — the exact post-parse tree walk
+ * below is the authoritative budget check.
+ */
+function countTagOpens(xml: string): number {
+  let tags = 0;
+  for (let i = 0; i < xml.length; i++) {
+    if (xml.charCodeAt(i) === 60) {
+      tags++;
+      if (tags > MAX_XML_TAGS) return tags;
+    }
+  }
+  return tags;
+}
+
+/**
+ * Throw if a parsed tree breaches the element-count/depth budget.
+ * Iterative (no recursion) so hostile depth can't stack-overflow the walk.
+ */
+function assertXmlTreeBudget(root: XmlElement, label: string): void {
+  let count = 0;
+  const stack: Array<{ el: XmlElement; depth: number }> = [{ el: root, depth: 0 }];
+  while (stack.length > 0) {
+    const { el, depth } = stack.pop() as { el: XmlElement; depth: number };
+    if (depth > MAX_XML_DEPTH) {
+      throw new Error(
+        `XML rejected: "${label}" exceeds XML depth limit ` + `(> ${MAX_XML_DEPTH} levels)`
+      );
+    }
+    const children = el.elements;
+    if (!children) continue;
+    for (let i = children.length - 1; i >= 0; i--) {
+      const child = children[i];
+      if (child.type !== 'element') continue;
+      count++;
+      if (count > MAX_XML_ELEMENTS) {
+        throw new Error(
+          `XML rejected: "${label}" exceeds XML element limit ` + `(> ${MAX_XML_ELEMENTS} elements)`
+        );
+      }
+      stack.push({ el: child, depth: depth + 1 });
+    }
+  }
+}
+
+/**
  * Parse XML string into element tree
  *
  * @param xml - XML string to parse
+ * @param partPath - Origin part path (e.g. `word/document.xml`), used only
+ * for limit-error messages. Optional for backward compatibility.
  * @returns Parsed element tree
  */
-export function parseXml(xml: string): XmlElement {
+export function parseXml(xml: string, partPath?: string): XmlElement {
+  const label = partPath ?? 'XML part';
+  // Size cap before tree expansion (see MAX_XML_PART_BYTES).
+  if (xml.length > MAX_XML_PART_BYTES) {
+    throw new Error(
+      `XML rejected: "${label}" exceeds XML size limit ` +
+        `(${xml.length} > ${MAX_XML_PART_BYTES} bytes)`
+    );
+  }
+  // Tag pre-scan before tree expansion: cheap O(n) `<` count, no allocation.
+  const tags = countTagOpens(xml);
+  if (tags > MAX_XML_TAGS) {
+    throw new Error(
+      `XML rejected: "${label}" exceeds XML element limit ` + `(> ${MAX_XML_ELEMENTS} elements)`
+    );
+  }
   // XXE / billion-laughs guard: OOXML never legitimately contains ENTITY
   // declarations. xml-js already ignores doctypes, but reject explicitly.
   // Note: parseXmlDocument catches this per-part (warn + null) so a malicious
   // part is dropped gracefully; callers must handle a null document part
   // (e.g. missing document.xml surfaces as an explicit error downstream).
+  // ENTITY first so the classic `<!DOCTYPE [<!ENTITY ...>]>` payload keeps
+  // its established /ENTITY/ message; bare DOCTYPE is rejected next.
   if (/<!ENTITY/i.test(xml)) {
-    throw new Error('XML rejected: ENTITY declarations are not allowed');
+    throw new Error(`XML rejected: ENTITY declarations are not allowed ("${label}")`);
+  }
+  if (/<!DOCTYPE/i.test(xml)) {
+    throw new Error(`XML rejected: DOCTYPE declarations are not allowed ("${label}")`);
   }
   const sanitized = escapeStrayAmpersands(xml);
 
   try {
-    return xml2js(sanitized, {
+    const parsed = xml2js(sanitized, {
       compact: false,
       ignoreComment: true,
       ignoreInstruction: true,
@@ -108,6 +211,9 @@ export function parseXml(xml: string): XmlElement {
       attributesKey: 'attributes',
       textKey: 'text',
     }) as XmlElement;
+    // Exact element/depth budget after expansion, before downstream parsers.
+    assertXmlTreeBudget(parsed, label);
+    return parsed;
   } catch (error) {
     if (!(error instanceof Error)) throw error;
 
@@ -137,9 +243,9 @@ export function elementToXml(element: XmlElement): string {
 /**
  * Parse XML string to a more convenient format
  */
-export function parseXmlDocument(xml: string): XmlElement | null {
+export function parseXmlDocument(xml: string, partPath?: string): XmlElement | null {
   try {
-    const parsed = parseXml(xml);
+    const parsed = parseXml(xml, partPath);
 
     // The root is typically the declaration + elements array
     if (parsed.elements && parsed.elements.length > 0) {

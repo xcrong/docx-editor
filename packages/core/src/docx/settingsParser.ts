@@ -50,7 +50,7 @@ export const DEFAULT_TAB_STOP_TWIPS = 720;
 const MAX_TAB_STOP_TWIPS = 31680;
 
 export function parseSettings(xml: string | null): DocumentSettings {
-  const root = xml ? parseXmlDocument(xml) : null;
+  const root = xml ? parseXmlDocument(xml, 'word/settings.xml') : null;
   const el = root ? findChild(root, 'w', 'defaultTabStop') : null;
   const raw = el ? parseInt(getAttribute(el, 'w', 'val') ?? '', 10) : NaN;
   const valid = Number.isFinite(raw) && raw > 0 && raw <= MAX_TAB_STOP_TWIPS;
