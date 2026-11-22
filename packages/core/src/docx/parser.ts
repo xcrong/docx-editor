@@ -413,7 +413,7 @@ function buildMediaMap(raw: RawDocxContent, _rels: RelationshipMap): Map<string,
     // display URL. Original bytes stay on `data` so round-trip is unaffected.
     const raster = isMetafileMimeType(mimeType) ? extractMetafileRaster(data) : null;
     const dataUrl = mediaToDataUrl(
-      raster ? (raster.bytes.buffer as ArrayBuffer) : data,
+      raster ? raster.bytes : data,
       raster ? raster.mimeType : mimeType
     );
 

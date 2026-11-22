@@ -36,7 +36,7 @@ describe('extractMetafileRaster', () => {
     const tail = raster!.bytes.slice(-8);
     expect(String.fromCharCode(tail[0], tail[1], tail[2], tail[3])).toBe('IEND');
     // Slice owns its buffer (not a view into the parent EMF), so the data URL
-    // built from `bytes.buffer` encodes only the PNG.
+    // built from the `bytes` view encodes only the PNG.
     expect(raster!.bytes.buffer.byteLength).toBe(raster!.bytes.byteLength);
   });
 

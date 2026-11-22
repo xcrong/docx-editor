@@ -376,20 +376,47 @@ export function getMediaMimeType(path: string): string {
 }
 
 /**
+ * Encode binary data as base64 without per-byte string concatenation.
+ *
+ * The naive `binary += String.fromCharCode(byte)` loop builds O(n²)
+ * intermediate strings; a 10MB image stalls parsing. Chunked
+ * `String.fromCharCode.apply` keeps one small call frame per 32K slice
+ * (larger slices risk stack overflow) and joins once before `btoa`.
+ * Node/Bun take the `Buffer` fast path when available.
+ *
+ * @param data - Binary data
+ * @returns Base64 string (no data-URL prefix)
+ */
+export function arrayBufferToBase64(data: ArrayBuffer | Uint8Array): string {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+  const g = globalThis as unknown as {
+    Buffer?: { from(input: Uint8Array | ArrayBuffer): { toString(encoding: string): string } };
+  };
+  if (typeof g.Buffer?.from === 'function') {
+    try {
+      return g.Buffer.from(bytes).toString('base64');
+    } catch {
+      // Fall through to the chunked btoa path below.
+    }
+  }
+  const CHUNK = 0x8000;
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    const chunk = bytes.subarray(i, Math.min(i + CHUNK, bytes.length));
+    parts.push(String.fromCharCode.apply(null, chunk as unknown as number[]));
+  }
+  return btoa(parts.join(''));
+}
+
+/**
  * Convert media file to data URL
  *
  * @param data - Binary data
  * @param mimeType - MIME type
  * @returns Data URL string
  */
-export function mediaToDataUrl(data: ArrayBuffer, mimeType: string): string {
-  const bytes = new Uint8Array(data);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  const base64 = btoa(binary);
-  return `data:${mimeType};base64,${base64}`;
+export function mediaToDataUrl(data: ArrayBuffer | Uint8Array, mimeType: string): string {
+  return `data:${mimeType};base64,${arrayBufferToBase64(data)}`;
 }
 
 /**
