@@ -57,7 +57,7 @@ function parseCommentsExtensible(
 ): Map<string, string> {
   const dateUtcByParaId = new Map<string, string>();
 
-  const root = parseXml(xml);
+  const root = parseXml(xml, 'word/commentsExtensible.xml');
   if (!root) return dateUtcByParaId;
 
   // Find the root element (may be w16cex:commentsExtensible or similar)
@@ -107,7 +107,7 @@ export function parseCommentsIds(xml: string | null | undefined): Map<string, st
   const durableIdToParaId = new Map<string, string>();
   if (!xml) return durableIdToParaId;
 
-  const root = parseXml(xml);
+  const root = parseXml(xml, 'word/commentsIds.xml');
   if (!root) return durableIdToParaId;
 
   const container = findChild(root, 'w16cid', 'commentsIds') ?? root;
@@ -137,7 +137,7 @@ function parseCommentsExtended(xml: string): {
   const parentByParaId = new Map<string, string>();
   const doneByParaId = new Map<string, boolean>();
 
-  const root = parseXml(xml);
+  const root = parseXml(xml, 'word/commentsExtended.xml');
   if (!root) return { parentByParaId, doneByParaId };
 
   const container = findChild(root, 'w15', 'commentsEx') ?? root;
@@ -185,7 +185,7 @@ export function parseComments(
 ): Comment[] {
   if (!commentsXml) return [];
 
-  const root = parseXml(commentsXml);
+  const root = parseXml(commentsXml, 'word/comments.xml');
   if (!root) return [];
 
   // Build UTC date lookup from commentsExtensible.xml (if available).

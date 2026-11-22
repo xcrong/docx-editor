@@ -64,7 +64,7 @@ export function parseNumbering(numberingXml: string | null): NumberingMap {
     return createNumberingMap(definitions);
   }
 
-  const root = parseXmlDocument(numberingXml);
+  const root = parseXmlDocument(numberingXml, 'word/numbering.xml');
   if (!root) {
     return createNumberingMap(definitions);
   }

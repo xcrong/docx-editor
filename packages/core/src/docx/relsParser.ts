@@ -66,14 +66,14 @@ export const RELATIONSHIP_TYPES = {
  * @param relsXml - XML content of a .rels file
  * @returns Map of relationship ID to Relationship object
  */
-export function parseRelationships(relsXml: string): RelationshipMap {
+export function parseRelationships(relsXml: string, partPath?: string): RelationshipMap {
   const map: RelationshipMap = new Map();
 
   if (!relsXml || relsXml.trim().length === 0) {
     return map;
   }
 
-  const root = parseXmlDocument(relsXml);
+  const root = parseXmlDocument(relsXml, partPath);
   if (!root) {
     console.warn('Failed to parse relationships XML');
     return map;
@@ -314,7 +314,7 @@ export function resolveRelativePath(basePath: string, target: string): string {
  * @returns RelationshipMap
  */
 export function parseDocumentRelationships(relsXml: string): RelationshipMap {
-  return parseRelationships(relsXml);
+  return parseRelationships(relsXml, 'word/_rels/document.xml.rels');
 }
 
 /**
@@ -326,7 +326,7 @@ export function parseDocumentRelationships(relsXml: string): RelationshipMap {
  * @returns RelationshipMap
  */
 export function parsePackageRelationships(relsXml: string): RelationshipMap {
-  return parseRelationships(relsXml);
+  return parseRelationships(relsXml, '_rels/.rels');
 }
 
 /**

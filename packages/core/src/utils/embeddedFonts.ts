@@ -135,7 +135,7 @@ export function getEmbeddedFontFaces(
   if (!fontTable || fontTable.fonts.length === 0) return [];
   if (!fontTableRelsXml || rawFonts.size === 0) return [];
 
-  const rels = parseRelationships(fontTableRelsXml);
+  const rels = parseRelationships(fontTableRelsXml, 'word/_rels/fontTable.xml.rels');
   const relTargets = new Map<string, string>();
   for (const [id, rel] of rels) relTargets.set(id, rel.target);
 
