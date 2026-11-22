@@ -12,6 +12,7 @@ import type {
   JsonSchema,
 } from '../core-plugins/types';
 import { parseDocx } from '../docx/parser';
+import { arrayBufferToBase64 } from '../docx/unzip';
 import { repackDocx, createDocx } from '../docx/rezip';
 import { executeCommand } from '../agent/executor';
 
@@ -176,13 +177,8 @@ Returns the document as a base64 string that can be saved to a file.`,
         buffer = await createDocx(loaded.document);
       }
 
-      // Encode to base64
-      const bytes = new Uint8Array(buffer);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64 = btoa(binary);
+      // Encode to base64 (chunked helper avoids per-byte += stalls on large docs)
+      const base64 = arrayBufferToBase64(buffer);
 
       return {
         content: [
