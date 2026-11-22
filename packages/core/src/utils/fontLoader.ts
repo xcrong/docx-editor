@@ -9,6 +9,22 @@
  */
 
 import { resolveFontFamily } from './fontResolver';
+import {
+  beginDocumentFontGeneration as beginRegistryGeneration,
+  canRenderFont,
+  cssStringEscape,
+  currentFontGeneration,
+  guessFontFormat,
+  hashFontBuffer,
+  pruneOldDocumentFaces as pruneRegistryFaces,
+  resetAllInjectedFaces,
+  touchInjectedFace,
+  trackInjectedFace,
+  untrackInjectedFace,
+  __resetFontFaceRegistryForTests,
+} from './fontFaceRegistry';
+
+export { canRenderFont } from './fontFaceRegistry';
 
 // Track loaded fonts to avoid duplicate requests
 const loadedFonts = new Set<string>();
@@ -92,15 +108,6 @@ function faceKey(
   style: 'normal' | 'italic' = 'normal'
 ): string {
   return `${family.trim()}|${weight}|${style}`;
-}
-
-// Buffer faces hash bytes into the key (#143): same-named subsetted fonts
-// from different documents register separately; identical bytes share a key.
-function hashFontBuffer(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < bytes.length; i++) hash = Math.imul(hash ^ bytes[i], 0x01000193);
-  return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
 // "A genuine system font satisfies this family" — the decision behind every
@@ -488,83 +495,6 @@ async function waitForFontAvailable(fontFamily: string, timeout: number): Promis
   return true;
 }
 
-// Probe scratchpad. The probe runs once per family per document load, so a
-// fresh canvas per call is pure waste — one shared context suffices, and the
-// fallback-font widths ('72px sans-serif' over a fixed string) are session
-// constants worth memoizing. Reset by __resetFontLoaderState (tests swap the
-// global document, which would otherwise leave a stale context behind).
-let probeContext: CanvasRenderingContext2D | null | undefined;
-const fallbackWidthCache = new Map<string, number>();
-const PROBE_TEXT = 'abcdefghijklmnopqrstuvwxyz0123456789';
-
-function getProbeContext(): CanvasRenderingContext2D | null {
-  if (probeContext === undefined) {
-    probeContext = document.createElement('canvas').getContext('2d');
-    if (probeContext) {
-      probeContext.textBaseline = 'top';
-    }
-  }
-  return probeContext;
-}
-
-/**
- * Check if a font is available on the system using canvas measurement
- *
- * Compares text width with the target font vs a known fallback font (and the
- * opposite fallback, for names that collide with the browser defaults). If
- * the widths differ, the font is available. Reuses one shared canvas; the
- * fallback widths are session constants and memoized.
- *
- * @param fontFamily - The font family name to check
- * @param fallbackFont - Fallback font to compare against
- * @returns true if font is available, false otherwise
- */
-export function canRenderFont(fontFamily: string, fallbackFont: string = 'sans-serif'): boolean {
-  // Skip if we're not in a browser
-  if (typeof document === 'undefined') {
-    return false;
-  }
-
-  const ctx = getProbeContext();
-  if (!ctx) {
-    return false;
-  }
-
-  const measure = (font: string): number => {
-    ctx.font = font;
-    return ctx.measureText(PROBE_TEXT).width;
-  };
-
-  // If widths differ, the custom font (not the fallback) was used.
-  const differsFrom = (fallback: string): boolean => {
-    let fallbackWidth = fallbackWidthCache.get(fallback);
-    if (fallbackWidth === undefined) {
-      fallbackWidth = measure(`72px ${fallback}`);
-      fallbackWidthCache.set(fallback, fallbackWidth);
-    }
-    return measure(`72px "${fontFamily}", ${fallback}`) !== fallbackWidth;
-  };
-
-  // Check with the primary fallback, then the opposite one (handles the edge
-  // case where the font name matches the browser's default sans-serif/serif).
-  return (
-    differsFrom(fallbackFont) || differsFrom(fallbackFont === 'sans-serif' ? 'serif' : 'sans-serif')
-  );
-}
-
-// CSS hex escapes (with the mandatory trailing space) for characters that
-// either terminate a CSS string token (LF/CR/FF — bad-string-token per
-// css-syntax-3) or could close a serialized <style> block (< >).
-const CSS_HEX_ESCAPES: Record<string, string> = {
-  '<': '\\3c ',
-  '>': '\\3e ',
-  '\n': '\\a ',
-  '\r': '\\d ',
-  '\f': '\\c ',
-};
-const cssStringEscape = (s: string) =>
-  s.replace(/["\\]/g, '\\$&').replace(/[<>\n\r\f]/g, (c) => CSS_HEX_ESCAPES[c]);
-
 /**
  * Load a font from a raw buffer (e.g., embedded in DOCX)
  *
@@ -594,6 +524,9 @@ export async function loadFontFromBuffer(
   const style = options?.style ?? 'normal';
   // Content-aware key (#143): keeps the `family|` prefix for in-flight matching.
   const key = `${faceKey(normalizedFamily, options?.weight, style)}|buf:${hashFontBuffer(buffer)}`;
+  // Capture synchronously: a document switch bumping the generation
+  // mid-load must not retag this face as the new document's (#144).
+  const generation = currentFontGeneration();
 
   // Provenance: mark before the async work so an in-flight registration
   // already counts as registered (see loadFontWithMapping). Marking a family
@@ -602,17 +535,24 @@ export async function loadFontFromBuffer(
   registeredFamilies.add(normalizedFamily);
 
   // Face-keyed dedupe; the content hash scopes entries per bytes (#143).
-  if (loadedFaces.has(key)) return true;
+  // A same-bytes hit refreshes the generation (#144) so a document prune
+  // after this load spares the shared face instead of revoking it.
+  if (loadedFaces.has(key)) {
+    touchInjectedFace(key, generation);
+    return true;
+  }
   const existing = loadingFaces.get(key);
   if (existing) return existing;
 
   const loadPromise = (async (): Promise<boolean> => {
     isLoadingAny = true;
+    let styleEl: HTMLStyleElement | null = null;
+    let url: string | null = null;
     try {
       const blob = new Blob([buffer], { type: 'font/ttf' });
-      const url = URL.createObjectURL(blob);
+      url = URL.createObjectURL(blob);
 
-      const styleEl = document.createElement('style');
+      styleEl = document.createElement('style');
       styleEl.textContent = `
       @font-face {
         font-family: "${cssStringEscape(normalizedFamily)}";
@@ -623,6 +563,7 @@ export async function loadFontFromBuffer(
       }
     `;
       document.head.appendChild(styleEl);
+      trackInjectedFace(key, styleEl, url, 'document', generation);
 
       await waitForFontAvailable(normalizedFamily, 3000);
 
@@ -630,6 +571,21 @@ export async function loadFontFromBuffer(
 
       return true;
     } catch (error) {
+      if (styleEl) {
+        try {
+          styleEl.remove();
+        } catch {
+          // Ignore stub-DOM removals; registry cleanup below still bounds.
+        }
+      }
+      if (url) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          // Headless; key cleanup below still prevents reuse.
+        }
+      }
+      untrackInjectedFace(key);
       reportFontError(error, `failed to load "${normalizedFamily}" from buffer`);
       return false;
     } finally {
@@ -642,14 +598,6 @@ export async function loadFontFromBuffer(
 
   loadingFaces.set(key, loadPromise);
   return loadPromise;
-}
-
-function guessFontFormat(src: string): string {
-  const url = src.split('?')[0].split('#')[0].toLowerCase();
-  if (url.endsWith('.woff2')) return 'woff2';
-  if (url.endsWith('.woff')) return 'woff';
-  if (url.endsWith('.otf')) return 'opentype';
-  return 'truetype';
 }
 
 /**
@@ -695,15 +643,20 @@ export async function loadFontFromUrl(
   // Provenance: subsetted-face safety net — see registeredFamilies.
   registeredFamilies.add(normalizedFamily);
 
-  if (loadedFaces.has(key)) return true;
+  // Editor-scoped (`fonts` prop): document prunes spare it; teardown clears.
+  if (loadedFaces.has(key)) {
+    touchInjectedFace(key);
+    return true;
+  }
   const existing = loadingFaces.get(key);
   if (existing) return existing;
 
   const loadPromise = (async (): Promise<boolean> => {
     isLoadingAny = true;
+    let styleEl: HTMLStyleElement | null = null;
     try {
-      const style = document.createElement('style');
-      style.textContent = `
+      styleEl = document.createElement('style');
+      styleEl.textContent = `
       @font-face {
         font-family: "${cssStringEscape(normalizedFamily)}";
         src: url(${JSON.stringify(src)}) format('${guessFontFormat(src)}');
@@ -711,7 +664,8 @@ export async function loadFontFromUrl(
         font-display: swap;
       }
     `;
-      document.head.appendChild(style);
+      document.head.appendChild(styleEl);
+      trackInjectedFace(key, styleEl, null, 'editor');
 
       await waitForFontAvailable(normalizedFamily, 3000);
 
@@ -719,6 +673,14 @@ export async function loadFontFromUrl(
 
       return true;
     } catch (error) {
+      if (styleEl) {
+        try {
+          styleEl.remove();
+        } catch {
+          // Ignore stub-DOM removals; registry cleanup below still bounds.
+        }
+      }
+      untrackInjectedFace(key);
       reportFontError(error, `failed to load "${normalizedFamily}" from ${src}`);
       return false;
     } finally {
@@ -870,6 +832,41 @@ export async function loadFontWithMapping(fontFamily: string): Promise<boolean> 
 }
 
 /**
+ * Start a new document's font generation (#144). Embedded loading bumps it
+ * before registering the new document's faces; the post-load prune then
+ * removes only older document-scoped faces, so the new faces register first
+ * (no flash) and same-bytes reuse (#143) survives via touch.
+ *
+ * @internal
+ */
+export function beginDocumentFontGeneration(): number {
+  return beginRegistryGeneration();
+}
+
+/**
+ * Remove document-scoped faces older than `activeGeneration` (#144).
+ * Editor-scoped URL faces (`fonts` prop) are spared; teardown uses
+ * {@link resetDocumentFonts}. Returns after revoking blob URLs.
+ *
+ * @internal
+ */
+export function pruneOldDocumentFaces(activeGeneration: number = currentFontGeneration()): void {
+  for (const key of pruneRegistryFaces(activeGeneration)) loadedFaces.delete(key);
+}
+
+/**
+ * Remove every tracked `@font-face` style + revoke every blob URL (#144).
+ * Call on editor teardown; document switches prefer the generation prune
+ * above so the current document's faces survive. Clears the face cache so
+ * a later load re-registers instead of reusing a removed style.
+ *
+ * @public
+ */
+export function resetDocumentFonts(): void {
+  for (const key of resetAllInjectedFaces()) loadedFaces.delete(key);
+}
+
+/**
  * Test-only: reset every piece of module-level loader state. fontLoader is a
  * module singleton, and `bun test` runs all files in one process — without a
  * reset, family names cached by one test file leak into every later one.
@@ -879,6 +876,8 @@ export async function loadFontWithMapping(fontFamily: string): Promise<boolean> 
  * @internal
  */
 export function __resetFontLoaderState(): void {
+  for (const key of resetAllInjectedFaces()) loadedFaces.delete(key);
+  __resetFontFaceRegistryForTests();
   loadedFonts.clear();
   loadingFonts.clear();
   loadedFaces.clear();
@@ -887,8 +886,6 @@ export function __resetFontLoaderState(): void {
   errorCallbacks.clear();
   registeredFamilies.clear();
   probeSatisfied.clear();
-  fallbackWidthCache.clear();
-  probeContext = undefined;
   googleFontsEnabled = true;
   isLoadingAny = false;
 }

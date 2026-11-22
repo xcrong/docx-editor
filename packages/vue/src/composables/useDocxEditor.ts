@@ -22,6 +22,7 @@ import { EditorView } from 'prosemirror-view';
 import {
   getRenderableDocumentFonts,
   getEmbeddedFontFamilies,
+  resetDocumentFonts,
 } from '@xcrong/docx-editor-core/utils';
 import type { FontOption } from '@xcrong/docx-editor-core/utils/fontOptions';
 import { proseDocToBlocks } from '@xcrong/docx-editor-core/prosemirror/conversion';
@@ -780,6 +781,7 @@ export function useDocxEditor(options: UseDocxEditorOptions): UseDocxEditorRetur
     destroyEditorView(); // cancels the layout scheduler
     destroyHfPMs();
     engine.cancelLoads();
+    resetDocumentFonts();
     agentRef.current = null;
     document.value = null;
   }

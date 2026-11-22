@@ -102,6 +102,7 @@ export {
   FONT_MAPPING,
   getGoogleFontEquivalent,
   extractFontsFromDocument,
+  resetDocumentFonts,
 } from './fontLoader';
 export type { FontDefinition } from './fontLoader';
 

@@ -735,6 +735,9 @@ export interface RenderableFontOptions {
 }
 
 // @public
+export function resetDocumentFonts(): void;
+
+// @public
 export function resolveColor(color: ColorValue | undefined | null, theme: Theme | null | undefined, defaultColor?: string): string;
 
 // @public

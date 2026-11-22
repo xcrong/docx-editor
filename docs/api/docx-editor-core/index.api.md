@@ -1472,6 +1472,9 @@ export interface ReplaceTextCommand extends BaseCommand {
 export function replaceVariables(text: string, values: Record<string, string>): string;
 
 // @public
+export function resetDocumentFonts(): void;
+
+// @public
 export function resolveColor(color: ColorValue | undefined | null, theme: Theme | null | undefined, defaultColor?: string): string;
 
 // @public
