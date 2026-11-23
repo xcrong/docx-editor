@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EditorView } from 'prosemirror-view';
+import { useTranslation } from '../../i18n';
 import {
   findContentControlsInPM,
   setContentControlValueTr,
@@ -81,6 +82,7 @@ export function ContentControlWidgets({
   containerRef,
   getView,
 }: ContentControlWidgetsProps): React.ReactElement | null {
+  const { t } = useTranslation();
   const [popup, setPopup] = useState<Popup | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
 
@@ -254,7 +256,7 @@ export function ContentControlWidgets({
     >
       {popup.kind === 'dropdown' ? (
         popup.items.length === 0 ? (
-          <div className="layout-sdt-widget-empty">No options</div>
+          <div className="layout-sdt-widget-empty">{t('contentControls.noOptions')}</div>
         ) : (
           popup.items.map((it) => {
             const selected = it.displayText === popup.current;

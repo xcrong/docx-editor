@@ -175,9 +175,9 @@ export const DocumentOutline = React.memo(function DocumentOutline({
                   borderRadius: 0,
                   letterSpacing: '0.01em',
                 }}
-                title={heading.text}
+                title={heading.text || t('documentOutline.untitled')}
               >
-                {heading.text}
+                {heading.text || t('documentOutline.untitled')}
               </button>
             </div>
           ))

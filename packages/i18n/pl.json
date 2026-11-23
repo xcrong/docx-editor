@@ -632,7 +632,8 @@
     "closeAriaLabel": "Zamknij konspekt",
     "closeTitle": "Zamknij konspekt",
     "title": "Konspekt",
-    "noHeadings": "Nie znaleziono nagłówków. Dodaj nagłówki do dokumentu, aby wyświetlić je tutaj."
+    "noHeadings": "Nie znaleziono nagłówków. Dodaj nagłówki do dokumentu, aby wyświetlić je tutaj.",
+    "untitled": null
   },
   "sidebar": {
     "ariaLabel": "Panel adnotacji"
@@ -903,5 +904,8 @@
     "runSuperscriptApplied": null,
     "runUnderlineAdded": null,
     "runUnderlineRemoved": null
+  },
+  "contentControls": {
+    "noOptions": null
   }
 }

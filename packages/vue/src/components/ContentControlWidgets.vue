@@ -17,6 +17,7 @@ import {
   removeRepeatingSectionItemTr,
 } from '@xcrong/docx-editor-core/prosemirror';
 import type { ContentControlValue } from '@xcrong/docx-editor-core/agent';
+import { useTranslation } from '../i18n';
 
 const WIDGET_SELECTOR = '.layout-sdt-widget, .layout-inline-sdt-widget';
 
@@ -62,6 +63,7 @@ type Popup =
 
 const popup = ref<Popup | null>(null);
 const popupEl = ref<HTMLElement | null>(null);
+const { t } = useTranslation();
 
 function apply(target: ControlTarget, value: ContentControlValue): void {
   const view = props.view;
@@ -246,7 +248,7 @@ function onDateInput(e: Event): void {
     @mousedown.prevent
   >
     <template v-if="popup.kind === 'dropdown'">
-      <div v-if="popup.items.length === 0" class="layout-sdt-widget-empty">No options</div>
+      <div v-if="popup.items.length === 0" class="layout-sdt-widget-empty">{{ t('contentControls.noOptions') }}</div>
       <button
         v-for="it in popup.items"
         :key="it.value"

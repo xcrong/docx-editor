@@ -668,7 +668,8 @@
     "closeAriaLabel": "Tutup struktur dokumen",
     "closeTitle": "Tutup struktur dokumen",
     "title": "Struktur Dokumen",
-    "noHeadings": "Tidak ditemukan judul. Tambahkan judul ke dokumen Anda untuk melihatnya di sini."
+    "noHeadings": "Tidak ditemukan judul. Tambahkan judul ke dokumen Anda untuk melihatnya di sini.",
+    "untitled": null
   },
   "sidebar": {
     "ariaLabel": "Panel anotasi"
@@ -903,5 +904,8 @@
       "summary": "{count, plural, one {# langkah} other {# langkah}}",
       "earlier": "+ {count, plural, one {# langkah sebelumnya} other {# langkah sebelumnya}}"
     }
+  },
+  "contentControls": {
+    "noOptions": null
   }
 }

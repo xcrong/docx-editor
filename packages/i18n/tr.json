@@ -632,7 +632,8 @@
     "closeAriaLabel": "Ana hattı kapat",
     "closeTitle": "Ana hattı kapat",
     "title": "Ana hat",
-    "noHeadings": "Başlık bulunamadı. Burada görünmeleri için belgeye başlık ekle."
+    "noHeadings": "Başlık bulunamadı. Burada görünmeleri için belgeye başlık ekle.",
+    "untitled": null
   },
   "sidebar": {
     "ariaLabel": "Açıklama kenar çubuğu"
@@ -903,5 +904,8 @@
     "runSuperscriptApplied": null,
     "runUnderlineAdded": null,
     "runUnderlineRemoved": null
+  },
+  "contentControls": {
+    "noOptions": null
   }
 }
