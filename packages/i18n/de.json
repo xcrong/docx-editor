@@ -632,7 +632,8 @@
     "closeAriaLabel": "Gliederung schließen",
     "closeTitle": "Gliederung schließen",
     "title": "Gliederung",
-    "noHeadings": "Keine Überschriften gefunden. Fügen Sie Ihrem Dokument Überschriften hinzu, um sie hier anzuzeigen."
+    "noHeadings": "Keine Überschriften gefunden. Fügen Sie Ihrem Dokument Überschriften hinzu, um sie hier anzuzeigen.",
+    "untitled": null
   },
   "sidebar": {
     "ariaLabel": "Anmerkungsleiste"
@@ -903,5 +904,8 @@
     "runSuperscriptApplied": null,
     "runUnderlineAdded": null,
     "runUnderlineRemoved": null
+  },
+  "contentControls": {
+    "noOptions": null
   }
 }

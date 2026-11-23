@@ -11,22 +11,22 @@
     class="doc-outline"
     :style="{ left: leftOffset + 'px', top: topPx + 'px' }"
     role="navigation"
-    aria-label="Document outline"
+    :aria-label="t('documentOutline.ariaLabel')"
     @mousedown.stop
   >
     <div class="doc-outline__header">
       <button
         class="doc-outline__back"
-        :title="'Close outline'"
-        :aria-label="'Close outline'"
+        :title="t('documentOutline.closeTitle')"
+        :aria-label="t('documentOutline.closeAriaLabel')"
         @click="$emit('close')"
       >
         <MaterialSymbol name="arrow_back" :size="20" />
       </button>
-      <span class="doc-outline__title">Document Outline</span>
+      <span class="doc-outline__title">{{ t('documentOutline.title') }}</span>
     </div>
     <div class="doc-outline__body">
-      <div v-if="headings.length === 0" class="doc-outline__empty">No headings found</div>
+      <div v-if="headings.length === 0" class="doc-outline__empty">{{ t('documentOutline.noHeadings') }}</div>
       <button
         v-for="(h, i) in headings"
         :key="i"
@@ -34,7 +34,7 @@
         :style="{ paddingLeft: 8 + (h.level - minLevel) * 16 + 'px' }"
         @mousedown.prevent="$emit('navigate', h.pmPos)"
       >
-        {{ h.text || '(untitled)' }}
+        {{ h.text || t('documentOutline.untitled') }}
       </button>
     </div>
   </nav>
@@ -44,6 +44,9 @@
 import { computed } from 'vue';
 import type { HeadingInfo } from '@xcrong/docx-editor-core/utils/headingCollector';
 import MaterialSymbol from './ui/MaterialSymbol.vue';
+import { useTranslation } from '../i18n';
+
+const { t } = useTranslation();
 
 const props = withDefaults(
   defineProps<{

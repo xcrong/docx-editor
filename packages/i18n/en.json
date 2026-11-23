@@ -668,7 +668,11 @@
     "closeAriaLabel": "Close outline",
     "closeTitle": "Close outline",
     "title": "Outline",
-    "noHeadings": "No headings found. Add headings to your document to see them here."
+    "noHeadings": "No headings found. Add headings to your document to see them here.",
+    "untitled": "(untitled)"
+  },
+  "contentControls": {
+    "noOptions": "No options"
   },
   "sidebar": {
     "ariaLabel": "Annotations sidebar"

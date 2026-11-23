@@ -632,7 +632,8 @@
     "closeAriaLabel": "Fermer le plan",
     "closeTitle": "Fermer le plan",
     "title": "Plan",
-    "noHeadings": "Aucun titre trouvé. Ajoutez des titres à votre document pour les voir apparaître ici."
+    "noHeadings": "Aucun titre trouvé. Ajoutez des titres à votre document pour les voir apparaître ici.",
+    "untitled": null
   },
   "sidebar": {
     "ariaLabel": "Barre latérale des annotations"
@@ -903,5 +904,8 @@
     "runSuperscriptApplied": null,
     "runUnderlineAdded": null,
     "runUnderlineRemoved": null
+  },
+  "contentControls": {
+    "noOptions": null
   }
 }

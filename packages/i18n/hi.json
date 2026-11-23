@@ -632,7 +632,8 @@
     "closeAriaLabel": "रूपरेखा बंद करें",
     "closeTitle": "रूपरेखा बंद करें",
     "title": "रूपरेखा",
-    "noHeadings": "कोई शीर्षक नहीं मिला। उन्हें यहाँ देखने के लिए अपने दस्तावेज़ में शीर्षक जोड़ें।"
+    "noHeadings": "कोई शीर्षक नहीं मिला। उन्हें यहाँ देखने के लिए अपने दस्तावेज़ में शीर्षक जोड़ें।",
+    "untitled": null
   },
   "sidebar": {
     "ariaLabel": "टिप्पणी साइडबार"
@@ -903,5 +904,8 @@
     "runSuperscriptApplied": null,
     "runUnderlineAdded": null,
     "runUnderlineRemoved": null
+  },
+  "contentControls": {
+    "noOptions": null
   }
 }
