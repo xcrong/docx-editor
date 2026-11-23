@@ -158,6 +158,8 @@ Pass a stable reference (module-level or memoized). Inline arrays re-register on
 
 Font-load failures route through `onError` (see [Callbacks](#callbacks)), so you can forward them to your own tracker. With no `onError` attached they fall back to `console.warn`.
 
+The automatic Google Fonts lookup is disabled by default (no-egress): opening a document never fetches `fonts.googleapis.com` unless you opt in. Embedded `.docx` fonts and system fonts still resolve locally. To opt in, call `setGoogleFontsEnabled(true)` once before loading, then `loadFont(name)` from `@xcrong/docx-editor-core/utils` for Google-hosted faces.
+
 For host code that isn't using the React or Vue adapter, `@xcrong/docx-editor-core/utils` exports `loadFontFromUrl`, `loadFontDefinitions`, `onFontError`, and the `FontDefinition` type so you can drive the same registration directly.
 
 ## Title bar customization
