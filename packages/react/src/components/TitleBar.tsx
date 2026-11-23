@@ -89,12 +89,12 @@ function DefaultDocIcon() {
     <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path
         d="M2 0C0.9 0 0 0.9 0 2V38C0 39.1 0.9 40 2 40H30C31.1 40 32 39.1 32 38V10L22 0H2Z"
-        fill="#cbd5e1"
+        fill="var(--doc-doc-icon-body)"
       />
-      <path d="M22 0L32 10H24C22.9 10 22 9.1 22 8V0Z" fill="#94a3b8" />
-      <rect x="7" y="18" width="18" height="2" rx="1" fill="#fff" />
-      <rect x="7" y="23" width="18" height="2" rx="1" fill="#fff" />
-      <rect x="7" y="28" width="12" height="2" rx="1" fill="#fff" />
+      <path d="M22 0L32 10H24C22.9 10 22 9.1 22 8V0Z" fill="var(--doc-doc-icon-fold)" />
+      <rect x="7" y="18" width="18" height="2" rx="1" fill="var(--doc-doc-icon-line)" />
+      <rect x="7" y="23" width="18" height="2" rx="1" fill="var(--doc-doc-icon-line)" />
+      <rect x="7" y="28" width="12" height="2" rx="1" fill="var(--doc-doc-icon-line)" />
     </svg>
   );
 }

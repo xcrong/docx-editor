@@ -32,7 +32,9 @@ const style = computed<CSSProperties>(() => ({
   height: props.size + 'px',
   borderRadius: '50%',
   backgroundColor: getAvatarColor(props.name || 'U'),
-  color: '#fff',
+  // Avatar bg is a fixed pastel palette (getAvatarColor), not primary —
+  // --doc-on-primary is reused because it keeps contrast in dark mode.
+  color: 'var(--doc-on-primary)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',

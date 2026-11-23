@@ -41,7 +41,9 @@ export function avatarStyle(name: string, size: 32 | 28 = 32): CSSProperties {
     height: size,
     borderRadius: '50%',
     backgroundColor: getAvatarColor(name),
-    color: '#fff',
+    // Avatar bg is a fixed pastel palette (getAvatarColor), not primary —
+    // --doc-on-primary is reused because it keeps contrast in dark mode.
+    color: 'var(--doc-on-primary)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -58,7 +60,7 @@ export function submitButtonStyle(enabled: boolean): CSSProperties {
     border: 'none',
     borderRadius: 20,
     background: enabled ? 'var(--doc-primary)' : 'var(--doc-bg-hover)',
-    color: enabled ? '#fff' : 'var(--doc-text-subtle)',
+    color: enabled ? 'var(--doc-on-primary)' : 'var(--doc-text-subtle)',
     cursor: enabled ? 'pointer' : 'default',
     fontWeight: 500,
     fontFamily: 'inherit',

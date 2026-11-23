@@ -31,6 +31,7 @@ withDefaults(
     variant?: 'spinner' | 'bar' | 'progress';
     size?: 'small' | 'medium' | 'large';
     message?: string;
+    /** Full-screen overlay mode. The scrim comes from the `--doc-overlay` theme token (no opacity prop — it is ignored on all adapters). */
     overlay?: boolean;
     /** Progress percentage 0-100. Only honored when variant='progress'. */
     progress?: number | null;
@@ -60,7 +61,9 @@ withDefaults(
   z-index: 9999;
 }
 .docx-loading--overlay .docx-loading__message {
-  color: var(--doc-on-primary);
+  /* The overlay is always a dark scrim (both themes), so text stays light
+     — --doc-on-primary flips dark in dark mode and would vanish here. */
+  color: #fff;
 }
 .docx-loading__spinner {
   width: 20px;
