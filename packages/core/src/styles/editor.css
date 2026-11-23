@@ -85,6 +85,13 @@
    * dark buttons, badges, tooltips). Inverts in dark mode so contrast holds. */
   --doc-on-primary: #ffffff;
 
+  /* Default document icon (title-bar logo) — depicts a light page, so these
+   * stay the same in both themes (like the document canvas, which is never
+   * themed). Intentionally NOT overridden under .ep-root.dark. */
+  --doc-doc-icon-body: #cbd5e1;
+  --doc-doc-icon-fold: #94a3b8;
+  --doc-doc-icon-line: #ffffff;
+
   /* Active toolbar toggle (bold/italic/comments/...): dark slab in light mode,
    * Word-accent tint in dark mode (where a dark slab would flip light). */
   --doc-toggle-active-bg: hsl(var(--foreground));

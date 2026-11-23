@@ -24,7 +24,9 @@ export function avatarStyle(name: string, size: 32 | 28 = 32): CSSProperties {
     height: size + 'px',
     borderRadius: '50%',
     backgroundColor: getAvatarColor(name),
-    color: '#fff',
+    // Avatar bg is a fixed pastel palette (getAvatarColor), not primary —
+    // --doc-on-primary is reused because it keeps contrast in dark mode.
+    color: 'var(--doc-on-primary)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

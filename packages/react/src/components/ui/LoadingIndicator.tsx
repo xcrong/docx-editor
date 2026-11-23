@@ -41,7 +41,10 @@ export interface LoadingIndicatorProps {
   message?: string;
   /** Whether to show as full-screen overlay */
   overlay?: boolean;
-  /** Overlay background opacity (0-1) */
+  /**
+   * @deprecated Ignored — the overlay scrim is controlled by the
+   * `--doc-overlay` theme token. Kept for API compatibility.
+   */
   overlayOpacity?: number;
   /** Progress percentage (0-100) for progress variant */
   progress?: number;
@@ -297,7 +300,7 @@ const ProgressVariant: React.FC<{
             justifyContent: 'center',
             fontSize,
             fontWeight: 500,
-            color: clampedProgress > 50 ? '#fff' : color,
+            color: clampedProgress > 50 ? 'var(--doc-on-primary)' : color,
           }}
         >
           {Math.round(clampedProgress)}%
@@ -317,7 +320,6 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   size = 'medium',
   message,
   overlay = false,
-  overlayOpacity = 0.5,
   progress = 0,
   showProgressText = true,
   color = DEFAULT_COLOR,
@@ -410,7 +412,8 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: `rgba(0, 0, 0, ${overlayOpacity})`,
+          // Themed modal scrim (overlayOpacity stays in props for API compat).
+          backgroundColor: 'var(--doc-overlay)',
           zIndex: 10000,
           ...style,
         }}
