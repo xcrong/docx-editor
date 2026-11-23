@@ -436,8 +436,9 @@ test.describe('Custom font registration via fonts prop', () => {
 test.describe('Google Fonts via loadFont()', () => {
   test('loadFont(name) registers a Google Fonts face on document.fonts', async ({ page }) => {
     // The `fonts` prop is for self-hosted faces. For Google Fonts, consumers
-    // call `loadFont(name)` directly — the demo does that when ?googleFont=
-    // is set, mirroring the recommended consumer pattern.
+    // call `setGoogleFontsEnabled(true)` once, then `loadFont(name)` directly
+    // (automatic lookup is disabled by default) — the demo does that when
+    // ?googleFont= is set, mirroring the recommended consumer pattern.
     await page.goto('/?e2e=1&empty=1&googleFont=Pacifico');
     const editor = new EditorPage(page);
     await editor.waitForReady();

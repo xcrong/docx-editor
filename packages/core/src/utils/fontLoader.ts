@@ -48,14 +48,13 @@ const errorCallbacks = new Set<(error: Error) => void>();
 // Track overall loading state
 let isLoadingAny = false;
 
-// When false, the automatic Google Fonts fetch path is disabled. Embedders
-// that must not egress (e.g. a CSP-locked review surface rendering privileged
-// content from embedded font blobs, or any offline host) call
-// setGoogleFontsEnabled(false) to suppress the redundant remote fetches at the
-// source. Embedded faces (loadFontFromBuffer) and consumer-hosted faces
+// Disabled by default (no-egress): the automatic Google Fonts fetch only
+// runs after the consumer opts in with setGoogleFontsEnabled(true).
+// No-egress / offline embedders stay silent with zero configuration.
+// Embedded faces (loadFontFromBuffer) and consumer-hosted faces
 // (loadFontFromUrl / the `fonts` prop) are unaffected — only the implicit
 // Google Fonts lookup in loadFont / loadFontWithMapping is gated.
-let googleFontsEnabled = true;
+let googleFontsEnabled = false;
 
 // Families registered through this module's face loaders — raw buffers
 // (DOCX-embedded fonts) and consumer URLs (the `fonts` prop). Both are
@@ -372,9 +371,9 @@ export function isFontLoaded(fontFamily: string): boolean {
 /**
  * Enable or disable the editor's automatic Google Fonts lookup.
  *
- * Defaults to enabled. Set to `false` in no-egress embedders (strict CSP,
- * offline) so `loadFont` / `loadFontWithMapping` never inject a
- * `fonts.googleapis.com` stylesheet `<link>`. This gates ONLY the implicit
+ * Defaults to disabled (no-egress): `loadFont` / `loadFontWithMapping` never
+ * inject a `fonts.googleapis.com` stylesheet `<link>` until the consumer
+ * opts in with `setGoogleFontsEnabled(true)`. This gates ONLY the implicit
  * Google Fonts lookup — font URLs you register yourself (the `fonts` prop /
  * `loadFontFromUrl`) are still fetched by the browser, and embedded blobs
  * (`loadFontFromBuffer`) and system fonts still resolve.
@@ -886,7 +885,7 @@ export function __resetFontLoaderState(): void {
   errorCallbacks.clear();
   registeredFamilies.clear();
   probeSatisfied.clear();
-  googleFontsEnabled = true;
+  googleFontsEnabled = false;
   isLoadingAny = false;
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createEmptyDocument, parseDocx } from '@xcrong/docx-editor-core';
-import { loadFont } from '@xcrong/docx-editor-core/utils';
+import { loadFont, setGoogleFontsEnabled } from '@xcrong/docx-editor-core/utils';
 import { DocxEditor, type DocxEditorRef } from '@xcrong/docx-editor-react';
 import { installE2EHooks } from './e2eHooks';
 import { templatePlugin } from '@xcrong/docx-editor-react/plugin-api';
@@ -216,15 +216,19 @@ export function App() {
     ];
   }, []);
 
-  // E2E hook: ?googleFont=Pacifico demonstrates the existing Google Fonts
-  // path. The `fonts` prop is for self-hosted faces; for Google Fonts call
-  // `loadFont(name)` from `@xcrong/docx-editor-core/utils` directly.
+  // E2E hook: ?googleFont=Pacifico demonstrates the explicit-opt-in Google
+  // Fonts path. The `fonts` prop is for self-hosted faces; for Google Fonts
+  // call `setGoogleFontsEnabled(true)` once, then `loadFont(name)` from
+  // `@xcrong/docx-editor-core/utils` directly.
   const googleFontName = useMemo(() => {
     if (typeof window === 'undefined') return null;
     return new URLSearchParams(window.location.search).get('googleFont');
   }, []);
   useEffect(() => {
-    if (googleFontName) void loadFont(googleFontName);
+    if (googleFontName) {
+      setGoogleFontsEnabled(true);
+      void loadFont(googleFontName);
+    }
   }, [googleFontName]);
 
   // E2E opt-in: ?e2e=1 in URL, MODE=test, or VITE_DOCX_EDITOR_E2E=1. Gates the

@@ -216,7 +216,8 @@ export interface DocxEditorProps {
   /**
    * Custom font faces to register with the browser before the editor measures
    * text. Each entry injects an `@font-face` rule. Pass a URL (woff2/woff/
-   * ttf/otf), an ArrayBuffer, or omit `src` to load by name from Google Fonts.
+   * ttf/otf), an ArrayBuffer, or omit `src` to load by name from Google Fonts
+   * (requires `setGoogleFontsEnabled(true)` opt-in; disabled by default).
    * Multiple entries can share `family` to register different weights/styles.
    *
    * Pass a stable reference — inline arrays re-register faces on each render

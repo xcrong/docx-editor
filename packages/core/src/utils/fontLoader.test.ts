@@ -112,12 +112,23 @@ afterEach(() => {
 });
 
 describe('setGoogleFontsEnabled', () => {
-  test('defaults to enabled and toggles', () => {
-    expect(isGoogleFontsEnabled()).toBe(true);
-    setGoogleFontsEnabled(false);
+  test('defaults to disabled (no-egress) and toggles', () => {
     expect(isGoogleFontsEnabled()).toBe(false);
     setGoogleFontsEnabled(true);
     expect(isGoogleFontsEnabled()).toBe(true);
+    setGoogleFontsEnabled(false);
+    expect(isGoogleFontsEnabled()).toBe(false);
+  });
+
+  test('default does not inject a Google <link> until opted in', async () => {
+    // Fresh reset state is the shipped default: an absent family must not
+    // egress. Opting in restores the fetch path.
+    const ok = await loadFont('EpTestAbsentDefault');
+    expect(ok).toBe(false);
+    expect(appended).not.toContain('link');
+    setGoogleFontsEnabled(true);
+    expect(await loadFont('EpTestAbsentDefault')).toBe(true);
+    expect(appended).toContain('link');
   });
 });
 
@@ -130,12 +141,14 @@ describe('loadFont — local availability', () => {
   });
 
   test('fetches when the family is not locally available', async () => {
+    setGoogleFontsEnabled(true);
     const ok = await loadFont('EpTestAbsentA');
     expect(ok).toBe(true); // stubbed onload resolves success
     expect(appended).toContain('link');
   });
 
   test('explicit options always fetch — the probe cannot prove a weight exists', async () => {
+    setGoogleFontsEnabled(true);
     presentFamilies.add('EpTestLocalB');
     const ok = await loadFont('EpTestLocalB', { weights: [900] });
     expect(ok).toBe(true);
@@ -143,6 +156,7 @@ describe('loadFont — local availability', () => {
   });
 
   test('an optionless local skip does not block a later explicit-options fetch', async () => {
+    setGoogleFontsEnabled(true);
     // The skip must not be recorded in loadedFonts — the "already loaded"
     // early return ignores options and would turn the second call into a
     // silent no-op.
@@ -204,6 +218,7 @@ describe('loadFontWithMapping — provenance-gated equivalent fetch', () => {
   });
 
   test('still fetches the mapped equivalent when the original is absent', async () => {
+    setGoogleFontsEnabled(true);
     // Cambria maps to Caladea; neither present → must fetch the equivalent.
     const ok = await loadFontWithMapping('Cambria');
     expect(ok).toBe(true);
@@ -211,6 +226,7 @@ describe('loadFontWithMapping — provenance-gated equivalent fetch', () => {
   });
 
   test('keeps fetching the equivalent for buffer-registered (embedded) families', async () => {
+    setGoogleFontsEnabled(true);
     // An embedded Tahoma renders, but embedded fonts are usually subsetted —
     // the metric-compatible equivalent stays in play for glyph coverage.
     await loadFontFromBuffer('Tahoma', new ArrayBuffer(8));
@@ -221,6 +237,7 @@ describe('loadFontWithMapping — provenance-gated equivalent fetch', () => {
   });
 
   test('keeps fetching the equivalent for URL-registered (fonts prop) families', async () => {
+    setGoogleFontsEnabled(true);
     // Consumer-hosted webfonts are subsetted as routinely as embedded ones.
     await loadFontFromUrl('Tahoma', 'https://fonts.example.com/tahoma-subset.woff2');
     presentFamilies.add('Tahoma');
