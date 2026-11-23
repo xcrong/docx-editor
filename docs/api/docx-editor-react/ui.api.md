@@ -663,6 +663,7 @@ export interface LoadingIndicatorProps {
     isLoading: boolean;
     message?: string;
     overlay?: boolean;
+    // @deprecated (undocumented)
     overlayOpacity?: number;
     progress?: number;
     showProgressText?: boolean;
