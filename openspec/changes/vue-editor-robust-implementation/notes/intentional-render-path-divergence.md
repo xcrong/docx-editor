@@ -7,7 +7,6 @@ that dead render-component tree.
 
 The remaining React-specific editor shell files are deliberate omissions:
 
-- `packages/react/src/components/edit/EditableImage.tsx`
 - `packages/react/src/paged-editor/HiddenProseMirror.tsx`
 - `packages/react/src/paged-editor/DecorationLayer.tsx`
 - `packages/react/src/paged-editor/SelectionOverlay.tsx`
