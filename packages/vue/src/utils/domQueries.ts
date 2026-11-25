@@ -14,6 +14,8 @@ import {
   findBodyPmSpans,
   findBodyPmAnchor,
   clickToPositionDom,
+  getCaretPositionFromDom,
+  getSelectionRectsFromDom,
   resolveHfHostEl,
 } from '@xcrong/docx-editor-core/layout-bridge';
 import { findPageIndexContainingPmPos } from '@xcrong/docx-editor-core/layout-engine';
@@ -33,6 +35,101 @@ export function nearestHfHostEl(
   preferredEl?: HTMLElement | null
 ): HTMLElement | null {
   return resolveHfHostEl(position, window.document, preferredEl);
+}
+
+/** Viewport-relative caret rect for the painted header/footer overlay. */
+export interface HfCaretRect {
+  top: number;
+  left: number;
+  height: number;
+}
+
+/** Viewport-relative selection rect for the painted header/footer overlay. */
+export interface HfSelectionRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+/** Zero rect so the core walk's overlay-relative output lands in viewport coords. */
+function viewportRect(): DOMRect {
+  return new DOMRect(0, 0, 0, 0);
+}
+
+/**
+ * Caret rect for a persistent HF view's selection head. Resolves the HF
+ * host via `resolveHfHostEl` (engaged `preferredHost` wins, else the host
+ * nearest the viewport center), then runs the shared core walk with
+ * `{ scope: 'hf', host }`. Returns `null` for a non-empty selection or
+ * when no painted HF host exists.
+ *
+ * Viewport px throughout (the overlay is `position: fixed`): x/y come back
+ * in viewport px, and the layout-px caret height from core is scaled by
+ * `zoom` here to land in viewport px.
+ */
+export function getHfCaretFromDom(
+  pagesContainer: HTMLElement,
+  view: EditorView,
+  section: 'header' | 'footer',
+  zoom: number,
+  doc: globalThis.Document = globalThis.document,
+  preferredHost: HTMLElement | null = null
+): HfCaretRect | null {
+  if (!view.state.selection.empty) return null;
+  const host = resolveHfHostEl(section, doc, preferredHost);
+  if (!host) return null;
+  const caret = getCaretPositionFromDom(
+    pagesContainer,
+    view.state.selection.head,
+    viewportRect(),
+    zoom,
+    { scope: 'hf', host }
+  );
+  if (!caret) return null;
+  return { top: caret.y, left: caret.x, height: caret.height * zoom };
+}
+
+/**
+ * Selection rects for a non-empty HF selection, projected against the
+ * painted HF spans via the shared core walk with `{ scope: 'hf', host }`.
+ * Host resolution mirrors `getHfCaretFromDom`. Returns `[]` for a
+ * collapsed selection or when no painted spans overlap the range.
+ */
+export function computeHfSelectionRectsFromDom(
+  pagesContainer: HTMLElement,
+  view: EditorView,
+  section: 'header' | 'footer',
+  doc: globalThis.Document = globalThis.document,
+  preferredHost: HTMLElement | null = null
+): HfSelectionRect[] {
+  if (view.state.selection.empty) return [];
+  const host = resolveHfHostEl(section, doc, preferredHost);
+  if (!host) return [];
+  const { from, to } = view.state.selection;
+  return getSelectionRectsFromDom(pagesContainer, from, to, viewportRect(), {
+    scope: 'hf',
+    host,
+  }).map((rect) => ({ top: rect.y, left: rect.x, width: rect.width, height: rect.height }));
+}
+
+/**
+ * Paint both halves of the HF overlay together (mirror of React's
+ * `applyHfOverlay`): null caret for a range, [] rects for a collapsed
+ * selection, so the two stay mutually exclusive.
+ */
+export function resolveHfOverlay(
+  pagesContainer: HTMLElement,
+  view: EditorView,
+  section: 'header' | 'footer',
+  zoom: number,
+  doc: globalThis.Document = globalThis.document,
+  preferredHost: HTMLElement | null = null
+): { caret: HfCaretRect | null; selection: HfSelectionRect[] } {
+  return {
+    caret: getHfCaretFromDom(pagesContainer, view, section, zoom, doc, preferredHost),
+    selection: computeHfSelectionRectsFromDom(pagesContainer, view, section, doc, preferredHost),
+  };
 }
 
 /**
