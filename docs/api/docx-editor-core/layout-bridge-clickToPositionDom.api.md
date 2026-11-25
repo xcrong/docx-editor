@@ -68,4 +68,7 @@ export function getCaretPositionFromDom(container: HTMLElement, pmPos: number, o
 // @public (undocumented)
 export function getSelectionRectsFromDom(container: HTMLElement, from: number, to: number, overlayRect: DOMRect, options?: DomScopeOptions): DomSelectionRect[];
 
+// @public
+export function invalidateHfScopeCache(): void;
+
 ```
