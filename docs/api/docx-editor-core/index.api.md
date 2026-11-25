@@ -298,6 +298,7 @@ export type ConvertFootnoteOptions = {
     theme?: Theme | null;
     measureBlocks: MeasureBlocksFn;
     defaultTabStopTwips?: number | null;
+    noteKind?: 'footnote' | 'endnote';
 };
 
 // @public (undocumented)
