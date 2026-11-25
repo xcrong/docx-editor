@@ -413,6 +413,11 @@ function collectFormattingInRange(
 
 /**
  * Check if position is in a table
+ *
+ * TODO: reuse the flattened table-aware paragraph collection
+ * (collectDocumentParagraphs, candidate to move into text-utils.ts) so this
+ * matches context.ts buildSelectionContextFromContext addressing; follow up
+ * in a later issue — out of scope for the current context.ts-only fix.
  */
 function isPositionInTable(_body: DocumentBody, _position: Position): boolean {
   // Tables are block-level, so position in a table would be in cell paragraphs

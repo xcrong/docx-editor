@@ -130,7 +130,12 @@ export function buildSelectionContext(
   const { contextChars = 200, includeSuggestions = true } = options;
 
   const body = doc.package.document;
-  const paragraphs = body.content.filter((block): block is Paragraph => block.type === 'paragraph');
+  // Flattened document-order paragraphs: top-level paragraphs plus
+  // table-cell paragraphs (recursively, so nested tables work). Range
+  // paragraphIndex addresses this flattened list, which is what lets
+  // table selections be expressed at all — the old top-level-only filter
+  // made every table paragraph unreachable and forced inTable to false.
+  const { paragraphs, inTable: inTableFlags } = collectDocumentParagraphs(body);
 
   // Get the paragraph at the start of the selection
   const paragraph = paragraphs[range.start.paragraphIndex];
@@ -190,7 +195,8 @@ export function buildSelectionContext(
   };
 
   // Check if in table or hyperlink
-  const inTable = false; // TODO: detect if selection is in a table
+  // True when any paragraph covered by the range lives inside a table cell.
+  const inTable = isRangeInTable(inTableFlags, range);
   const inHyperlink = isInHyperlink(paragraph, range.start.offset);
 
   // Build suggested actions
@@ -625,6 +631,72 @@ function getFormattingAtPosition(
   }
 
   return {};
+}
+
+/**
+ * Flatten body content into document-order paragraphs, tracking whether
+ * each paragraph lives inside a table cell.
+ *
+ * NOTE — addressing semantics differ from the top-level-only helpers:
+ * this function's paragraphIndex is a flattened document-order index with
+ * table-cell paragraphs expanded inline in document order, whereas
+ * text-utils.ts getParagraphs / selectionContext.ts still treat
+ * paragraphIndex as top-level-only. This is the first step of that
+ * addressing-semantics migration; callers must not mix the two index spaces.
+ *
+ * The flattened list keeps top-level paragraphs in place for documents
+ * without tables (no behavior change there) and expands cell paragraphs
+ * inline in document order otherwise, so a selection index can actually
+ * point at table text.
+ */
+function collectDocumentParagraphs(body: DocumentBody): {
+  paragraphs: Paragraph[];
+  inTable: boolean[];
+} {
+  const paragraphs: Paragraph[] = [];
+  const inTable: boolean[] = [];
+  for (const block of body.content) {
+    if (block.type === 'paragraph') {
+      paragraphs.push(block);
+      inTable.push(false);
+    } else if (block.type === 'table') {
+      collectTableParagraphs(block, paragraphs, inTable);
+    }
+  }
+  return { paragraphs, inTable };
+}
+
+/**
+ * Recursively collect paragraphs from a table's cells (nested tables included).
+ *
+ * Defensive ?? [] fallbacks: external DOCX input is untrusted and may carry
+ * missing rows/cells/content arrays.
+ */
+function collectTableParagraphs(table: Table, paragraphs: Paragraph[], inTable: boolean[]): void {
+  for (const row of table.rows ?? []) {
+    for (const cell of row.cells ?? []) {
+      for (const block of cell.content ?? []) {
+        if (block.type === 'paragraph') {
+          paragraphs.push(block);
+          inTable.push(true);
+        } else if (block.type === 'table') {
+          collectTableParagraphs(block, paragraphs, inTable);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * True when any paragraph covered by the range lives inside a table.
+ */
+function isRangeInTable(inTableFlags: boolean[], range: Range): boolean {
+  for (let i = range.start.paragraphIndex; i <= range.end.paragraphIndex; i++) {
+    if (inTableFlags[i]) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
