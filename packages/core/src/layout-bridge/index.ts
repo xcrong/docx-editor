@@ -77,6 +77,7 @@ export type {
   DomSelectionRect,
   DomCaretPosition,
   ClickToPositionDomOptions,
+  DomScopeOptions,
 } from './clickToPositionDom';
 export { syncImeCaretAnchor, resetImeCaretAnchor } from './imeCaretAnchor';
 export type { SyncImeCaretAnchorOptions, VisibleCaretViewportRect } from './imeCaretAnchor';
@@ -133,10 +134,7 @@ export {
   contributesToHeaderFooterFlowHeight,
   convertHeaderFooterToContent,
   convertHeaderFooterPmDocToContent,
-  computeHfCaretRectFromView,
-  computeHfSelectionRectsFromView,
   resolveHfHostEl,
-  invalidateHfDomCache,
 } from './headerFooterLayout';
 export type { HeaderFooterMetrics, ConvertHeaderFooterOptions } from './headerFooterLayout';
 
@@ -156,15 +154,24 @@ export {
 } from './tableInsertHover';
 export type { TableInsertHoverHit, TableInsertHoverInput } from './tableInsertHover';
 
-// Body-scoped PM-position DOM lookups. Centralizes the `.layout-page-content`
-// prefix so call sites can't accidentally match HF runs whose PM positions
-// collide with body positions (HF parses to a separate PM document).
+// Body/HF-scoped PM-position DOM lookups. Centralize the
+// `.layout-page-content` / `.layout-page-header|footer` prefixes so call
+// sites can't accidentally match runs whose PM positions collide across
+// the body and HF documents (HF parses to a separate PM document).
 export {
   findBodyPmSpans,
   findBodyEmptyRuns,
   findBodyPmAnchors,
   findBodyPmAnchor,
+  findBodyParagraphs,
+  findHfPmSpans,
+  findHfEmptyRuns,
+  findHfPmAnchors,
+  findHfPmAnchor,
+  findHfRanged,
+  findHfParagraphs,
 } from './findBodyPmSpans';
+export type { DomScope } from './findBodyPmSpans';
 
 // Per-table measurement (recursive over cell content via callback).
 export { measureTableBlock, measureTableCellBlockVisualHeight } from './measureTable';

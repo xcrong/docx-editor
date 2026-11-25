@@ -13,11 +13,10 @@ import type {
 import type { Comment } from '@xcrong/docx-editor-core/types/content';
 import type { Plugin } from 'prosemirror-state';
 import {
-  computeHfCaretRectFromView,
-  computeHfSelectionRectsFromView,
-  invalidateHfDomCache,
-} from '@xcrong/docx-editor-core/layout-bridge';
-import { applyCellSelectionHighlight } from './internals/domSelection';
+  applyCellSelectionHighlight,
+  computeHfSelectionRectsFromDom,
+  getHfCaretFromDom,
+} from './internals/domSelection';
 import { extractSelectionState } from '@xcrong/docx-editor-core/prosemirror';
 import type { ExtensionManager } from '@xcrong/docx-editor-core/prosemirror/extensions';
 import type { SelectionState } from '@xcrong/docx-editor-core/prosemirror';
@@ -264,15 +263,26 @@ export function DocxEditorPagedArea({
         setHfSelectionRects([]);
         return;
       }
-      const caret = computeHfCaretRectFromView(view, hfEditPosition);
-      setHfCaretRect(caret ? toHfHostLocal(caret) : null);
-      setHfSelectionRects(computeHfSelectionRectsFromView(view, hfEditPosition).map(toHfHostLocal));
       const pagesEl = window.document.querySelector('.paged-editor__pages') as HTMLElement | null;
+      if (!pagesEl) {
+        setHfCaretRect(null);
+        setHfSelectionRects([]);
+        return;
+      }
+      // Shared core DOM walks scoped to the painted HF host
+      // (`{ scope: 'hf', host }` resolved inside the helpers) — the
+      // viewport-relative rects convert to host-local once via
+      // `toHfHostLocal` so they survive scroll.
+      const caret = getHfCaretFromDom(pagesEl, view, hfEditPosition, zoom);
+      setHfCaretRect(caret ? toHfHostLocal(caret) : null);
+      setHfSelectionRects(
+        computeHfSelectionRectsFromDom(pagesEl, view, hfEditPosition).map(toHfHostLocal)
+      );
       // Multi-cell selection renders via `.layout-table-cell-selected`, scoped
       // to the active section so footer selections don't light up header cells.
-      if (pagesEl) applyCellSelectionHighlight(pagesEl, view.state, { scope: hfEditPosition });
+      applyCellSelectionHighlight(pagesEl, view.state, { scope: hfEditPosition });
     },
-    [hfEditPosition, toHfHostLocal]
+    [hfEditPosition, toHfHostLocal, zoom]
   );
 
   // Initial-caret-on-engage: when the user double-clicks into HF mode the
@@ -285,7 +295,6 @@ export function DocxEditorPagedArea({
     if (!hfEditPosition) {
       setHfCaretRect(null);
       setHfSelectionRects([]);
-      invalidateHfDomCache();
       return;
     }
     const measure = () => {
@@ -296,11 +305,9 @@ export function DocxEditorPagedArea({
     // Deterministic "painter is done" signal — `useLayoutPipeline` dispatches
     // `painter:painted` after `renderPages` writes the page DOM. Listen for
     // it instead of the rAF chain so the measurement always sees the fresh
-    // `data-pm-start` spans. Also invalidate the cached HF DOM snapshot so
-    // the next caret compute re-walks the host.
+    // `data-pm-start` spans.
     const pagesEl = window.document.querySelector('.paged-editor__pages') as HTMLElement | null;
     const onPainted = () => {
-      invalidateHfDomCache();
       measure();
     };
     pagesEl?.addEventListener('painter:painted', onPainted);
@@ -321,7 +328,6 @@ export function DocxEditorPagedArea({
       cancelAnimationFrame(raf);
       pagesEl?.removeEventListener('painter:painted', onPainted);
       window.removeEventListener('resize', onResize);
-      invalidateHfDomCache();
     };
   }, [hfEditPosition, hfEditorRef, applyHfOverlay]);
 
@@ -352,9 +358,10 @@ export function DocxEditorPagedArea({
           // selection state still rides through `onSelectionChange` on
           // the inline overlay's old wiring path, which now reads from
           // the persistent view via `hfEditorRef.getView()`.
-          // Painter dispatches `painter:painted` after `renderPages`.
-          // Wait for it so the cache invalidation + caret measurement sees
-          // the fresh span layout. Selection-only transactions skip the
+          // Painter dispatches `painter:painted` after `renderPages` (the
+          // engine drops its cached HF scope snapshot just before
+          // dispatching). Wait for it so the caret measurement sees the
+          // fresh span layout. Selection-only transactions skip the
           // painter, so use a one-shot rAF as a fallback.
           const pagesEl = window.document.querySelector(
             '.paged-editor__pages'
@@ -363,7 +370,6 @@ export function DocxEditorPagedArea({
           const apply = () => {
             if (painted) return;
             painted = true;
-            invalidateHfDomCache();
             applyHfOverlay(view);
           };
           pagesEl?.addEventListener('painter:painted', apply, { once: true });

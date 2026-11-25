@@ -11,7 +11,36 @@
  * @public
  */
 
-import { findBodyEmptyRuns, findBodyPmSpans } from './findBodyPmSpans';
+import {
+  findBodyEmptyRuns,
+  findBodyParagraphs,
+  findBodyPmSpans,
+  findHfEmptyRuns,
+  findHfParagraphs,
+  findHfPmAnchor,
+  findHfPmSpans,
+  findHfRanged,
+  type DomScope,
+} from './findBodyPmSpans';
+
+export type { DomScope } from './findBodyPmSpans';
+
+/**
+ * Scope selector for the DOM-based caret/selection walks.
+ *
+ * The body and the header/footer live in separate ProseMirror documents
+ * whose numeric positions overlap, so every walk must commit to one
+ * tree. `'body'` (default) scopes to `.layout-page-content`;
+ * `'hf'` scopes to the painted header/footer `host` (a resolved
+ * `.layout-page-header` / `.layout-page-footer` element, or — when
+ * omitted — any HF host under `container`).
+ *
+ * @public
+ */
+export interface DomScopeOptions {
+  scope?: DomScope;
+  host?: HTMLElement | null;
+}
 
 /**
  * Options for {@link clickToPositionDom}.
@@ -467,16 +496,24 @@ export function getSelectionRectsFromDom(
   container: HTMLElement,
   from: number,
   to: number,
-  overlayRect: DOMRect
+  overlayRect: DOMRect,
+  options?: DomScopeOptions
 ): DomSelectionRect[] {
   const rects: DomSelectionRect[] = [];
+  const scope = options?.scope ?? 'body';
+  const scopeRoot: ParentNode = scope === 'hf' ? (options?.host ?? container) : container;
+  // Shared host-level snapshot with the caret walk (see the cache note
+  // above); container-wide HF roots skip the cache and query directly.
+  const hfSnapshot = scope === 'hf' ? getHfScopeSnapshot(scopeRoot) : null;
 
-  // Find all body spans that intersect with the selection. Scoped via
-  // `findBodyPmSpans` so HF spans (whose PM positions live in a
-  // separate document) don't bleed selection rects into headers when
-  // body PM positions happen to overlap. Same fix as #406 / #408 on
-  // the React-side selection-resolution path.
-  const spans = findBodyPmSpans(container);
+  // Body spans are scoped via `findBodyPmSpans` so HF spans (whose PM
+  // positions live in a separate document) don't bleed selection rects
+  // into headers when body PM positions happen to overlap. Same fix as
+  // #406 / #408 on the React-side selection-resolution path. The HF
+  // scope mirrors it via `findHfPmSpans` so a header/footer selection
+  // never picks up body spans with colliding positions.
+  const spans =
+    scope === 'hf' ? (hfSnapshot?.spans ?? findHfPmSpans(scopeRoot)) : findBodyPmSpans(container);
 
   for (const span of Array.from(spans)) {
     const spanEl = span as HTMLElement;
@@ -548,7 +585,9 @@ export function getSelectionRectsFromDom(
     }
   }
 
-  for (const emptyRun of findBodyEmptyRuns(container)) {
+  for (const emptyRun of scope === 'hf'
+    ? (hfSnapshot?.emptyRuns ?? findHfEmptyRuns(scopeRoot))
+    : findBodyEmptyRuns(container)) {
     const range = emptyParagraphRangeFor(emptyRun);
     if (!range || range.pmEnd <= from || range.pmStart >= to) continue;
     const sliver = blankLineSliverRect(emptyRun, overlayRect);
@@ -593,6 +632,62 @@ function isClippedOutOfTableFragment(el: HTMLElement, rect: DOMRect): boolean {
   return mid < t.top - 0.5 || mid > t.bottom + 0.5;
 }
 
+/** Page index (0-based) of the `.layout-page` containing `el`. */
+function pageIndexOf(el: HTMLElement): number {
+  const pageEl = el.closest('.layout-page') as HTMLElement | null;
+  return pageEl ? Number(pageEl.dataset.pageNumber || 1) - 1 : 0;
+}
+
+/**
+ * Collapsed range at a PM offset into a run span, walking every text
+ * node under the span (including hyperlink `<a>`-nested text) so the
+ * caret lands on the exact character boundary. Returns null when the
+ * span holds no text or the range cannot be built.
+ *
+ * NOTE — not a pure refactor: the previous body path only consulted
+ * `span.firstChild`, so a hyperlink run (whose first child is the `<a>`
+ * element, not a text node) always fell back to the span's left edge for
+ * every offset. The TreeWalker below is a behavior fix for those runs
+ * (body and `scope: 'hf'` alike): the caret now resolves to the exact
+ * character boundary inside `<a>`-nested text.
+ */
+function collapseRangeAtPmOffset(spanEl: HTMLElement, pmOffset: number): Range | null {
+  const ownerDoc = spanEl.ownerDocument;
+  if (!ownerDoc) return null;
+  const walker = ownerDoc.createTreeWalker(spanEl, NodeFilter.SHOW_TEXT);
+  let remaining = Math.max(0, pmOffset);
+  let textNode = walker.nextNode() as Text | null;
+  let last: Text | null = null;
+  while (textNode) {
+    last = textNode;
+    if (remaining <= textNode.data.length) {
+      try {
+        const range = ownerDoc.createRange();
+        range.setStart(textNode, remaining);
+        range.setEnd(textNode, remaining);
+        return range;
+      } catch {
+        return null;
+      }
+    }
+    remaining -= textNode.data.length;
+    textNode = walker.nextNode() as Text | null;
+  }
+  // Offset past every text node (degenerate span): clamp to the end of
+  // the last one, mirroring the old first-child clamping.
+  if (last) {
+    try {
+      const range = ownerDoc.createRange();
+      range.setStart(last, last.data.length);
+      range.setEnd(last, last.data.length);
+      return range;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 /** Build the caret position from a matched span (tab / text / empty run). */
 function caretFromSpan(
   spanEl: HTMLElement,
@@ -601,60 +696,150 @@ function caretFromSpan(
   overlayRect: DOMRect,
   zoom: number
 ): DomCaretPosition {
-  const pageEl = spanEl.closest('.layout-page') as HTMLElement | null;
-  const pageIndex = pageEl ? Number(pageEl.dataset.pageNumber || 1) - 1 : 0;
+  const pageIndex = pageIndexOf(spanEl);
   const lineEl = spanEl.closest('.layout-line');
   const lineHeight = lineEl ? (lineEl as HTMLElement).offsetHeight : 16;
 
-  const textNode = spanEl.firstChild;
   const isTab = spanEl.classList.contains('layout-run-tab');
-  if (isTab || !textNode || textNode.nodeType !== Node.TEXT_NODE) {
-    // Tab or no text node — caret at the span's left edge.
-    const spanRect = spanEl.getBoundingClientRect();
-    return {
-      x: spanRect.left - overlayRect.left,
-      y: spanRect.top - overlayRect.top,
-      height: lineHeight,
-      pageIndex,
-    };
+  if (!isTab) {
+    const range = collapseRangeAtPmOffset(spanEl, pmPos - pmStart);
+    if (range) {
+      const rangeRect = range.getBoundingClientRect();
+
+      // Caret height tracks the run AT the cursor, not the line box: on a line
+      // with mixed font sizes the line box is as tall as the largest run, but
+      // the caret should match the font where the insertion point sits, like
+      // Word (#748). The collapsed range's rect already reports the per-run
+      // font box (and its top is baseline-aligned), so use it; fall back to the
+      // line height if the browser returns a zero-height rect.
+      //
+      // `rangeRect` comes from getBoundingClientRect, so its height is in screen
+      // space (scaled by `zoom`); divide it back to layout px so the returned
+      // height matches the offsetHeight-based fallbacks. Consumers paint the caret
+      // inside the zoom-scaled container and so expect layout px (#928).
+      return {
+        x: rangeRect.left - overlayRect.left,
+        y: rangeRect.top - overlayRect.top,
+        height: rangeRect.height ? rangeRect.height / zoom : lineHeight,
+        pageIndex,
+      };
+    }
   }
 
-  const text = textNode as Text;
-  const charIndex = Math.min(pmPos - pmStart, text.length);
-  const ownerDoc = spanEl.ownerDocument!;
-  const range = ownerDoc.createRange();
-  range.setStart(text, charIndex);
-  range.setEnd(text, charIndex);
-  const rangeRect = range.getBoundingClientRect();
-
-  // Caret height tracks the run AT the cursor, not the line box: on a line
-  // with mixed font sizes the line box is as tall as the largest run, but
-  // the caret should match the font where the insertion point sits, like
-  // Word (#748). The collapsed range's rect already reports the per-run
-  // font box (and its top is baseline-aligned), so use it; fall back to the
-  // line height if the browser returns a zero-height rect.
+  // Tab or no text node — caret at the span's left edge.
   //
-  // `rangeRect` comes from getBoundingClientRect, so its height is in screen
-  // space (scaled by `zoom`); divide it back to layout px so the returned
-  // height matches the offsetHeight-based fallbacks. Consumers paint the caret
-  // inside the zoom-scaled container and so expect layout px (#928).
+  // Intentional divergence from the retired `computeHfCaretRectFromView`,
+  // which interpolated `left + width * (pmPos - start) / (end - start)` when
+  // its TreeWalker found no text: a collapsed caret must sit on a real
+  // character boundary, and a fractional mid-run x has no corresponding PM
+  // position (clicks there resolve to a neighboring boundary anyway).
+  // Line-end and empty-run positions are covered by the trailing-edge /
+  // empty-paragraph fallbacks instead, so the interpolation only ever
+  // produced visually-between-characters carets.
+  const spanRect = spanEl.getBoundingClientRect();
   return {
-    x: rangeRect.left - overlayRect.left,
-    y: rangeRect.top - overlayRect.top,
-    height: rangeRect.height ? rangeRect.height / zoom : lineHeight,
+    x: spanRect.left - overlayRect.left,
+    y: spanRect.top - overlayRect.top,
+    height: lineHeight,
     pageIndex,
   };
+}
+
+// ----------------------------------------------------------------------------
+// HF scope snapshot cache (host-level, elements only).
+//
+// `getCaretPositionFromDom` / `getSelectionRectsFromDom` with
+// `{ scope: 'hf' }` need the engaged host's spans, ranged elements,
+// paragraphs, and empty runs — up to four subtree walks per call — while
+// the HF overlay recomputes on every transaction plus `painter:painted`
+// plus resize. Cache the ELEMENT lists per section+host and re-measure
+// rects fresh on every call (rects are never cached: scroll/zoom/resize
+// move them, while the element set is paint-stable).
+//
+// Keyed by section AND host identity (like the retired `hfDomCache` in
+// `headerFooterLayout.ts`): the same HF doc is painted on every page, so a
+// section-only key would keep resolving against the wrong page's instance
+// after scrolling. A paint replaces the spans inside a reused host shell
+// (incremental `renderPages` preserves header/footer shells and only
+// repopulates the content area), so identity alone cannot detect
+// staleness — `DocxEditorEngine` drops the cache after every `renderPages`
+// pass, just before dispatching `painter:painted`. Between paints the HF
+// DOM is static, so the snapshot is always fresh.
+//
+// `invalidateHfScopeCache` is a module-level export for the engine only —
+// it is intentionally NOT re-exported from the layout-bridge index, so it
+// stays out of the public API.
+// ----------------------------------------------------------------------------
+
+type HfScopeSnapshot = {
+  host: HTMLElement;
+  spans: HTMLElement[];
+  ranged: HTMLElement[];
+  paragraphs: HTMLElement[];
+  emptyRuns: HTMLElement[];
+};
+
+const hfScopeCache: Record<'header' | 'footer', HfScopeSnapshot | null> = {
+  header: null,
+  footer: null,
+};
+
+function sectionOfHfHost(host: HTMLElement): 'header' | 'footer' | null {
+  if (host.matches('.layout-page-header')) return 'header';
+  if (host.matches('.layout-page-footer')) return 'footer';
+  return null;
+}
+
+/**
+ * Element snapshot for an HF `scopeRoot`. A resolved host hits the
+ * section+host cache; a wider container root (the rare no-host fallback)
+ * queries directly without caching.
+ */
+function getHfScopeSnapshot(scopeRoot: ParentNode): HfScopeSnapshot | null {
+  if (!(scopeRoot instanceof HTMLElement)) return null;
+  const section = sectionOfHfHost(scopeRoot);
+  if (!section) return null;
+  const cached = hfScopeCache[section];
+  if (cached && cached.host === scopeRoot && cached.host.isConnected) return cached;
+  const snapshot: HfScopeSnapshot = {
+    host: scopeRoot,
+    spans: findHfPmSpans(scopeRoot),
+    ranged: findHfRanged(scopeRoot),
+    paragraphs: findHfParagraphs(scopeRoot),
+    emptyRuns: findHfEmptyRuns(scopeRoot),
+  };
+  hfScopeCache[section] = snapshot;
+  return snapshot;
+}
+
+/**
+ * Drop cached HF scope snapshots. Called by `DocxEditorEngine` after every
+ * `renderPages` pass (before `painter:painted`); see the cache note above.
+ */
+export function invalidateHfScopeCache(): void {
+  hfScopeCache.header = null;
+  hfScopeCache.footer = null;
 }
 
 export function getCaretPositionFromDom(
   container: HTMLElement,
   pmPos: number,
   overlayRect: DOMRect,
-  zoom: number = 1
+  zoom: number = 1,
+  options?: DomScopeOptions
 ): DomCaretPosition | null {
+  const scope = options?.scope ?? 'body';
+  const scopeRoot: ParentNode = scope === 'hf' ? (options?.host ?? container) : container;
+  // Host-level element snapshot so the span / paragraph / fallback walks
+  // below share one subtree query per paint (see the cache note above).
+  // Null for body scope and for container-wide HF roots (no single host).
+  const hfSnapshot = scope === 'hf' ? getHfScopeSnapshot(scopeRoot) : null;
   // Body-scoped span lookup so HF spans don't mis-resolve the caret
-  // when a body PM position happens to fall within an HF range.
-  const spans = findBodyPmSpans(container);
+  // when a body PM position happens to fall within an HF range. The HF
+  // scope mirrors it: only the resolved host's spans participate, so a
+  // body span with a colliding PM position can never win.
+  const spans =
+    scope === 'hf' ? (hfSnapshot?.spans ?? findHfPmSpans(scopeRoot)) : findBodyPmSpans(container);
 
   // A position that lands inside a table cell which breaks across pages can
   // match the SAME run painted in two fragments. Prefer the on-window copy;
@@ -688,8 +873,14 @@ export function getCaretPositionFromDom(
     return caretFromSpan(fallback, pmPos, fallbackStart, overlayRect, zoom);
   }
 
-  // Check empty paragraphs (prefer an on-window copy here too).
-  const paragraphs = container.querySelectorAll('.layout-paragraph');
+  // Check empty paragraphs (prefer an on-window copy here too). Scoped to
+  // the active tree so an HF paragraph (a separate PM document whose
+  // positions overlap the body's) can never win a body lookup or vice
+  // versa.
+  const paragraphs =
+    scope === 'hf'
+      ? (hfSnapshot?.paragraphs ?? findHfParagraphs(scopeRoot))
+      : findBodyParagraphs(container);
   let pFallback: { el: HTMLElement; targetEl: HTMLElement } | null = null;
   for (const p of Array.from(paragraphs)) {
     const pEl = p as HTMLElement;
@@ -709,6 +900,120 @@ export function getCaretPositionFromDom(
   }
   if (pFallback) {
     return caretFromParagraph(pFallback.el, pFallback.targetEl, overlayRect);
+  }
+
+  // HF-only final fallbacks so the caret stays visible while editing a
+  // header/footer: exact paragraph/line anchor, smallest bracketing
+  // range, trailing edge past every painted range, host top-left.
+  // Ported from the retired `computeHfCaretRectFromView` in
+  // `headerFooterLayout.ts` (unify-hf-editing follow-up).
+  if (scope === 'hf') {
+    return hfCaretFallback(scopeRoot, pmPos, overlayRect, zoom, hfSnapshot);
+  }
+
+  return null;
+}
+
+/**
+ * HF caret fallbacks for positions no painted span or paragraph covers.
+ *
+ * The header/footer editor must always show a caret while active — unlike
+ * the body walk, which returns null off-content. Coordinates are
+ * overlay-relative like the rest of this module; pass a zero rect to get
+ * viewport coords (what the old `computeHfCaretRectFromView` returned).
+ *
+ * Heights are normalized to layout px (screen-space `getBoundingClientRect`
+ * values divided by `zoom`), matching the `caretFromSpan` main path, so
+ * every fallback below shares one unit with it: callers inside the
+ * zoom-scaled pages container (React) use the value directly, while
+ * `position: fixed` overlays (Vue) multiply by `zoom` back to viewport px.
+ * The host-top-left constant (`16`) is already layout px and passes through
+ * unscaled. X/Y stay viewport px (the caller passes a zero `overlayRect`).
+ */
+function hfCaretFallback(
+  scopeRoot: ParentNode,
+  pmPos: number,
+  overlayRect: DOMRect,
+  zoom: number = 1,
+  snapshot?: HfScopeSnapshot | null
+): DomCaretPosition | null {
+  const scale = zoom || 1;
+  // Exact paragraph/line anchor at `pmPos` (when the painter emits one).
+  const anchor = findHfPmAnchor(scopeRoot, pmPos);
+  if (anchor) {
+    const rect = anchor.getBoundingClientRect();
+    return {
+      x: rect.left - overlayRect.left + 1,
+      y: rect.top - overlayRect.top,
+      height: rect.height ? rect.height / scale : 16,
+      pageIndex: pageIndexOf(anchor),
+    };
+  }
+
+  // Walk every painted element carrying `[data-pm-start][data-pm-end]` and
+  // find the smallest range bracketing `pmPos`. Left edge for a position
+  // at the range start (empty paragraph), right edge at the range end.
+  const ranged = snapshot?.ranged ?? findHfRanged(scopeRoot);
+  let bestEl: HTMLElement | null = null;
+  let bestSpan = Infinity;
+  for (const el of ranged) {
+    const start = Number(el.dataset.pmStart);
+    const end = Number(el.dataset.pmEnd);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    if (pmPos < start || pmPos > end) continue;
+    const span = end - start;
+    if (span < bestSpan) {
+      bestSpan = span;
+      bestEl = el;
+    }
+  }
+  if (bestEl) {
+    const rect = bestEl.getBoundingClientRect();
+    const end = Number(bestEl.dataset.pmEnd);
+    const atEnd = pmPos >= end;
+    return {
+      x: (atEnd ? rect.right : rect.left + 1) - overlayRect.left,
+      y: rect.top - overlayRect.top,
+      height: rect.height ? rect.height / scale : 16,
+      pageIndex: pageIndexOf(bestEl),
+    };
+  }
+
+  // Cursor past every painted element's range (typically `doc.content.size`
+  // at the end of the last paragraph): snap to the trailing edge of the
+  // painted element with the largest `pmStart` still `<= pmPos`.
+  let trailingEl: HTMLElement | null = null;
+  let trailingStart = -Infinity;
+  for (const el of ranged) {
+    const start = Number(el.dataset.pmStart);
+    if (!Number.isFinite(start)) continue;
+    if (start > pmPos) continue;
+    if (start > trailingStart) {
+      trailingStart = start;
+      trailingEl = el;
+    }
+  }
+  if (trailingEl) {
+    const rect = trailingEl.getBoundingClientRect();
+    return {
+      x: rect.right - overlayRect.left,
+      y: rect.top - overlayRect.top,
+      height: rect.height ? rect.height / scale : 16,
+      pageIndex: pageIndexOf(trailingEl),
+    };
+  }
+
+  // Last resort: anchor at the host's top-left so the caret is at least
+  // visible while in HF edit mode. Better than disappearing.
+  const hostEl = scopeRoot as HTMLElement;
+  if (typeof hostEl.getBoundingClientRect === 'function') {
+    const hostRect = hostEl.getBoundingClientRect();
+    return {
+      x: hostRect.left - overlayRect.left + 2,
+      y: hostRect.top - overlayRect.top + 2,
+      height: 16,
+      pageIndex: pageIndexOf(hostEl),
+    };
   }
 
   return null;

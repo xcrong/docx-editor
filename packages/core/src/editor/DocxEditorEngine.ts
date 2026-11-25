@@ -32,6 +32,7 @@ import type {
 } from '../layout-painter';
 import { buildBlockLookup, renderPages } from '../layout-painter';
 import type { FloatPageGeometry } from '../layout-bridge';
+import { invalidateHfScopeCache } from '../layout-bridge/clickToPositionDom';
 import { findVerticalScrollParentOrRoot } from '../utils/findVerticalScrollParent';
 import type { LayoutSelectionGate } from '../prosemirror/utils/LayoutSelectionGate';
 import type {
@@ -795,6 +796,13 @@ export class DocxEditorEngine {
         // selection-rect resolvers wait on this instead of
         // `requestAnimationFrame` chains. Bubbling CustomEvent so any
         // ancestor can listen via the pages container.
+        //
+        // The HF scope snapshot (`clickToPositionDom` host-level cache)
+        // holds element lists from the pre-paint DOM — drop it first so
+        // resolvers measuring on this signal re-walk the fresh spans.
+        // Both adapters funnel through this `run`, so one invalidation
+        // covers React and Vue.
+        invalidateHfScopeCache();
         pagesEl.dispatchEvent(new CustomEvent('painter:painted', { bubbles: true }));
 
         host.onPainted?.({ layout: newLayout, renderKind: renderPagesKind, state });

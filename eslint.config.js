@@ -348,6 +348,18 @@ export default [
     },
   },
 
+  // clickToPositionDom.ts is the single click→PM-position resolver for body
+  // and header/footer (scope:'body'|'hf' unification). One module by design
+  // so HF reuses the body selection path instead of a forked copy; the
+  // scope plumbing pushed it just past the default 1000. Modest headroom
+  // while the cap still enforces a ceiling.
+  {
+    files: ['packages/core/src/layout-bridge/clickToPositionDom.ts'],
+    rules: {
+      'max-lines': ['error', { max: 1100, skipBlankLines: false, skipComments: false }],
+    },
+  },
+
   // Agent-use framework-agnostic surface — top-level utilities + tools/,
   // ai-sdk/ (excluding the per-framework entry files), i18n/, __tests__/.
   // TODO: drop the `ignores` list once task §9 migrates the React hooks

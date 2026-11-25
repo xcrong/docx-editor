@@ -421,8 +421,9 @@ import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick 
 import type { EditorView } from 'prosemirror-view';
 import { TextSelection } from 'prosemirror-state';
 import {
-  computeHfCaretRectFromView,
-  computeHfSelectionRectsFromView,
+  getCaretPositionFromDom,
+  getSelectionRectsFromDom,
+  resolveHfHostEl,
 } from '@xcrong/docx-editor-core/layout-bridge';
 import { getSelectionInfo as getSelectionInfoImpl } from '../utils/refApiQueries';
 import { extractSelectionState } from '@xcrong/docx-editor-core/prosemirror';
@@ -692,28 +693,55 @@ const styleDefinitions = computed(() => {
   void stateTick.value;
   return getDocument()?.package?.styles ?? undefined;
 });
-// HF caret overlay rect from the persistent HF view; shared with React via core's `computeHfCaretRectFromView`.
+// HF caret overlay rect for the painted header/footer; resolved through the
+// shared core DOM walks with `{ scope: 'hf', host }` (viewport coords for
+// the `position: fixed` overlay). The caret height comes back in layout px
+// from core on every path — the main span walk and all `hfCaretFallback`
+// branches divide by zoom (#928) — so it is scaled by zoom here to land in
+// viewport px.
 const hfCaretRect = ref<{ top: number; left: number; height: number } | null>(null);
 // HF drag-selection rects — drawn when the user selects a range inside the
 // painted header/footer. The body selection overlay is gated off in HF mode
 // (`isHfEditing` in useSelectionSync), so without these the selection is set on
-// the HF PM but never highlighted (#691). Shared with React via core's
-// `computeHfSelectionRectsFromView`.
+// the HF PM but never highlighted. Same shared core walk as the caret.
 const hfSelectionRects = ref<Array<{ top: number; left: number; width: number; height: number }>>(
   []
 );
 
 // Paint the HF caret + drag-selection rects from the live HF view together
-// (mirror of React's `applyHfOverlay`). `computeHfCaretRectFromView` returns
-// null for a non-empty selection and `computeHfSelectionRectsFromView` returns
-// [] for a collapsed one, so the caret and highlight are mutually exclusive.
+// (mirror of React's `applyHfOverlay`). The core caret walk returns null for
+// a non-empty selection and the selection walk returns [] for a collapsed
+// one, so the caret and highlight stay mutually exclusive.
 function applyHfOverlay(
   view: EditorView,
   position: 'header' | 'footer',
   hostEl?: HTMLElement | null
 ) {
-  hfCaretRect.value = computeHfCaretRectFromView(view, position, document, hostEl);
-  hfSelectionRects.value = computeHfSelectionRectsFromView(view, position, document, hostEl);
+  const container = pagesRef.value;
+  const host = resolveHfHostEl(position, document, hostEl ?? null);
+  if (!container || !host) {
+    clearHfOverlay();
+    return;
+  }
+  // Zero overlay rect → the core walk's overlay-relative output lands in
+  // viewport coords, matching the `position: fixed` overlay.
+  const viewportRect = new DOMRect(0, 0, 0, 0);
+  const z = zoom.value || 1;
+  const sel = view.state.selection;
+  if (sel.empty) {
+    const caret = getCaretPositionFromDom(container, sel.head, viewportRect, z, {
+      scope: 'hf',
+      host,
+    });
+    hfCaretRect.value = caret ? { top: caret.y, left: caret.x, height: caret.height * z } : null;
+    hfSelectionRects.value = [];
+    return;
+  }
+  hfCaretRect.value = null;
+  hfSelectionRects.value = getSelectionRectsFromDom(container, sel.from, sel.to, viewportRect, {
+    scope: 'hf',
+    host,
+  }).map((rect) => ({ top: rect.y, left: rect.x, width: rect.width, height: rect.height }));
 }
 function clearHfOverlay() {
   hfCaretRect.value = null;

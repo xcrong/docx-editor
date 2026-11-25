@@ -327,7 +327,8 @@ export function renderHeaderFooterContent(
       // are essential for HF caret resolution — without them the painter
       // emits no `data-pm-*` markers on this paragraph wrapper, and empty
       // paragraphs (or cursors at line boundaries) lose any anchor at all.
-      // `computeHfCaretRectFromView`'s fallback chain depends on these.
+      // `hfCaretFallback`'s anchor chain (clickToPositionDom, `scope: 'hf'`)
+      // depends on these.
       const syntheticFragment: ParagraphFragment = {
         kind: 'paragraph',
         blockId: paragraphBlock.id,
