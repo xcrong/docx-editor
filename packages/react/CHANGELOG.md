@@ -1,5 +1,90 @@
 # @xcrong/docx-js-editor
 
+## 2.0.0
+
+### Major Changes
+
+- 7d663aa: Remove the legacy `useTextContextMenu` hook and its unused helpers (`getDefaultTextContextMenuItems`, `isTextActionAvailable`, `getTextActionLabel`, `getTextActionShortcut`). The generic `TextContextMenu` component driven by `composeMenuItems` is the supported path and is unchanged.
+
+### Patch Changes
+
+- 5282e2e: Fixed useAutoSave ignoring runtime option changes; callbacks, interval, maxAge, saveOnChange, and debounceDelay now stay live via AutoSaveManager.updateOptions. Fixes #142.
+- 0464a1c: Move the Clear Formatting (format_clear) button to the end of the text formatting group in both adapters.
+- 7d663aa: Fix the text context menu swallowing a keystroke race: pressing Enter (or arrow keys / Escape) while the menu is open no longer leaks through to the editor, where ProseMirror's keymap would delete the current selection before the menu item ran. Menu keys are now intercepted in the capture phase.
+- 952dce7: Fix demo preview banner and page metadata: the banner no longer references the upstream release domain and links the fork repository, brand links point at the upstream GitHub repo, and the license is correctly stated as Apache-2.0. Fixes #43. Fixes #44.
+- d1b6b7a: Replace hardcoded chrome colors with `--doc-*` tokens: the title-bar doc icon now uses stable `--doc-doc-icon-*` tokens, sidebar avatar/submit text uses `--doc-on-primary`, and the loading overlay scrim uses `--doc-overlay` (the unused `overlayOpacity` prop is kept for API compat). Fixes #148.
+- 15afb74: fix: render endnote bodies in a document-end sheet with reference/body cross-navigation (fixes #89)
+
+  `word/endnotes.xml` parsed fine but the layout chain never consumed endnotes, so note bodies appeared nowhere. Endnote references are now collected alongside footnote references and the referenced bodies render in a trailing sheet after the last page (mirroring the footnote body pipeline, not a new stack). Clicking a body marker scrolls to its note; clicking a note number jumps back to the reference. Fixes #89.
+
+- 92b8ed0: Unify header/footer caret/selection resolution onto the shared `DomScope`-aware DOM walks (`getCaretPositionFromDom` / `getSelectionRectsFromDom` with `{ scope: 'hf', host }`), replacing the retired per-adapter `computeHfCaretRectFromView` / `computeHfSelectionRectsFromView` pair. Public surface: removes 3 `@public` helpers (`computeHfCaretRectFromView`, `computeHfSelectionRectsFromView`, `invalidateHfDomCache`) and adds 7 scoped finders (`findBodyParagraphs`, `findHfPmSpans`, `findHfEmptyRuns`, `findHfPmAnchors`, `findHfPmAnchor`, `findHfRanged`, `findHfParagraphs`, plus the `DomScope` / `DomScopeOptions` types). Caret heights are normalized to layout px on every HF fallback path (including `hfCaretFallback` at any zoom); hyperlink runs now resolve to the exact character boundary inside `<a>`-nested text. Defaulting to `patch`: the removed helpers were introduced for the unify-hf-editing workstream and never shipped in a stable release line — if the maintainer judges the removals breaking for adapter authors, please escalate this to `major` before merging.
+- 52bbc3c: Internal hyperlinks (`w:hyperlink w:anchor`) now navigate to their bookmark in both adapters: clicking a `#bookmark` link scrolls the viewport to the bookmarked paragraph, and the HyperlinkPopup "go" action plus the context-menu "open link" item do the same instead of opening a blank tab. Unknown bookmarks are a silent no-op; external links are unchanged. Also fixes Vue clicks on painted links being swallowed by a selection-triggered relayout, which broke external-link popups there too. Fixes #88.
+- d60463b: Second `loadDocument` call now takes effect instead of silently keeping the old body text. Fixes #138.
+- c0cc679: Fixed Paste Special dialog pressing Enter no longer pastes stale clipboard content. Fixes #140.
+- 4b78c4f: Remove the unused `EditableImage` component (`components/edit/EditableImage.tsx`), which was never exported from any package entry and had no internal references. Image rendering and resize now go through the layout painter and `useImageInteractions`. Fixes #149.
+- e007da9: Fixed Response Preview Cmd/Ctrl+Enter accepting stale text after editing. Fixes #141.
+- e9abd61: The tracked-changes review group (accept/reject/prev/next) now follows the comments sidebar: closing the sidebar hides it, reopening restores it. Viewing mode still hides it, and an explicit `showReviewControls` still wins.
+- 86201f1: Hide the tracked-changes review toolbar group in viewing mode. The read-only mode no longer shows disabled accept/reject buttons; editing and suggesting modes are unchanged. Explicit showReviewControls still overrides. Fixes #104.
+- 0310c20: Dual-adapter Playwright architecture + snapshot/bundle gates (T28-01, refs #84, refs #71). No runtime change. New gates, all red-capable and running in CI: the full `e2e/tests/parity/` suite (parametrized over `/react/` + `/vue/` with per-adapter failure screenshots) on every PR, a cross-adapter first-page pixel-diff, normalized Document round-trip digests (`bun run check:snapshot-parity`), gzip bundle-size parity for both adapter entries (`bun run check:parity-bundle-size`), and a matrix-freshness check for component changes. On-demand smoke usage is documented in CONTRIBUTING and the Vue README.
+- 43d24db: fix: cursor navigation auto-scroll and cross-page split-paragraph selection (fixes #73)
+
+  ArrowUp/Down now steps one painted visual line in Vue too (it previously fell back to document-offset stepping with no painted-line scrolling); drag-selecting to the viewport edge auto-scrolls without corrupting the selection when the pointer slides over a header, footer, or the native scrollbar; and the auto-scroll loop parks when the pointer leaves the edge zone. Fixes #73.
+
+- Updated dependencies [da78957]
+- Updated dependencies [5282e2e]
+- Updated dependencies [fe7f2ed]
+- Updated dependencies [4c5444e]
+- Updated dependencies [d35cda4]
+- Updated dependencies [d1b6b7a]
+- Updated dependencies [15afb74]
+- Updated dependencies [bd325ed]
+- Updated dependencies [6f9c4fc]
+- Updated dependencies [81b7241]
+- Updated dependencies [1071128]
+- Updated dependencies [d99c094]
+- Updated dependencies [de98685]
+- Updated dependencies [5719d64]
+- Updated dependencies [ac78b76]
+- Updated dependencies [92b8ed0]
+- Updated dependencies [6ce42a9]
+- Updated dependencies [965bab8]
+- Updated dependencies [52bbc3c]
+- Updated dependencies [f2740e7]
+- Updated dependencies [af9910f]
+- Updated dependencies [d60463b]
+- Updated dependencies [f34973a]
+- Updated dependencies [efbe24b]
+- Updated dependencies [ea943d8]
+- Updated dependencies [2c91422]
+- Updated dependencies [7ed722d]
+- Updated dependencies [e8f00e6]
+- Updated dependencies [b0e03d2]
+- Updated dependencies [ac0988c]
+- Updated dependencies [5a0dbeb]
+- Updated dependencies [2ba6d79]
+- Updated dependencies [76a6bca]
+- Updated dependencies [e1d2499]
+- Updated dependencies [6318fd0]
+- Updated dependencies [c682b3f]
+- Updated dependencies [a22eae8]
+- Updated dependencies [2f585e8]
+- Updated dependencies [0282ec9]
+- Updated dependencies [e61f2d7]
+- Updated dependencies [793b48a]
+- Updated dependencies [2c91b11]
+- Updated dependencies [070be5b]
+- Updated dependencies [43d24db]
+- Updated dependencies [6406222]
+- Updated dependencies [8ad9fdd]
+- Updated dependencies [869d622]
+- Updated dependencies [321c4bf]
+- Updated dependencies [1e7c2b5]
+- Updated dependencies [7758983]
+- Updated dependencies [8310d63]
+  - @xcrong/docx-editor-agents@2.0.0
+  - @xcrong/docx-editor-core@2.0.0
+  - @xcrong/docx-editor-i18n@2.0.0
+
 ## 1.10.3
 
 ### Patch Changes
