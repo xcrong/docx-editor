@@ -25,7 +25,14 @@ import type {
   TextRun,
 } from '../layout-engine/types';
 import { layoutDocument, type LayoutOptions } from '../layout-engine';
-import type { Document, Endnote, Footnote, StyleDefinitions, Theme } from '../types/document';
+import type {
+  Document,
+  Endnote,
+  Footnote,
+  Style,
+  StyleDefinitions,
+  Theme,
+} from '../types/document';
 import type { FootnoteRenderItem } from '../layout-painter';
 import { footnoteToProseDoc } from '../prosemirror/conversion/toProseDoc';
 import { toFlowBlocks } from './toFlowBlocks';
@@ -87,15 +94,115 @@ function mergeFootnoteReservedHeights(
 }
 
 /**
- * Default footnote font size in points. Word's built-in "Footnote Text"
- * style sets 8pt; we apply this only when the footnote's runs don't
- * already specify a fontSize (avoids overriding authored sizes).
- *
- * TODO once the style cascade for paragraph styles is fully wired through
- * the bridge, footnotes should pick this up from the resolved
- * "FootnoteText" / "footnote text" style instead of hardcoding the value.
+ * Fallback footnote font size in points. Word's built-in "Footnote Text"
+ * style sets 8pt; we apply the resolved "FootnoteText" / "footnote text"
+ * style size when styles are available (see {@link resolveFootnoteFontSizePt})
+ * and fall back to this only when the style is absent or sets no size
+ * (avoids overriding authored sizes either way — this only fills runs with
+ * no explicit `fontSize`).
  */
 const FOOTNOTE_FONT_SIZE_PT = 8;
+
+/**
+ * Style identities consulted by {@link resolveNoteFontSizePt}, in priority
+ * order. Word authors the built-in note styles with these ids/names
+ * (`<w:style w:styleId="FootnoteText"><w:name w:val="footnote text"/>`);
+ * matching both covers renamed/localized documents where either half
+ * survived (e.g. the footnote-roundtrip fixture's `EndnoteText`→`FootnoteText`
+ * style, or a styleId preserved without its display name).
+ */
+const FOOTNOTE_STYLE_IDS = ['FootnoteText'];
+const FOOTNOTE_STYLE_NAMES = ['footnote text'];
+const ENDNOTE_STYLE_IDS = ['EndnoteText', 'FootnoteText'];
+const ENDNOTE_STYLE_NAMES = ['endnote text', 'footnote text'];
+
+/**
+ * Resolve the default note font size (points) from parsed style definitions.
+ *
+ * Looks up the first style matching `styleIds` (exact `styleId`) or
+ * `styleNames` (case-insensitive `name`), then reads its run size
+ * (`rPr.fontSize`, half-points → points; `fontSizeCs` and
+ * `pPr.runProperties` as fallbacks). `StyleDefinitions.styles` entries are
+ * already `basedOn`-resolved by `parseStyles`, so inheritance is included.
+ *
+ * Returns `FOOTNOTE_FONT_SIZE_PT` when styles are absent, no style matches,
+ * or the matched style sets no usable size — the note pipeline must never
+ * fail to lay out for lack of a style size.
+ */
+function resolveNoteFontSizePt(
+  styles: StyleDefinitions | null | undefined,
+  styleIds: string[],
+  styleNames: string[]
+): number {
+  const defs = styles?.styles;
+  if (!defs) return FOOTNOTE_FONT_SIZE_PT;
+  // Exact styleId hits win over display-name hits, and earlier ids win over
+  // later ones (so endnotes prefer EndnoteText over the FootnoteText
+  // fallback regardless of document order).
+  for (const wantedId of styleIds) {
+    for (const style of defs) {
+      if (style.styleId === wantedId) {
+        const pt = noteStyleSizeToPt(style);
+        if (pt != null) return pt;
+        break;
+      }
+    }
+  }
+  for (const wantedName of styleNames) {
+    for (const style of defs) {
+      if (style.name != null && style.name.trim().toLowerCase() === wantedName) {
+        const pt = noteStyleSizeToPt(style);
+        if (pt != null) return pt;
+        break;
+      }
+    }
+  }
+  return FOOTNOTE_FONT_SIZE_PT;
+}
+
+/**
+ * Read a note style's run size in points. Returns `undefined` when the
+ * style sets no usable size so the caller can keep looking / fall back.
+ */
+function noteStyleSizeToPt(style: Style): number | undefined {
+  const halfPoints =
+    style.rPr?.fontSize ?? style.rPr?.fontSizeCs ?? style.pPr?.runProperties?.fontSize;
+  if (halfPoints == null || !Number.isFinite(halfPoints) || halfPoints <= 0) return undefined;
+  const pt = halfPoints / 2;
+  // Guard against corrupt styles.xml: w:sz is half-points, so a resolved
+  // size above 100pt means the value is garbage (unit confusion, truncated
+  // XML, hostile file) rather than an intentional style. Reject it and let
+  // the caller fall back to the 8pt built-in instead of blowing up the note
+  // layout with a giant run.
+  if (!Number.isFinite(pt) || pt <= 0 || pt > 100) return undefined;
+  return pt;
+}
+
+/**
+ * Resolve the footnote default font size (points) from `styles.xml`.
+ * Falls back to {@link FOOTNOTE_FONT_SIZE_PT} (Word's 8pt built-in) when
+ * the "FootnoteText" / "footnote text" style is absent or sets no size.
+ *
+ * Module-private: the only caller is {@link applyFootnotePresentation} in
+ * this file. Adapter authors and tests should go through that function
+ * (or `convertFootnoteToContent`) rather than resolving sizes directly,
+ * so the default-size policy stays in one place.
+ */
+function resolveFootnoteFontSizePt(styles?: StyleDefinitions | null): number {
+  return resolveNoteFontSizePt(styles, FOOTNOTE_STYLE_IDS, FOOTNOTE_STYLE_NAMES);
+}
+
+/**
+ * Resolve the endnote default font size (points) from `styles.xml`.
+ * Prefers "EndnoteText" / "endnote text", accepts "FootnoteText" as a
+ * fallback (some documents reuse the footnote style for endnotes), else
+ * falls back to {@link FOOTNOTE_FONT_SIZE_PT}.
+ *
+ * Module-private, same rationale as {@link resolveFootnoteFontSizePt}.
+ */
+function resolveEndnoteFontSizePt(styles?: StyleDefinitions | null): number {
+  return resolveNoteFontSizePt(styles, ENDNOTE_STYLE_IDS, ENDNOTE_STYLE_NAMES);
+}
 
 /**
  * Where an endnote reference lives, as found by {@link collectEndnoteRefs}.
@@ -308,8 +415,15 @@ export function mapFootnotesToPages(
  * Footnote-specific block normalization. Mirrors the spirit of
  * `normalizeHeaderFooterMeasureBlocks`: post-process the body-pipeline
  * output for a single footnote so it carries the correct visual prefix
- * (its display number, rendered as a superscript) and a default 8pt font
- * for any run that didn't specify a size.
+ * (its display number, rendered as a superscript) and a default font
+ * size for any run that didn't specify one.
+ *
+ * The default size is resolved from the "FootnoteText" / "footnote text"
+ * paragraph style (or "EndnoteText" / "endnote text" when `noteKind` is
+ * `'endnote'`), falling back to Word's 8pt built-in when the style is
+ * absent or sets no size. Runs that already carry an explicit `fontSize`
+ * (authored direct formatting or a style-resolved size from the
+ * `footnoteToProseDoc → toFlowBlocks` cascade) are left untouched.
  *
  * The displayNumber is prepended onto the FIRST paragraph as a fresh
  * superscript text run — visually matches Word's footnote numbering
@@ -318,7 +432,14 @@ export function mapFootnotesToPages(
  * Exported for callers that want to compose their own conversion
  * pipeline; `convertFootnoteToContent` calls it as part of its flow.
  */
-export function applyFootnotePresentation(blocks: FlowBlock[], displayNumber: number): FlowBlock[] {
+export function applyFootnotePresentation(
+  blocks: FlowBlock[],
+  displayNumber: number,
+  styles?: StyleDefinitions | null,
+  noteKind: 'footnote' | 'endnote' = 'footnote'
+): FlowBlock[] {
+  const defaultFontSizePt =
+    noteKind === 'endnote' ? resolveEndnoteFontSizePt(styles) : resolveFootnoteFontSizePt(styles);
   if (blocks.length === 0) {
     return [
       {
@@ -328,7 +449,7 @@ export function applyFootnotePresentation(blocks: FlowBlock[], displayNumber: nu
           {
             kind: 'text',
             text: `${displayNumber}  `,
-            fontSize: FOOTNOTE_FONT_SIZE_PT,
+            fontSize: defaultFontSizePt,
             superscript: true,
           },
         ],
@@ -336,8 +457,8 @@ export function applyFootnotePresentation(blocks: FlowBlock[], displayNumber: nu
     ];
   }
 
-  // Apply default 8pt to every run that didn't specify a fontSize. Mutating
-  // a copy keeps the input blocks pure for caching upstream.
+  // Apply the resolved default size to every run that didn't specify a
+  // fontSize. Mutating a copy keeps the input blocks pure for caching upstream.
   const out = blocks.map((b) => {
     if (b.kind !== 'paragraph') return b;
     const para = b as ParagraphBlock;
@@ -346,7 +467,7 @@ export function applyFootnotePresentation(blocks: FlowBlock[], displayNumber: nu
       runs: para.runs.map((r) => {
         if (r.kind === 'text' || r.kind === 'tab') {
           if (r.fontSize == null) {
-            return { ...r, fontSize: FOOTNOTE_FONT_SIZE_PT };
+            return { ...r, fontSize: defaultFontSizePt };
           }
         }
         return r;
@@ -369,7 +490,7 @@ export function applyFootnotePresentation(blocks: FlowBlock[], displayNumber: nu
     const numberRun: TextRun = {
       kind: 'text',
       text: `${displayNumber}  `,
-      fontSize: FOOTNOTE_FONT_SIZE_PT,
+      fontSize: defaultFontSizePt,
       superscript: true,
       ...(firstTextRun?.fontFamily ? { fontFamily: firstTextRun.fontFamily } : {}),
     };
@@ -405,6 +526,13 @@ export type ConvertFootnoteOptions = {
    * inside footnotes honor the same tab grid.
    */
   defaultTabStopTwips?: number | null;
+  /**
+   * Which note style supplies the default font size when runs carry no
+   * explicit size: `'footnote'` resolves "FootnoteText" / "footnote text",
+   * `'endnote'` prefers "EndnoteText" / "endnote text". Defaults to
+   * `'footnote'`; `convertEndnoteToContent` passes `'endnote'`.
+   */
+  noteKind?: 'footnote' | 'endnote';
 };
 
 /**
@@ -427,7 +555,12 @@ export function convertFootnoteToContent(
     defaultTabStopTwips: options.defaultTabStopTwips ?? null,
   });
   const rawBlocks = toFlowBlocks(pmDoc, { theme: options.theme ?? undefined });
-  const blocks = applyFootnotePresentation(rawBlocks, displayNumber);
+  const blocks = applyFootnotePresentation(
+    rawBlocks,
+    displayNumber,
+    options.styles ?? null,
+    options.noteKind ?? 'footnote'
+  );
 
   const measures = options.measureBlocks(blocks, contentWidth);
 
@@ -510,12 +643,10 @@ export function convertEndnoteToContent(
   contentWidth: number,
   options: ConvertFootnoteOptions
 ): FootnoteContent {
-  return convertFootnoteToContent(
-    endnote as unknown as Footnote,
-    displayNumber,
-    contentWidth,
-    options
-  );
+  return convertFootnoteToContent(endnote as unknown as Footnote, displayNumber, contentWidth, {
+    ...options,
+    noteKind: options.noteKind ?? 'endnote',
+  });
 }
 
 /**

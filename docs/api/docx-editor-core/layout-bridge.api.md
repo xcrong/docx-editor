@@ -14,7 +14,7 @@ export function applyCellSelectionHighlight(pagesContainer: HTMLElement, state: 
 }): void;
 
 // @public
-export function applyFootnotePresentation(blocks: FlowBlock[], displayNumber: number): FlowBlock[];
+export function applyFootnotePresentation(blocks: FlowBlock[], displayNumber: number, styles?: StyleDefinitions | null, noteKind?: 'footnote' | 'endnote'): FlowBlock[];
 
 // @public
 export function buildEndnoteContentMap(endnotes: Endnote[], endnoteRefs: Array<{
@@ -162,6 +162,7 @@ export type ConvertFootnoteOptions = {
     theme?: Theme | null;
     measureBlocks: MeasureBlocksFn;
     defaultTabStopTwips?: number | null;
+    noteKind?: 'footnote' | 'endnote';
 };
 
 // @public

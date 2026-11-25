@@ -7,6 +7,7 @@ import {
   mapFootnotesToPages,
 } from '../footnoteLayout';
 import type { FootnoteRefLocation } from '../footnoteLayout';
+import type { StyleDefinitions } from '../../types/document';
 import type {
   FlowBlock,
   ParagraphBlock,
@@ -86,6 +87,140 @@ describe('applyFootnotePresentation', () => {
     const marker = (out[0] as ParagraphBlock).runs[0] as TextRun;
 
     expect(marker.fontFamily).toBeUndefined();
+  });
+
+  test('uses the resolved FootnoteText size instead of the 8pt fallback', () => {
+    // w:sz is half-points: 20 → 10pt.
+    const styles: StyleDefinitions = {
+      styles: [
+        {
+          styleId: 'FootnoteText',
+          type: 'paragraph',
+          name: 'footnote text',
+          rPr: { fontSize: 20 },
+        },
+      ],
+    };
+    const blocks: FlowBlock[] = [
+      { kind: 'paragraph', id: 'fn1', runs: [{ kind: 'text', text: 'See note.' }] },
+    ];
+
+    const out = applyFootnotePresentation(blocks, 1, styles);
+    const marker = (out[0] as ParagraphBlock).runs[0] as TextRun;
+    const body = (out[0] as ParagraphBlock).runs[1] as TextRun;
+
+    expect(marker.fontSize).toBe(10);
+    expect(body.fontSize).toBe(10);
+  });
+
+  test('never overrides an authored run size with the style default', () => {
+    const styles: StyleDefinitions = {
+      styles: [
+        {
+          styleId: 'FootnoteText',
+          type: 'paragraph',
+          name: 'footnote text',
+          rPr: { fontSize: 20 },
+        },
+      ],
+    };
+    const blocks: FlowBlock[] = [
+      {
+        kind: 'paragraph',
+        id: 'fn1',
+        runs: [{ kind: 'text', text: 'Big note.', fontSize: 12 }],
+      },
+    ];
+
+    const out = applyFootnotePresentation(blocks, 1, styles);
+    const body = (out[0] as ParagraphBlock).runs[1] as TextRun;
+
+    expect(body.fontSize).toBe(12);
+  });
+});
+
+describe('footnote / endnote default font-size resolution', () => {
+  const plainBlocks = (): FlowBlock[] => [
+    { kind: 'paragraph', id: 'fn1', runs: [{ kind: 'text', text: 'See note.' }] },
+  ];
+  const bodyFontSizeOf = (out: FlowBlock[]): number | undefined =>
+    ((out[0] as ParagraphBlock).runs[1] as TextRun).fontSize;
+
+  test('falls back to 8pt without styles or without a matching style', () => {
+    expect(bodyFontSizeOf(applyFootnotePresentation(plainBlocks(), 1))).toBe(8);
+    expect(bodyFontSizeOf(applyFootnotePresentation(plainBlocks(), 1, null))).toBe(8);
+    expect(bodyFontSizeOf(applyFootnotePresentation(plainBlocks(), 1, { styles: [] }))).toBe(8);
+    expect(
+      bodyFontSizeOf(
+        applyFootnotePresentation(plainBlocks(), 1, {
+          styles: [{ styleId: 'Normal', type: 'paragraph', rPr: { fontSize: 24 } }],
+        })
+      )
+    ).toBe(8);
+  });
+
+  test('resolves FootnoteText by styleId (half-points → points)', () => {
+    const styles: StyleDefinitions = {
+      styles: [
+        {
+          styleId: 'FootnoteText',
+          type: 'paragraph',
+          name: 'footnote text',
+          rPr: { fontSize: 22 },
+        },
+      ],
+    };
+    expect(bodyFontSizeOf(applyFootnotePresentation(plainBlocks(), 1, styles))).toBe(11);
+  });
+
+  test('matches the display name when the styleId was renamed', () => {
+    const styles: StyleDefinitions = {
+      styles: [
+        { styleId: 'CustomNote', type: 'paragraph', name: 'footnote text', rPr: { fontSize: 18 } },
+      ],
+    };
+    expect(bodyFontSizeOf(applyFootnotePresentation(plainBlocks(), 1, styles))).toBe(9);
+  });
+
+  test('endnotes prefer EndnoteText and accept FootnoteText as fallback', () => {
+    const footnoteOnly: StyleDefinitions = {
+      styles: [{ styleId: 'FootnoteText', type: 'paragraph', rPr: { fontSize: 20 } }],
+    };
+    expect(
+      bodyFontSizeOf(applyFootnotePresentation(plainBlocks(), 1, footnoteOnly, 'endnote'))
+    ).toBe(10);
+
+    const both: StyleDefinitions = {
+      styles: [
+        { styleId: 'FootnoteText', type: 'paragraph', rPr: { fontSize: 20 } },
+        { styleId: 'EndnoteText', type: 'paragraph', name: 'endnote text', rPr: { fontSize: 14 } },
+      ],
+    };
+    expect(bodyFontSizeOf(applyFootnotePresentation(plainBlocks(), 1, both, 'endnote'))).toBe(7);
+  });
+
+  test('an id match without a size does not shadow a usable size', () => {
+    const styles: StyleDefinitions = {
+      // First id match sets no size; the usable EndnoteText entry still wins.
+      styles: [
+        { styleId: 'EndnoteText', type: 'paragraph', name: 'endnote text' },
+        {
+          styleId: 'FootnoteText',
+          type: 'paragraph',
+          name: 'footnote text',
+          rPr: { fontSize: 20 },
+        },
+      ],
+    };
+    expect(bodyFontSizeOf(applyFootnotePresentation(plainBlocks(), 1, styles, 'endnote'))).toBe(10);
+  });
+
+  test('rejects absurd style sizes and falls back to 8pt', () => {
+    const styles: StyleDefinitions = {
+      // 400 half-points → 200pt: corrupt value, must not reach layout.
+      styles: [{ styleId: 'FootnoteText', type: 'paragraph', rPr: { fontSize: 400 } }],
+    };
+    expect(bodyFontSizeOf(applyFootnotePresentation(plainBlocks(), 1, styles))).toBe(8);
   });
 });
 
