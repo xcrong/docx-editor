@@ -38,6 +38,17 @@ export interface DomCaretPosition {
 }
 
 // @public
+export type DomScope = 'body' | 'hf';
+
+// @public
+export interface DomScopeOptions {
+    // (undocumented)
+    host?: HTMLElement | null;
+    // (undocumented)
+    scope?: DomScope;
+}
+
+// @public
 export interface DomSelectionRect {
     // (undocumented)
     height: number;
@@ -52,9 +63,12 @@ export interface DomSelectionRect {
 }
 
 // @public (undocumented)
-export function getCaretPositionFromDom(container: HTMLElement, pmPos: number, overlayRect: DOMRect, zoom?: number): DomCaretPosition | null;
+export function getCaretPositionFromDom(container: HTMLElement, pmPos: number, overlayRect: DOMRect, zoom?: number, options?: DomScopeOptions): DomCaretPosition | null;
 
 // @public (undocumented)
-export function getSelectionRectsFromDom(container: HTMLElement, from: number, to: number, overlayRect: DOMRect): DomSelectionRect[];
+export function getSelectionRectsFromDom(container: HTMLElement, from: number, to: number, overlayRect: DOMRect, options?: DomScopeOptions): DomSelectionRect[];
+
+// @public
+export function invalidateHfScopeCache(): void;
 
 ```

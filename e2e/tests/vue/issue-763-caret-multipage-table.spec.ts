@@ -11,6 +11,19 @@ test('Vue: caret follows a table cell across a page break (#763)', async ({ page
   await page.goto('http://localhost:5174/?e2e=1');
   await page.locator('.docx-editor-vue').waitFor();
   await page.locator('input[type="file"]').first().setInputFiles('e2e/fixtures/demo.docx');
+  // Wait for the uploaded demo doc (not the boot sample.docx) before
+  // mutating: `[data-page-number]` appears for either, and inserting into
+  // the sample before the demo load lands gets clobbered.
+  await page.waitForFunction(
+    () =>
+      (
+        window as unknown as { __DOCX_EDITOR_E2E__?: { agentGetDocumentText?: () => string } }
+      ).__DOCX_EDITOR_E2E__
+        ?.agentGetDocumentText?.()
+        .includes('Demonstration of DOCX') ?? false,
+    null,
+    { timeout: 15000 }
+  );
   await page.waitForSelector('[data-page-number]');
 
   // Build a single-cell table tall enough to break across a page boundary.

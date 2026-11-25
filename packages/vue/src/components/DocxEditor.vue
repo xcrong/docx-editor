@@ -420,13 +420,14 @@
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import type { EditorView } from 'prosemirror-view';
 import { TextSelection } from 'prosemirror-state';
-import {
-  computeHfCaretRectFromView,
-  computeHfSelectionRectsFromView,
-} from '@xcrong/docx-editor-core/layout-bridge';
 import { getSelectionInfo as getSelectionInfoImpl } from '../utils/refApiQueries';
 import { extractSelectionState } from '@xcrong/docx-editor-core/prosemirror';
-import { nearestHfHostEl } from '../utils/domQueries';
+import {
+  nearestHfHostEl,
+  resolveHfOverlay,
+  type HfCaretRect,
+  type HfSelectionRect,
+} from '../utils/domQueries';
 import Toolbar from './Toolbar.vue';
 import TableToolbar from './ui/TableToolbar.vue';
 import DecorationLayer from './DecorationLayer.vue';
@@ -692,28 +693,19 @@ const styleDefinitions = computed(() => {
   void stateTick.value;
   return getDocument()?.package?.styles ?? undefined;
 });
-// HF caret overlay rect from the persistent HF view; shared with React via core's `computeHfCaretRectFromView`.
-const hfCaretRect = ref<{ top: number; left: number; height: number } | null>(null);
-// HF drag-selection rects — drawn when the user selects a range inside the
-// painted header/footer. The body selection overlay is gated off in HF mode
-// (`isHfEditing` in useSelectionSync), so without these the selection is set on
-// the HF PM but never highlighted (#691). Shared with React via core's
-// `computeHfSelectionRectsFromView`.
-const hfSelectionRects = ref<Array<{ top: number; left: number; width: number; height: number }>>(
-  []
-);
-
-// Paint the HF caret + drag-selection rects from the live HF view together
-// (mirror of React's `applyHfOverlay`). `computeHfCaretRectFromView` returns
-// null for a non-empty selection and `computeHfSelectionRectsFromView` returns
-// [] for a collapsed one, so the caret and highlight are mutually exclusive.
-function applyHfOverlay(
-  view: EditorView,
-  position: 'header' | 'footer',
-  hostEl?: HTMLElement | null
-) {
-  hfCaretRect.value = computeHfCaretRectFromView(view, position, document, hostEl);
-  hfSelectionRects.value = computeHfSelectionRectsFromView(view, position, document, hostEl);
+// HF caret + drag-selection overlay for the painted header/footer (mirror of
+// React's `applyHfOverlay`); details live in `../utils/domQueries`.
+const hfCaretRect = ref<HfCaretRect | null>(null);
+const hfSelectionRects = ref<HfSelectionRect[]>([]);
+function applyHfOverlay(view: EditorView, position: 'header' | 'footer', hostEl?: HTMLElement | null) {
+  const container = pagesRef.value;
+  if (!container) {
+    clearHfOverlay();
+    return;
+  }
+  const overlay = resolveHfOverlay(container, view, position, zoom.value || 1, document, hostEl ?? null);
+  hfCaretRect.value = overlay.caret;
+  hfSelectionRects.value = overlay.selection;
 }
 function clearHfOverlay() {
   hfCaretRect.value = null;

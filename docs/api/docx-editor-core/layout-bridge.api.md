@@ -120,21 +120,6 @@ export function columnWidthForSection(config: SectionLayoutConfig): number;
 export function computeCommentAnchorPositions(pmView: EditorView | null, layout: Layout, blocks: FlowBlock[], measures: Measure[], contentOffset: number): Map<string, number>;
 
 // @public
-export function computeHfCaretRectFromView(view: EditorView, section: 'header' | 'footer', doc?: globalThis.Document, preferredHost?: HTMLElement | null): {
-    top: number;
-    left: number;
-    height: number;
-} | null;
-
-// @public
-export function computeHfSelectionRectsFromView(view: EditorView, section: 'header' | 'footer', doc?: globalThis.Document, preferredHost?: HTMLElement | null): Array<{
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-}>;
-
-// @public
 export function computePerBlockWidths(blocks: FlowBlock[], initialConfig: SectionLayoutConfig, finalConfig: SectionLayoutConfig): number[];
 
 // @public
@@ -221,6 +206,17 @@ export interface DomCaretPosition {
 }
 
 // @public
+export type DomScope = 'body' | 'hf';
+
+// @public
+export interface DomScopeOptions {
+    // (undocumented)
+    host?: HTMLElement | null;
+    // (undocumented)
+    scope?: DomScope;
+}
+
+// @public
 export interface DomSelectionRect {
     // (undocumented)
     height: number;
@@ -272,6 +268,9 @@ export interface ExtendMarginsForHeaderFooterResult {
 export function findBodyEmptyRuns(container: ParentNode): HTMLElement[];
 
 // @public
+export function findBodyParagraphs(container: ParentNode): HTMLElement[];
+
+// @public
 export function findBodyPmAnchor(container: ParentNode, pmStart: number): HTMLElement | null;
 
 // @public
@@ -282,6 +281,24 @@ export function findBodyPmSpans(container: ParentNode): HTMLElement[];
 
 // @public
 export function findCharacterAtX(x: number, charWidths: number[]): number;
+
+// @public
+export function findHfEmptyRuns(root: ParentNode): HTMLElement[];
+
+// @public
+export function findHfParagraphs(root: ParentNode): HTMLElement[];
+
+// @public
+export function findHfPmAnchor(root: ParentNode, pmStart: number): HTMLElement | null;
+
+// @public
+export function findHfPmAnchors(root: ParentNode): HTMLElement[];
+
+// @public
+export function findHfPmSpans(root: ParentNode): HTMLElement[];
+
+// @public
+export function findHfRanged(root: ParentNode): HTMLElement[];
 
 // @public (undocumented)
 export interface FloatingExclusionRect {
@@ -406,7 +423,7 @@ export function getCanvasContext(): CanvasRenderingContext2D;
 export function getCaretPosition(layout: Layout, blocks: FlowBlock[], measures: Measure[], pmPosition: number, startPageIndex?: number): CaretPosition_2 | null;
 
 // @public (undocumented)
-export function getCaretPositionFromDom(container: HTMLElement, pmPos: number, overlayRect: DOMRect, zoom?: number): DomCaretPosition | null;
+export function getCaretPositionFromDom(container: HTMLElement, pmPos: number, overlayRect: DOMRect, zoom?: number, options?: DomScopeOptions): DomCaretPosition | null;
 
 // @public
 export function getColumns(sectionProps: SectionProperties | null | undefined): ColumnLayout | undefined;
@@ -458,7 +475,7 @@ export function getRunCharWidths(run: TextRun): number[];
 export function getScrollYForPage(layout: Layout, pageIndex: number): number;
 
 // @public (undocumented)
-export function getSelectionRectsFromDom(container: HTMLElement, from: number, to: number, overlayRect: DOMRect): DomSelectionRect[];
+export function getSelectionRectsFromDom(container: HTMLElement, from: number, to: number, overlayRect: DOMRect, options?: DomScopeOptions): DomSelectionRect[];
 
 // @public
 export function getTextCacheSize(): number;
@@ -512,9 +529,6 @@ export type HitTestResult = {
 
 // @public
 export function hitTestTableCell(pageHit: PageHit, blocks: FlowBlock[], measures: Measure[], pagePoint: Point): TableCellHit | null;
-
-// @public
-export function invalidateHfDomCache(): void;
 
 // @internal
 export function isBlockLikeFloatingTable(block: TableBlock, contentWidth: number): boolean;

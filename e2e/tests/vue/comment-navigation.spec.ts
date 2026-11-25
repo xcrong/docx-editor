@@ -36,6 +36,25 @@ async function pageLeftX(page: Page): Promise<number> {
   return box.x;
 }
 
+/**
+ * Resolve once the pages-container shift transform finishes: the sidebar
+ * eases `translateX(-176px)` over 0.2s (`useSidebarLayout`), while the
+ * sidebar-ready signal below only watches the 0.15s opacity fade — so
+ * opacity can hit 1 while the transform is still mid-flight. Polling X
+ * until it stops moving avoids sampling a mid-transition value.
+ */
+async function waitForPageXSettled(page: Page): Promise<number> {
+  let last = await pageLeftX(page);
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(100);
+    const cur = await pageLeftX(page);
+    if (Math.abs(cur - last) < 1) return cur;
+    last = cur;
+  }
+  return last;
+}
+
 /** Seed paragraphs via the raw PM view, then anchor a comment via the agent bridge. */
 async function seedDocWithComment(
   page: Page,
@@ -71,20 +90,22 @@ async function seedDocWithComment(
 }
 
 test.describe('Vue comment navigation — sidebar shift + overlay', () => {
-  test('toolbar button toggles sidebar, document shifts left and re-centers', async ({
-    page,
-  }) => {
+  test('toolbar button toggles sidebar, document shifts left and re-centers', async ({ page }) => {
     await page.goto('http://localhost:5174/?e2e=1&empty=1');
     await page.locator('.docx-editor-vue').waitFor();
     await page.waitForSelector('[data-page-number]');
+    // Measure BEFORE seeding: the seeded comment auto-opens the sidebar and
+    // eases the pages container left over 0.2s, so measuring after the seed
+    // races that transition (a mid-flight sample made `centeredX` land ~43px
+    // into the shift, flaking `|recentered - centered| < 40` in CI).
+    const centeredX = await pageLeftX(page);
     const id = await seedDocWithComment(page, ['Alpha bravo charlie.'], 'bravo', 'shift me');
 
-    const centeredX = await pageLeftX(page);
     // Sidebar auto-opens when the comment lands (extractCommentsAndChanges).
     await waitForSidebarReady(page);
     await expect(page.locator(SIDEBAR)).toBeVisible();
 
-    const shiftedX = await pageLeftX(page);
+    const shiftedX = await waitForPageXSettled(page);
     expect(centeredX - shiftedX).toBeGreaterThan(100);
 
     // Review group renders: DocxEditor wires all six review-* listeners,
@@ -93,17 +114,16 @@ test.describe('Vue comment navigation — sidebar shift + overlay', () => {
     await expect(page.locator('[data-testid="toolbar-reject-all"]')).toBeVisible();
 
     await page.locator(TOGGLE).click();
-    await page.waitForTimeout(600);
     await expect(page.locator(SIDEBAR)).toHaveCount(0);
-    const recenteredX = await pageLeftX(page);
+    // Closing eases the transform back over 0.2s — poll until settled instead
+    // of a fixed sleep so slow frames can't sample mid-transition.
+    const recenteredX = await waitForPageXSettled(page);
     // Closing animates back (0.2s transition) — allow layout tolerance.
     expect(Math.abs(recenteredX - centeredX)).toBeLessThan(40);
     void id;
   });
 
-  test('narrow container (<1200px): overlay mode with backdrop, no shift', async ({
-    page,
-  }) => {
+  test('narrow container (<1200px): overlay mode with backdrop, no shift', async ({ page }) => {
     await page.setViewportSize({ width: 1000, height: 800 });
     await page.goto('http://localhost:5174/?e2e=1&empty=1');
     await page.locator('.docx-editor-vue').waitFor();
